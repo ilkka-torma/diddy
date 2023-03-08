@@ -7,6 +7,7 @@ import sys
 import pickle
 import argparse
 import fractions
+from sft import *
 
 NUM_THREADS = 2
 CHUNK_SIZE = 200
@@ -20,61 +21,20 @@ COMP_MODE = None
 
 PRINT_NFA = False
 PRINT_CYCLE = True
+    
 
-# Vertices of hex grid are either (x,y,0) or (x,y,1).
-# The graph looks like this.
-# We don't actually use the graph structure since
-# we define the forbidden patterns of identifying codes by hand.
-#
-# (0,2,0)--(0,2,1)--(1,2,0)--(1,2,1)--(2,2,0)--(2,2,1)
-#      \                 \                 \
-#       `-.               `-.               `-.
-#          \                 \                 \
-# (0,1,0)--(0,1,1)--(1,1,0)--(1,1,1)--(2,1,0)--(2,1,1)
-#       \                 \                \
-#        `-.               `-.              `-.
-#           \                 \                \
-# (0,0,0)--(0,0,1)--(1,0,0)--(1,0,1)--(2,0,0)--(2,0,1)
-#       \                \                 \
-#        `-.              `-.               `-.
-#           \                \                 \
-# (0,-1,0)-(0,-1,1)-(1,-1,0)-(1,-1,1)-(2,-1,0)-(2,-1,1)
-
-# Nodes of the fundamental domain wrt translation
-NODES = [0,1]
-
-def forbs_at(p):
-    "Forbidden patterns 'anchored' at nodes with coordinate (x,y)"
-    # TODO: only specify for (0,0) instead and translate automatically
-    x, y = p
-    # neighborhoods centered at (x,y,0) or (x,y,1)
-    yield {(x,y,0):0,(x,y,1):0,(x-1,y,1):0,(x,y-1,1):0}
-    yield {(x,y,1):0,(x,y,0):0,(x+1,y,0):0,(x,y+1,0):0}
-    # confused horizontal neighbors
-    yield {(x-1,y,1):0,(x,y-1,1):0,(x,y+1,0):0,(x+1,y,0):0}
-    yield {(x,y,0):0,(x,y+1,0):0,(x+1,y-1,1):0,(x+1,y,1):0}
-    # confused vertical neighbors
-    yield {(x,y,0):0,(x+1,y,0):0,(x-1,y+1,1):0,(x,y+1,1):0}
-    # confused distance-1 at angle
-    yield {(x,y,0):0,(x-1,y,1):0,(x,y-1,1):0,(x,y+1,0):0,(x-1,y+1,1):0,(x,y+1,1):0}
-    yield {(x,y,0):0,(x-1,y,1):0,(x,y,1):0,(x+1,y-1,0):0,(x+1,y-1,1):0,(x+1,y-2,1):0}
-    yield {(x,y,1):0,(x,y,0):0,(x+1,y,0):0,(x,y+1,1):0,(x,y+2,0):0,(x+1,y+1,0):0}
-    yield {(x,y,1):0,(x,y,0):0,(x,y+1,0):0,(x+1,y-1,1):0,(x+1,y-1,0):0,(x+2,y-1,0):0}
-    # confused straight distance-1
-    yield {(x,y,0):0,(x-1,y,1):0,(x,y-1,1):0,(x+1,y,0):0,(x+1,y,1):0,(x+1,y-1,1):0}
-    yield {(x,y,1):0,(x,y,0):0,(x,y+1,0):0,(x+1,y,1):0,(x+2,y,0):0,(x+1,y+1,0):0}
-
-def pats(domain):
+def pats(domain, alph):
     if not domain:
         yield dict()
     else:
         vec = domain.pop()
-        for pat in pats(domain):
-            pat2 = pat.copy()
-            pat[vec] = 0
+        for pat in pats(domain, alph):
+            for c in alph[:-1]:
+                pat2 = pat.copy()
+                pat2[vec] = c
+                yield pat2
+            pat[vec] = alph[-1]
             yield pat
-            pat2[vec] = 1
-            yield pat2
         domain.add(vec)
 
 def wrap(height, shear, p):
@@ -89,26 +49,26 @@ class PeriodAutomaton:
     # Height must be positive, nodes must be nonempty
     # trans has type dict[state] -> (dict[state] -> weight) and only stores minimum weights
 
-    def __init__(self, height, shear, nodes, rotate=False, sym_bound=None, verbose=False, immediately_relabel=True):
+    def __init__(self, height, shear, sft, rotate=False, sym_bound=None, verbose=False, immediately_relabel=True):
         if verbose:
             print("constructing period automaton with height", height, "shear", shear, "no symmetry" if sym_bound is None else "symmetry %s"%sym_bound, "rotated" if rotate else "not rotated")
         self.height = height
         self.shear = shear
-        self.nodes = nodes
+        self.sft = sft
         self.frontier = set()
         self.border_forbs = []
         for y in range(self.height):
             x = self.border_at(y)
             self.frontier.add((x,y))
-            for forb in forbs_at((x,y)):
+            for forb in sft.forbs:
                 tr = 0
-                while any(a+tr < self.border_at(b) for (a,b,_) in forb):
+                while any(x+a+tr < self.border_at(y+b) for (a,b,_) in forb):
                     tr += 1
-                while all(a+tr > self.border_at(b) for (a,b,_) in forb):
+                while all(x+a+tr > self.border_at(y+b) for (a,b,_) in forb):
                     tr -= 1
                 new_forb = dict()
-                for ((x,y,q),c) in forb.items():
-                    vec = wrap(height, shear, (x+tr,y,q))
+                for ((a,b,q),c) in forb.items():
+                    vec = wrap(height, shear, (x+a+tr,y+b,q))
                     if vec in new_forb and new_forb[vec] != c:
                         new_forb = dict()
                         break
@@ -116,7 +76,7 @@ class PeriodAutomaton:
                         new_forb[vec] = c
                 if new_forb not in self.border_forbs:
                     self.border_forbs.append(new_forb)
-        self.node_frontier = set((x,y,q) for (x,y) in self.frontier for q in self.nodes)
+        self.node_frontier = set((x,y,q) for (x,y) in self.frontier for q in self.sft.nodes)
         self.states = set([0])
         self.trans = dict()
         if verbose:
@@ -146,7 +106,7 @@ class PeriodAutomaton:
         task_q = mp.Queue()
         res_q = mp.Queue()
         processes = [mp.Process(target=populate_worker,
-                                args=(self.height, self.shear, self.border_forbs, self.node_frontier, self.sym_bound, self.rotate,
+                                args=(self.height, self.shear, self.sft.alph, self.border_forbs, self.node_frontier, self.sym_bound, self.rotate,
                                       task_q, res_q))
                      for _ in range(NUM_THREADS)]
         for pr in processes:
@@ -492,7 +452,7 @@ class PeriodAutomaton:
                 n = n//2
                 i += 1
             frontier = set(self.node_frontier)
-            for new_front in pats(frontier):
+            for new_front in pats(frontier, self.sft.alph):
                 try:
                     if sum(new_front.values()) != self.trans[ass][bss]:
                         continue
@@ -575,7 +535,7 @@ class PeriodAutomaton:
 def border_at(height, shear, y):
     return (-y*shear) // height
 
-def populate_worker(height, shear, border_forbs, frontier, sym_bound, rotate, task_queue, res_queue):
+def populate_worker(height, shear, alph, border_forbs, frontier, sym_bound, rotate, task_queue, res_queue):
     numf = len(border_forbs)
     #border_sets = [set(forb) for forb in border_forbs]
     while True:
@@ -593,7 +553,7 @@ def populate_worker(height, shear, border_forbs, frontier, sym_bound, rotate, ta
                     shifted.append((border_forbs[ix], tr+1))
                 n = n//2
                 i += 1
-            for new_front in pats(frontier):
+            for new_front in pats(frontier, alph):
                 new_pairs = []
                 sym_pairs = dict()
                 for pair in shifted:
@@ -860,8 +820,53 @@ if __name__ == "__main__":
     print("using height %s shear %s mode %s symmetry-breaking %s Karp bound %s rotation symmetry %s" % (h, s, COMP_MODE, sym_b, bound_len, rotate))
     
     if infile is None:
+        # Define identifying codes on the hexagonal grid as in SFT
+        # Vertices of hex grid are either (x,y,0) or (x,y,1).
+        # The graph looks like this.
+        # We don't actually use the graph structure since
+        # we define the forbidden patterns of identifying codes by hand.
+        #
+        # (0,2,0)--(0,2,1)--(1,2,0)--(1,2,1)--(2,2,0)--(2,2,1)
+        #      \                 \                 \
+        #       `-.               `-.               `-.
+        #          \                 \                 \
+        # (0,1,0)--(0,1,1)--(1,1,0)--(1,1,1)--(2,1,0)--(2,1,1)
+        #       \                 \                \
+        #        `-.               `-.              `-.
+        #           \                 \                \
+        # (0,0,0)--(0,0,1)--(1,0,0)--(1,0,1)--(2,0,0)--(2,0,1)
+        #       \                \                 \
+        #        `-.              `-.               `-.
+        #           \                \                 \
+        # (0,-1,0)-(0,-1,1)-(1,-1,0)-(1,-1,1)-(2,-1,0)-(2,-1,1)
+
+        # Nodes modulo translations
         nodes = [0,1]
-        nfa = PeriodAutomaton(h,s,nodes,sym_bound=sym_b,verbose=True,immediately_relabel=True,rotate=rotate)
+        # Alphabet of identifying codes
+        alph = [0,1]
+        # Forbidden patterns of identifying codes
+        forbs = []
+        # neighborhoods centered at (x,y,0) or (x,y,1)
+        forbs.append({(0,0,0):0,(0,0,1):0,(-1,0,1):0,(0,-1,1):0})
+        forbs.append({(0,0,1):0,(0,0,0):0,(1,0,0):0,(0,1,0):0})
+        # confused horizontal neighbors
+        forbs.append({(-1,0,1):0,(0,-1,1):0,(0,1,0):0,(1,0,0):0})
+        forbs.append({(0,0,0):0,(0,1,0):0,(1,-1,1):0,(1,0,1):0})
+        # confused vertical neighbors
+        forbs.append({(0,0,0):0,(1,0,0):0,(-1,1,1):0,(0,1,1):0})
+        # confused distance-1 at angle
+        forbs.append({(0,0,0):0,(-1,0,1):0,(0,-1,1):0,(0,1,0):0,(-1,1,1):0,(0,1,1):0})
+        forbs.append({(0,0,0):0,(-1,0,1):0,(0,0,1):0,(1,-1,0):0,(1,-1,1):0,(1,-2,1):0})
+        forbs.append({(0,0,1):0,(0,0,0):0,(1,0,0):0,(0,1,1):0,(0,2,0):0,(1,1,0):0})
+        forbs.append({(0,0,1):0,(0,0,0):0,(0,1,0):0,(1,-1,1):0,(1,-1,0):0,(2,-1,0):0})
+        # confused straight distance-1
+        forbs.append({(0,0,0):0,(-1,0,1):0,(0,-1,1):0,(1,0,0):0,(1,0,1):0,(1,-1,1):0})
+        forbs.append({(0,0,1):0,(0,0,0):0,(0,1,0):0,(1,0,1):0,(2,0,0):0,(1,1,0):0})
+
+        hex_iden_sft = SFT(nodes, alph, forbs)
+        print("using", hex_iden_sft)
+                     
+        nfa = PeriodAutomaton(h,s,hex_iden_sft,sym_bound=sym_b,verbose=True,immediately_relabel=True,rotate=rotate)
         nfa.populate(verbose=True, report=reportpop)
         print("time taken after pop:", time.time()-starttime, "seconds")
         nfa.relabel()

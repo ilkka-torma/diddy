@@ -1,9 +1,16 @@
 # Diddy
 Diddy: Python toolbox for analysis of infinite discrete dynamical systems
 
+## SFT
+
+The file `sft.py` contains a thin wrapper class for defining a shift of finite type over a 2-dimensional gridlike graph.
+The set of nodes of the graph is **Z² × nodes**, and its alphabet is **alph**.
+This corresponds to a **Z²**-SFT whose alphabet is **alph^nodes**.
+The forbidden patterns should be given as a list of dictionaries.
+
 ## Period automaton
 
-The file `period_automaton.py` contains a class that represents the set of **v**-periodic configurations of a binary 2D shift of finite type on a gridlike graph.
+The file `period_automaton.py` contains a class that represents the set of **v**-periodic configurations of a 2D shift of finite type on a gridlike graph.
 It also contains functions for finding minimum-density configurations in such automata, and a command line interface for accessing them.
 
 ### Command line interface
@@ -28,14 +35,10 @@ Optional technical arguments:
 
 ### Modifying the SFT
 
-The top part of the file contains the global value `NODES` and the function `forbs_at`.
-By changing them, one can analyze different SFTs.
-`NODES` is the fundamental domain of the gridlike graph; its vertex set is **Z² × NODES**, and its alphabet is **{0,1}^NODES**.
-`forbs_at` takes a vector **(x,y)** and returns the set of forbidden patterns of the SFT translated by **(x,y)**.
-The function should commute with translations.
+The bottom part of the file defines the SFT used by the command line interface, which is currently the set of identifying codes on the hexagonal grid.
+By changing it, one can analyze different SFTs.
+The alphabet should consist of numbers, as they're used directly as weights by the density computation.
 
 Note that for the density analysis to work correctly, the automaton of **v**-periodic configurations must be strongly connected.
 This is not true in general, but is guaranteed if, for example, the forbidden patterns contain no 1-symbols.
-
-In a future update, we plan to implement a more convenient way of representing SFTs, which may be passed to the period automaton as arguments, instead of redefining global variables and functions.
-We will also get rid of the requirement of strong connectedness.
+This requirement will be removed in a future update.
