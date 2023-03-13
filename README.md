@@ -38,7 +38,3 @@ Optional technical arguments:
 The bottom part of the file defines the SFT used by the command line interface, which is currently the set of identifying codes on the hexagonal grid.
 By changing it, one can analyze different SFTs.
 The alphabet should consist of numbers, as they're used directly as weights by the density computation.
-
-Note that for the density analysis to work correctly, the automaton of **v**-periodic configurations must be strongly connected.
-This is not true in general, but is guaranteed if, for example, the forbidden patterns contain no 1-symbols.
-This requirement will be removed in a future update.
