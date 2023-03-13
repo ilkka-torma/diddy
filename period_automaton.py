@@ -167,15 +167,15 @@ class PeriodAutomaton:
             print("finding min density cycle in O(n^2) space")
         n = len(self.states)
         if bound_len is None:
-            m = n
+            m = n+1
         else:
-            m = min(n, bound_len)
+            m = min(n+1, bound_len)
         # split transdict among processes; they can do the search backwards
         # each modifies only its own part of mins so we can share it
-        # initialize with 2*height*n, which is theoretical max val
+        # initialize with 2*height*m*max(alph), which is theoretical max val
         # access like mins[n*k+q]
         global mins, opt_prevs
-        max_w = 2*self.height*m
+        max_w = 2*self.height*m*max(self.sft.alph)
         mins = mp.Array('i', [0 if q==k==0 else max_w
                               for k in range(m+1)
                               for q in range(n)],
@@ -196,7 +196,7 @@ class PeriodAutomaton:
             proc.start()
         for k in range(1, m+1):
             if verbose and k%report==0:
-                print("round", k, "/", n)
+                print("round", k, "/", m)
             for (_, _, task_q) in task_qs:
                 task_q.put(k)
             for _ in range(NUM_THREADS):
@@ -226,12 +226,14 @@ class PeriodAutomaton:
             path.append(nxt)
             cur = nxt
         
+        #print("checking path", path)
         # check path length and weight
         assert len(path) == m+1
         assert sum(self.trans[path[k]][path[k+1]] for k in range(m)) == mins[n*m+path[0]]
-        
-        for cycle_len in range(1, m):
-            for i in range(m - cycle_len):
+
+        #print("finding cycle in", path, min_num)
+        for cycle_len in range(1, m+1):
+            for i in range(m+1 - cycle_len):
                 if path[i] == path[i+cycle_len]:
                     summe = 0
                     for k in range(cycle_len):
@@ -239,8 +241,8 @@ class PeriodAutomaton:
                     if summe/cycle_len == min_num:
                         min_cycle = list(path[i:i+cycle_len])
                         break
-                    else:
-                        print(summe/cycle_len, min_num)
+                    #else:
+                    #    print("did not find", summe/cycle_len, min_num)
             else:
                 continue
             break
@@ -253,9 +255,9 @@ class PeriodAutomaton:
             print("finding min density cycle on O(n^(2/3)) space")
         n = len(self.states)
         if bound_len is None:
-            m = n
+            m = n+1
         else:
-            m = min(n, bound_len)
+            m = min(n+1, bound_len)
         # split transdict among processes; they can do the search backwards
         # each modifies only its own part of mins so we can share it
         # initialize with 2*height*n, which is theoretical max val
@@ -269,7 +271,7 @@ class PeriodAutomaton:
         #    this needs dense mins and opt prevs
         #    stitch together into a single path, find cycle on it
         global dense_mins, sparse_mins, opt_prevs
-        max_w = 2*self.height*m
+        max_w = 2*self.height*m*max(self.sft.alph)
         sqrtm = int(math.ceil(m**0.5))+1
         # dense_mins represents rows int(i*sqrt(n)) + j for 0 <= j <= ceil(sqrt(n)) for varying i
         dense_mins = mp.Array('i', [0 if k==q==0 else max_w
@@ -277,7 +279,7 @@ class PeriodAutomaton:
                                     for q in range(n)],
                         lock=False)
         # sparse_mins represents rows int(i*sqrt(n)) for 0 <= i <= ceil(sqrt(n))
-        sparse_rows = [max(0, min(n, (n*k)//sqrtm)) for k in range(sqrtm+1)]
+        sparse_rows = [max(0, min(m, (m*k)//sqrtm)) for k in range(sqrtm+1)]
         print("using rows", sparse_rows)
         sparse_mins = mp.Array('i', [max_w
                                      for _ in sparse_rows
@@ -326,7 +328,7 @@ class PeriodAutomaton:
             res = res_q.get()
             min_things = min(min_things, res)
         min_d, min_len, min_q = min_things
-        print("min density", min_d, "min len", min_len)
+        print("min density", min_d/(len(self.sft.nodes)*self.height), "min len", min_len)
 
         # phase 3: compute path from q
         path = [min_q]
@@ -376,16 +378,16 @@ class PeriodAutomaton:
             print("finding min density of cycle in O(n) space")
         n = len(self.states)
         if bound_len is None:
-            m = n
+            m = n+1
         else:
-            m = min(n, bound_len)
+            m = min(n+1, bound_len)
         # split transdict among processes; they can do the search backwards
         # each modifies only its own part of mins so we can share it
         # access like mins[n*a+q] for a in [0,1,2]
         # initialize with 2*height*n, which is theoretical max val
         # 0 and 1 are "workspace" arrays, 2 is where we store values for n
         global mins
-        max_w = 2*self.height*n
+        max_w = 2*self.height*n*max(self.sft.alph)
         mins = mp.Array('i', [0 if q==k==0 else max_w
                               for k in range(3)
                               for q in range(n)],
@@ -487,7 +489,6 @@ class PeriodAutomaton:
                             new_state = 0
                             for (forb, tr) in new_pairs:
                                 ix = border_sets.index(set((x, (y+2*rot)%self.height, q) for (x,y,q) in forb))
-                                sym_pairs[ix%(numf//2), tr] = 1 - sym_pairs.get((ix%(numf//2), tr), 0)
                                 new_state += 2**(numf*tr + ix)
                             min_state = min(min_state, new_state)
                         new_state = min_state
@@ -495,8 +496,6 @@ class PeriodAutomaton:
                         new_state = 0
                         for (forb, tr) in new_pairs:
                             ix = self.border_forbs.index(forb)
-                            sym_pairs[ix%(numf//2), tr] = 1 - sym_pairs.get((ix%(numf//2), tr), 0)
-                            
                             new_state += 2**(numf*tr + ix)
                     if new_state == b:
                         labels.append(new_front)
@@ -517,7 +516,7 @@ class PeriodAutomaton:
         return (-y*self.shear) // self.height
         
     def accepts(self, w_path, repetitions=True):
-        cur = init = set([0])
+        cur = init = set(self.trans)
         r = 1
         while True:
             for (i, w) in enumerate(w_path):
@@ -531,6 +530,49 @@ class PeriodAutomaton:
             r += 1
             init = cur
         return (True, r)
+
+    def strong_components(self):
+        "Tarjan's algorithm"
+        self.compute_i2sdict()
+        comps = []
+        ixes = {}
+        lows = {}
+        ix = 0
+        stack = []
+        for p in self.trans:
+            if p not in ixes:
+                for comp in self.strong_connect(p, ixes, lows, ix, stack):
+                    aut = PeriodAutomaton(self.height, self.shear, self.sft, self.rotate, self.sym_bound, False, self.immediately_relabel)
+                    aut.states = set(st for st in self.states if self.s2idict[st] in comp)
+                    aut.s2idict = {st : i
+                                   for (i,st) in enumerate(aut.states)}
+                    aut.trans = {aut.s2idict[self.i2sdict[st]] : {aut.s2idict[self.i2sdict[st2]] : c
+                                       for (st2, c) in self.trans[st].items()
+                                       if st2 in comp}
+                                 for st in comp}
+                    yield aut
+
+    def strong_connect(self, p, ixes, lows, ix, stack):
+        ixes[p] = lows[p] = ix
+        ix += 1
+        stack.append(p)
+        for q in self.trans.get(p, []):
+            if q not in ixes:
+                for comp in self.strong_connect(q, ixes, lows, ix, stack):
+                    yield comp
+                lows[p] = min(lows[p], lows[q])
+            elif q in stack:
+                lows[p] = min(lows[p], ixes[q])
+        if lows[p] == ixes[p]:
+            comp = set()
+            while True:
+                q = stack.pop()
+                comp.add(q)
+                if q == p:
+                    break
+            if len(comp) > 1 or p in self.trans.get(p, []):
+                yield comp
+            
 
 def border_at(height, shear, y):
     return (-y*shear) // height
@@ -581,7 +623,8 @@ def populate_worker(height, shear, alph, border_forbs, frontier, sym_bound, rota
                             new_state = 0
                             for (forb, tr) in new_pairs:
                                 ix = border_forbs.index({(x, (y+2*rot)%height, q):c for ((x,y,q), c) in forb.items()})
-                                sym_pairs[ix%(numf//2), tr] = 1 - sym_pairs.get((ix%(numf//2), tr), 0)
+                                if sym_bound is not None:
+                                    sym_pairs[ix%(numf//2), tr] = 1 - sym_pairs.get((ix%(numf//2), tr), 0)
                                 new_state += 2**(numf*tr + ix)
                             min_state = min(min_state, new_state)
                         new_state = min_state
@@ -589,7 +632,8 @@ def populate_worker(height, shear, alph, border_forbs, frontier, sym_bound, rota
                         new_state = 0
                         for (forb, tr) in new_pairs:
                             ix = border_forbs.index(forb)
-                            sym_pairs[ix%(numf//2), tr] = 1 - sym_pairs.get((ix%(numf//2), tr), 0)
+                            if sym_bound is not None:
+                                sym_pairs[ix%(numf//2), tr] = 1 - sym_pairs.get((ix%(numf//2), tr), 0)
                             new_state += 2**(numf*tr + ix)
                     if sym_bound is None or sum(sym_pairs.values()) <= sym_bound:
                         ret.append((state, sum(new_front.values()), new_state))
@@ -615,22 +659,22 @@ def square_min_worker(the_mins, the_opt_prevs, n, m, max_w, trans, task_q, res_q
             mins[n*k+p] = new_min
             opt_prevs[n*k+p] = opt_prev
         res_q.put(None)
-        if k == n:
+        if k == m:
             break
     # compute minimum for assigned states
     dummy = task_q.get()
     assert dummy is None
     the_min = math.inf
-    min_val = None
+    min_val = math.inf
     min_state = 0
     for p in trans:
         the_max = 0
-        max_val = None
-        for k in range(1,n):
-            num = (mins[m*n+p]-mins[k*n+p])/(n-k)
+        max_val = math.inf
+        for k in range(1,m):
+            num = (mins[m*n+p]-mins[k*n+p])/(m-k)
             if (num > the_max) or (num == the_max and m-k < max_val):
                 the_max = num
-                max_val = n-k
+                max_val = m-k
         if (the_max < the_min) or (the_max == the_min and max_val < min_val):
             the_min = the_max
             min_val = max_val
@@ -663,7 +707,7 @@ def linsqrt_min_worker(the_dense_mins, the_sparse_mins, the_opt_prevs, n, m, max
         except ValueError:
             pass
         res_q.put(None)
-        if k == n:
+        if k == m:
             break
     
     # recompute previous layers, simultaneously compute minimum for assigned states
@@ -840,6 +884,7 @@ if __name__ == "__main__":
         #           \                \                 \
         # (0,-1,0)-(0,-1,1)-(1,-1,0)-(1,-1,1)-(2,-1,0)-(2,-1,1)
 
+        
         # Nodes modulo translations
         nodes = [0,1]
         # Alphabet of identifying codes
@@ -862,7 +907,7 @@ if __name__ == "__main__":
         # confused straight distance-1
         forbs.append({(0,0,0):0,(-1,0,1):0,(0,-1,1):0,(1,0,0):0,(1,0,1):0,(1,-1,1):0})
         forbs.append({(0,0,1):0,(0,0,0):0,(0,1,0):0,(1,0,1):0,(2,0,0):0,(1,1,0):0})
-
+        
         hex_iden_sft = SFT(nodes, alph, forbs)
         print("using", hex_iden_sft)
                      
@@ -884,30 +929,43 @@ if __name__ == "__main__":
         print("loading automaton from", infile)
         with open(infile, 'rb') as f:
             nfa = pickle.load(f)
-    
-    if COMP_MODE == CompMode.SQUARE_CYCLE:
-        dens, minlen, stcyc, cyc = nfa.square_min_density_cycle(bound_len=bound_len, verbose=True, report=reportcyc)
-    elif COMP_MODE == CompMode.LINSQRT_CYCLE:        
-        dens, minlen, stcyc, cyc = nfa.linsqrt_min_density_cycle(bound_len=bound_len, verbose=True, report=reportcyc)
-    elif COMP_MODE == CompMode.LINEAR_NOCYCLE:
-        dens, minlen, minst = nfa.linear_min_density_cycle(bound_len=bound_len, verbose=True, report=reportcyc)
+
+    comps = list(nfa.strong_components())
+    del nfa
+    #print("#components", len(comps))
+    min_data = (math.inf,)
+    min_comp = None
+    for (ic, comp) in enumerate(comps):
+        # TODO: special case components that are cycles
+        print("analyzing connected component", ic+1, "/", len(comps), "with", len(comp.states), "states")
+        if COMP_MODE == CompMode.SQUARE_CYCLE:
+            data = comp.square_min_density_cycle(bound_len=bound_len, verbose=True, report=reportcyc)
+        elif COMP_MODE == CompMode.LINSQRT_CYCLE:        
+            data = comp.linsqrt_min_density_cycle(bound_len=bound_len, verbose=True, report=reportcyc)
+        elif COMP_MODE == CompMode.LINEAR_NOCYCLE:
+            data = comp.linear_min_density_cycle(bound_len=bound_len, verbose=True, report=reportcyc)   
+        if data[:1] < min_data[:1]:
+            min_data = data
+            min_aut = comp
     print("height %s, shear %s, bound %s, symmetry %s, rotation %s completed" % (h, s, bound_len, sym_b, rotate))
     #print(dens,minlen,stcyc,cyc)
-    if bound_len is not None and len(nfa.states) <= bound_len:
+    if bound_len is not None and all(len(comp.states) for comp in comps) <= bound_len:
         print("bound was not needed")
     
     # the known bounds are for identifying codes on the infinite hexagonal grid
     if COMP_MODE == CompMode.LINEAR_NOCYCLE:
+        dens, minlen, minst = min_data
         print("density", dens/(2*h), "known bounds", 23/55, 53/126)
     else:
+        dens, minlen, stcyc, cyc = min_data
         print("density", fractions.Fraction(sum(b for fr in cyc for b in fr.values()), 2*h*len(cyc)), "~", dens/(2*h), "known bounds", 23/55, 53/126)
-    print("cycle length", minlen, "concretely", minlen*2)
+    print("cycle length", minlen)
     if COMP_MODE != CompMode.LINEAR_NOCYCLE and PRINT_CYCLE:
         print("cycle:")
         print([tuple(sorted(pat.items())) for pat in cyc])
         cyc_w = [sum(x.values()) for x in cyc]
         # sanity check: cycle is accepted by nfa
-        res, reason = nfa.accepts(cyc_w, repetitions=True)
+        res, reason = min_aut.accepts(cyc_w, repetitions=True)
         if res:
             print("cycle^n accepted for all n,", reason, "was enough")
         else:
