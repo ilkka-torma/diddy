@@ -3,14 +3,14 @@ Diddy: Python toolbox for analysis of infinite discrete dynamical systems
 
 ## SFT
 
-The file `sft.py` contains a thin wrapper class for defining a shift of finite type over a 2-dimensional gridlike graph.
-The set of nodes of the graph is **Z² × nodes**, and its alphabet is **alph**.
-This corresponds to a **Z²**-SFT whose alphabet is **alph^nodes**.
+The file `sft.py` contains a thin wrapper class for defining a shift of finite type over a **d**-dimensional gridlike graph.
+The set of nodes of the graph is **Z^d × nodes**, and its alphabet is **alph**.
+This corresponds to a **Z^d**-SFT whose alphabet is **alph^nodes**.
 The forbidden patterns should be given as a list of dictionaries.
 
 ## Period automaton
 
-The file `period_automaton.py` contains a class that represents the set of **v**-periodic configurations of a 2D shift of finite type on a gridlike graph.
+The file `period_automaton.py` contains a class that represents the set of **L**-periodic configurations of a *Z^d* shift of finite type on a gridlike graph, where **L** is a rank-**(d-1)** sublattice of **Z^d**.
 It also contains functions for finding minimum-density configurations in such automata, and a command line interface for accessing them.
 
 ### Command line interface
