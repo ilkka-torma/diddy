@@ -21,7 +21,18 @@ COMP_MODE = None
 
 PRINT_NFA = False
 PRINT_CYCLE = True
-    
+
+def vrot(vec, rots, heights):
+    "Translate a vector cyclically in a hyperrectangle"
+    return tuple((y+r)%h for(y,r,h) in zip(vec, rots, heights))
+
+def hyperrectangle(heights):
+    if not heights:
+        yield tuple()
+    else:
+        for vec in hyperrectangle(heights[1:]):
+            for coord in range(heights[0]):
+                yield (coord,) + vec
 
 def pats(domain, alph):
     if not domain:
@@ -36,10 +47,70 @@ def pats(domain, alph):
             pat[vec] = alph[-1]
             yield pat
         domain.add(vec)
+        
+def gcd_bezout(nums):
+    "Return the pair (gcd, bezout_coefficients)"
+    a = nums[0]
+    if len(nums) == 1:
+        if a > 0:
+            return (a, [1])
+        else:
+            return (-a, [-1])
+    if a == 1:
+        return (1, [1] + [0*(len(nums)-1)])
+    b, coeffs = gcd_bezout(nums[1:])
+    # Extended euclidean algorithm
+    s = 0
+    r = b
+    old_s = 1
+    old_r = a
+    while r:
+        q = old_r // r
+        old_r, r = r, old_r % r
+        old_s, s = s, old_s - q*s
+    if b:
+        m = (old_r - old_s*a) // b
+    else:
+        m = 0
+    if old_r > 0:
+        return (old_r, [old_s] + [m*c for c in coeffs])
+    else:
+        return (-old_r, [-old_s] + [-m*c for c in coeffs])
+        
+def normalize_periods(pmat):
+    "Put a period matrix in a 'row echelon form' of sorts"
+    dim = len(pmat[0])
+    pmat = [list(p) for p in pmat]
+    for i in range(dim-1):
+        # reduce column i
+        if all(r[i+1] == 0 for r in pmat):
+            raise Exception("bad periods")
+        else:
+            # compute gcd and Bezout coefficients
+            g, cs = gcd_bezout([pmat[j][i+1] for j in range(i,dim-1)])
+            m = pmat[i][i+1] // g
+            pmat[i] = [pmat[i][k] - (m-1)*sum(c*x for (c,x) in zip(cs, [pmat[j][k] for j in range(i,dim-1)]))
+                       for k in range(dim)]
+            assert pmat[i][i+1] == g
+            for k in range(i+1,dim-1):
+                assert pmat[k][i+1] % pmat[i][i+1] == 0
+                m = pmat[k][i+1] // pmat[i][i+1]
+                for j in range(dim):
+                    pmat[k][j] = pmat[k][j] - m*pmat[i][j]
+    return pmat
 
-def wrap(height, shear, p):
-    x,y,q = p
-    return (x+(y//height)*shear, y%height, q)
+def wrap(pmat, nvec):
+    vec = list(nvec[:-1])
+    for (i, pvec) in enumerate(pmat, start=1):
+        q = vec[i] // pvec[i]
+        vec[0] += q*pvec[0]
+        vec[i] = vec[i] % pvec[i]
+        for j in range(i+1,len(vec)):
+            vec[j] += q*pvec[j]
+    return tuple(vec)+(nvec[-1],)
+    
+def nvadd(nvec, vec):
+    return tuple(a+b for (a,b) in zip(nvec, vec)) + (nvec[-1],)
 
 class PeriodAutomaton:
     # Alphabet is weights
@@ -49,34 +120,43 @@ class PeriodAutomaton:
     # Height must be positive, nodes must be nonempty
     # trans has type dict[state] -> (dict[state] -> weight) and only stores minimum weights
 
-    def __init__(self, height, shear, sft, rotate=False, sym_bound=None, verbose=False, immediately_relabel=True):
+    def __init__(self, sft, periods, rotate=False, sym_bound=None, verbose=False, immediately_relabel=True, check_periods=True):
         if verbose:
-            print("constructing period automaton with height", height, "shear", shear, "no symmetry" if sym_bound is None else "symmetry %s"%sym_bound, "rotated" if rotate else "not rotated")
-        self.height = height
-        self.shear = shear
+            print("constructing period automaton with periods", periods, "no symmetry" if sym_bound is None else "symmetry %s"%sym_bound, "rotated" if rotate else "not rotated")
         self.sft = sft
+        if check_periods:
+            if len(periods) != sft.dim-1:
+                raise Exception("periods must form a basis with (1,0...0)")
+            pmat = normalize_periods(periods)
+            if verbose:
+                print("normalized periods", pmat)
+        else:
+            pmat = periods
+        self.pmat = pmat
         self.frontier = set()
         self.border_forbs = []
-        for y in range(self.height):
-            x = self.border_at(y)
-            self.frontier.add((x,y))
+        for vec in hyperrectangle([pmat[i][i+1] for i in range(sft.dim-1)]):
+            x = self.border_at(vec)
+            self.frontier.add((x,) + vec)
             for forb in sft.forbs:
-                tr = 0
-                while any(x+a+tr < self.border_at(y+b) for (a,b,_) in forb):
-                    tr += 1
-                while all(x+a+tr > self.border_at(y+b) for (a,b,_) in forb):
-                    tr -= 1
                 new_forb = dict()
-                for ((a,b,q),c) in forb.items():
-                    vec = wrap(height, shear, (x+a+tr,y+b,q))
-                    if vec in new_forb and new_forb[vec] != c:
+                for (nvec, c) in forb.items():
+                    nvec2 = wrap(pmat, nvadd(nvec, (x,)+vec))
+                    if nvec2 in new_forb and new_forb[nvec2] != c:
                         new_forb = dict()
                         break
                     else:
-                        new_forb[vec] = c
+                        new_forb[nvec2] = c
+                else:
+                    tr = 0
+                    while any(nvec[0]+tr < self.border_at(nvec[1:-1]) for nvec in new_forb):
+                        tr += 1
+                    while all(nvec[0]+tr > self.border_at(nvec[1:-1]) for nvec in new_forb):
+                        tr -= 1
+                    new_forb = {(nvec[0]+tr,)+nvec[1:] : c for (nvec, c) in new_forb.items()}
                 if new_forb not in self.border_forbs:
                     self.border_forbs.append(new_forb)
-        self.node_frontier = set((x,y,q) for (x,y) in self.frontier for q in self.sft.nodes)
+        self.node_frontier = set(nvec+(q,) for nvec in self.frontier for q in self.sft.nodes)
         self.states = set([0])
         self.trans = dict()
         if verbose:
@@ -106,7 +186,7 @@ class PeriodAutomaton:
         task_q = mp.Queue()
         res_q = mp.Queue()
         processes = [mp.Process(target=populate_worker,
-                                args=(self.height, self.shear, self.sft.alph, self.border_forbs, self.node_frontier, self.sym_bound, self.rotate,
+                                args=(self.pmat, self.sft.alph, self.border_forbs, self.node_frontier, self.sym_bound, self.rotate,
                                       task_q, res_q))
                      for _ in range(NUM_THREADS)]
         for pr in processes:
@@ -175,7 +255,7 @@ class PeriodAutomaton:
         # initialize with 2*height*m*max(alph), which is theoretical max val
         # access like mins[n*k+q]
         global mins, opt_prevs
-        max_w = 2*self.height*m*max(self.sft.alph)
+        max_w = len(self.frontier)*len(self.sft.nodes)*m*max(self.sft.alph)
         mins = mp.Array('i', [0 if q==k==0 else max_w
                               for k in range(m+1)
                               for q in range(n)],
@@ -271,7 +351,7 @@ class PeriodAutomaton:
         #    this needs dense mins and opt prevs
         #    stitch together into a single path, find cycle on it
         global dense_mins, sparse_mins, opt_prevs
-        max_w = 2*self.height*m*max(self.sft.alph)
+        max_w = len(self.frontier)*len(self.sft.nodes)*m*max(self.sft.alph)
         sqrtm = int(math.ceil(m**0.5))+1
         # dense_mins represents rows int(i*sqrt(n)) + j for 0 <= j <= ceil(sqrt(n)) for varying i
         dense_mins = mp.Array('i', [0 if k==q==0 else max_w
@@ -328,7 +408,7 @@ class PeriodAutomaton:
             res = res_q.get()
             min_things = min(min_things, res)
         min_d, min_len, min_q = min_things
-        print("min density", min_d/(len(self.sft.nodes)*self.height), "min len", min_len)
+        print("min density", min_d/(len(self.sft.nodes)*len(self.frontier)), "min len", min_len)
 
         # phase 3: compute path from q
         path = [min_q]
@@ -387,7 +467,7 @@ class PeriodAutomaton:
         # initialize with 2*height*n, which is theoretical max val
         # 0 and 1 are "workspace" arrays, 2 is where we store values for n
         global mins
-        max_w = 2*self.height*n*max(self.sft.alph)
+        max_w = len(self.frontier)*len(self.sft.nodes)*m*max(self.sft.alph)
         mins = mp.Array('i', [0 if q==k==0 else max_w
                               for k in range(3)
                               for q in range(n)],
@@ -437,6 +517,8 @@ class PeriodAutomaton:
         border_sets = [set(forb) for forb in self.border_forbs]
         self.compute_i2sdict()
         labels = []
+        if self.rotate:
+            heights = [pmat[i][i] for i in range(len(pmat))]
         for s in range(len(cycle_as_states)):
             ass = cycle_as_states[s]
             bss = cycle_as_states[(s+1)%len(cycle_as_states)]
@@ -467,10 +549,13 @@ class PeriodAutomaton:
                 for pair in shifted:
                     forb, tr = pair
                     over = False
-                    for ((x,y,q), c) in forb.items():
-                        if x-tr >= border_at(self.height, self.shear, y)+1:
+                    for (nvec, c) in forb.items():
+                        x = nvec[0]
+                        ys = nvec[1:-1]
+                        q = nvec[-1]
+                        if x-tr >= border_at(self.pmat, ys)+1:
                             over = True
-                        if new_front.get((x-tr+(y//self.height)*self.shear, y%self.height, q), c) != c:
+                        if new_front.get(wrap(self.pmat, (x-tr,)+ys+(q,)), c) != c:
                             # this forb can be discarded
                             break
                     else:
@@ -485,10 +570,10 @@ class PeriodAutomaton:
                     # choose minimal state along rotations
                     if rotate:
                         min_state = math.inf
-                        for rot in range(self.height//2):
+                        for rots in hyperrectangle(heights):
                             new_state = 0
                             for (forb, tr) in new_pairs:
-                                ix = border_sets.index(set((x, (y+2*rot)%self.height, q) for (x,y,q) in forb))
+                                ix = border_forbs.index({(nvec[0],) + vrot(nvec[1:-1], rots, heights) + (nvec[-1],):c for (nvec, c) in forb.items()})
                                 new_state += 2**(numf*tr + ix)
                             min_state = min(min_state, new_state)
                         new_state = min_state
@@ -512,8 +597,8 @@ class PeriodAutomaton:
         for k in self.s2idict:
             self.i2sdict[self.s2idict[k]] = k
         
-    def border_at(self, y):
-        return (-y*self.shear) // self.height
+    def border_at(self, vec):
+        return border_at(self.pmat, vec)
         
     def accepts(self, w_path, repetitions=True):
         cur = init = set(self.trans)
@@ -532,54 +617,57 @@ class PeriodAutomaton:
         return (True, r)
 
     def strong_components(self):
-        "Tarjan's algorithm"
+        "Tarjan's algorithm, implicit recursion"
         self.compute_i2sdict()
         comps = []
-        ixes = {}
         lows = {}
-        ix = 0
         stack = []
         for p in self.trans:
-            if p not in ixes:
-                for comp in self.strong_connect(p, ixes, lows, ix, stack):
-                    aut = PeriodAutomaton(self.height, self.shear, self.sft, self.rotate, self.sym_bound, False, self.immediately_relabel)
-                    aut.states = set(st for st in self.states if self.s2idict[st] in comp)
-                    aut.s2idict = {st : i
-                                   for (i,st) in enumerate(aut.states)}
-                    aut.trans = {aut.s2idict[self.i2sdict[st]] : {aut.s2idict[self.i2sdict[st2]] : c
-                                       for (st2, c) in self.trans[st].items()
-                                       if st2 in comp}
-                                 for st in comp}
-                    yield aut
+            if p not in lows:
+                callstack = [(p,0,list(self.trans[p]),len(lows))]
+                while callstack:
+                    cur, ix, nxts, num = callstack.pop()
+                    if ix == 0:
+                        if cur in lows:
+                            continue
+                        lows[cur] = num
+                        stack.append(cur)
+                        nxts = list(self.trans[cur])
+                    else:
+                        lows[cur] = min(lows[cur], lows[nxts[ix-1]])
+                    if ix < len(nxts):
+                        callstack.append((cur, ix+1, nxts, num))
+                        callstack.append((nxts[ix], 0, list(self.trans[nxts[ix]]), len(lows)))
+                        continue
+                    if num == lows[cur]:
+                        comp = set()
+                        while True:
+                            nxt = stack.pop()
+                            lows[nxt] = len(self.trans)
+                            comp.add(nxt)
+                            if nxt == cur:
+                                break
+                        if len(comp) > 1 or cur in self.trans.get(cur, []):
+                            aut = PeriodAutomaton(self.sft, self.pmat, self.rotate, self.sym_bound, False, self.immediately_relabel, check_periods=False)
+                            aut.states = set(st for st in self.states if self.s2idict[st] in comp)
+                            aut.s2idict = {st : i
+                                           for (i,st) in enumerate(aut.states)}
+                            aut.trans = {aut.s2idict[self.i2sdict[st]] : {aut.s2idict[self.i2sdict[st2]] : c
+                                                                          for (st2, c) in self.trans[st].items()
+                                                                          if st2 in comp}
+                                         for st in comp}
+                            yield aut
 
-    def strong_connect(self, p, ixes, lows, ix, stack):
-        ixes[p] = lows[p] = ix
-        ix += 1
-        stack.append(p)
-        for q in self.trans.get(p, []):
-            if q not in ixes:
-                for comp in self.strong_connect(q, ixes, lows, ix, stack):
-                    yield comp
-                lows[p] = min(lows[p], lows[q])
-            elif q in stack:
-                lows[p] = min(lows[p], ixes[q])
-        if lows[p] == ixes[p]:
-            comp = set()
-            while True:
-                q = stack.pop()
-                comp.add(q)
-                if q == p:
-                    break
-            if len(comp) > 1 or p in self.trans.get(p, []):
-                yield comp
-            
 
-def border_at(height, shear, y):
-    return (-y*shear) // height
 
-def populate_worker(height, shear, alph, border_forbs, frontier, sym_bound, rotate, task_queue, res_queue):
+def border_at(pmat, vec):
+    return 0 # TODO: change
+
+def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_queue, res_queue):
     numf = len(border_forbs)
     #border_sets = [set(forb) for forb in border_forbs]
+    if rotate:
+        heights = [pmat[i][i] for i in range(len(pmat))]
     while True:
         states = task_queue.get()
         ret = []
@@ -596,33 +684,44 @@ def populate_worker(height, shear, alph, border_forbs, frontier, sym_bound, rota
                 n = n//2
                 i += 1
             for new_front in pats(frontier, alph):
+                #print("front", new_front)
                 new_pairs = []
                 sym_pairs = dict()
                 for pair in shifted:
+                    #print("doing pair", pair)
                     forb, tr = pair
                     over = False
-                    for ((x,y,q), c) in forb.items():
-                        if x-tr >= border_at(height, shear, y)+1:
+                    for (nvec, c) in forb.items():
+                        x = nvec[0]
+                        ys = nvec[1:-1]
+                        q = nvec[-1]
+                        if x-tr >= border_at(pmat, ys)+1:
                             over = True
-                        if new_front.get((x-tr+(y//height)*shear, y%height, q), c) != c:
+                        #print("did", x-tr, ys, q, (x-tr,)+ys+(q,))
+                        if new_front.get(wrap(pmat, (x-tr,)+ys+(q,)), c) != c:
+                            #print("can discard due to", wrap(pmat, (x-tr,)+ys+(q,)), c)
                             # this forb can be discarded
                             break
                     else:
                         # forb was not discarded
                         if over:
+                            #print("still over")
                             # forb can still be handled later
                             new_pairs.append(pair)
                         else:
                             # forb can't be handled, reject state
+                            #print("rejected")
                             break
                 else:
                     # choose minimal state along rotations
+                    # NB. the period matrix is assumed diagonal
                     if rotate:
                         min_state = math.inf
-                        for rot in range(height):
+                        for rots in hyperrectangle(heights):
                             new_state = 0
                             for (forb, tr) in new_pairs:
-                                ix = border_forbs.index({(x, (y+2*rot)%height, q):c for ((x,y,q), c) in forb.items()})
+                                ix = border_forbs.index({(nvec[0],) + vrot(nvec[1:-1], rots, heights) + (nvec[-1],):c for (nvec, c) in forb.items()})
+                                # symmetry only available along first non-horizontal coordinate
                                 if sym_bound is not None:
                                     sym_pairs[ix%(numf//2), tr] = 1 - sym_pairs.get((ix%(numf//2), tr), 0)
                                 new_state += 2**(numf*tr + ix)
@@ -816,6 +915,10 @@ def kek(f):
     return str(f)+"~"+("%.3f"%float(f))
     
 if __name__ == "__main__":
+    #for vec in hyperrectangle([2]):
+    #    print(vec)
+    #quit()
+
     starttime = time.time()
     
     arg_parser = argparse.ArgumentParser()
@@ -908,10 +1011,10 @@ if __name__ == "__main__":
         forbs.append({(0,0,0):0,(-1,0,1):0,(0,-1,1):0,(1,0,0):0,(1,0,1):0,(1,-1,1):0})
         forbs.append({(0,0,1):0,(0,0,0):0,(0,1,0):0,(1,0,1):0,(2,0,0):0,(1,1,0):0})
         
-        hex_iden_sft = SFT(nodes, alph, forbs)
+        hex_iden_sft = SFT(2, nodes, alph, forbs)
         print("using", hex_iden_sft)
                      
-        nfa = PeriodAutomaton(h,s,hex_iden_sft,sym_bound=sym_b,verbose=True,immediately_relabel=True,rotate=rotate)
+        nfa = PeriodAutomaton(hex_iden_sft,[(s,h)],sym_bound=sym_b,verbose=True,immediately_relabel=True,rotate=rotate)
         nfa.populate(verbose=True, report=reportpop)
         print("time taken after pop:", time.time()-starttime, "seconds")
         nfa.relabel()
