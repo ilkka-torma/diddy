@@ -43,8 +43,11 @@ SFTs can be compared for equality and containment (though the computation is not
 
 ## Period automaton
 
-The file `period_automaton.py` contains a class that represents the set of **L**-periodic configurations of a *Z^d* shift of finite type on a gridlike graph, where **L** is a rank-**(d-1)** sublattice of **Z^d**.
+The file `period_automaton.py` contains a class that represents the set of **L**-periodic configurations of a **Z^d** shift of finite type on a gridlike graph, where **L** is a rank-**(d-1)** sublattice of **Z^d**.
 It also contains functions for finding minimum-density configurations in such automata, and a command line interface for accessing them.
+The interface should be considered a more "heavy duty" version of the DSL command `%minimum_density`.
+In particular, it allows one to parallelize the computations on a given number of cores, and to save the automaton for later analysis.
+On the flip side, the SFT must be defined by modifying the script file.
 
 ### Command line interface
 
