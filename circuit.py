@@ -1,0 +1,703 @@
+"""
+A Circuit is a trivial container for circuits with ONE output.
+The initial inputs can be any Python objects or other Circuits.
+You can use substitute to in-place set the value of an input.
+In-place so that subexpressions can be handled efficiently.
+
+You should only perform substitutions on a "top-level circuit"
+and not share subexpressions between distinct top-level Circuits,
+as you may not want their variables to mean the same.
+
+Probably not parallelizable.
+"""
+
+#import ctypes
+
+#def val_by_id(i):
+#    return ctypes.cast(i, ctypes.py_object).value
+
+from pysat.solvers import Glucose4
+import time
+
+class Circuit:
+    smart_simplify = True
+    #internal_sweep_int = 1
+    verbose = False
+    def __init__(self, op, *inputs):
+        self.op = op
+        self.inputs = inputs
+        #self.isi = 0
+        if Circuit.smart_simplify:
+            self.SAT = None
+            self.TAUTO = None
+            self.simplify()
+            
+    def simplify(self):
+        if self.op in "FT":
+            return
+        #print("a")
+        
+        if TAUTO(self):
+            self.op = "T"
+            self.inputs = []
+            return
+        #print("a")
+        
+        if UNSAT(self):
+            self.op = "F"
+            self.inputs = []
+            return
+        #print("a")
+        if self.op == "&":
+            #print("here")
+            remove = []
+            for i in range(len(self.inputs)):
+                if self.inputs[i].SAT == None:
+                    self.inputs[i].SAT = SAT(self.inputs[i])
+                if self.inputs[i].SAT == False:
+                    self.op = "F"
+                    self.inputs = []
+                    return
+                #print("check tauto", self.inputs[i])
+                if self.inputs[i].TAUTO == None:
+                    self.inputs[i].TAUTO = TAUTO(self.inputs[i])
+                #print("taauto", self.inputs[i].TAUTO)
+                if self.inputs[i].TAUTO == True:
+                    remove.append(i)
+            #print(remove)
+            for i in reversed(remove):
+                self.inputs = self.inputs[:i] + self.inputs[i+1:]
+            if len(self.inputs) == 0:
+                self.op = "T"
+                self.inputs = []
+            #elif len(self.inputs) == 1: actually a bad idea!
+            #    self.op = self.inputs[0].op
+            #    self.inputs = self.inputs[0].inputs
+        elif self.op == "|":
+            #print("here")
+            remove = []
+            for i in range(len(self.inputs)):
+                if self.inputs[i].TAUTO == None:
+                    self.inputs[i].TAUTO = TAUTO(self.inputs[i])
+                if self.inputs[i].TAUTO == True:
+                    self.op = "T"
+                    self.inputs = []
+                    return
+                if self.inputs[i].SAT == None:
+                    self.inputs[i].SAT = SAT(self.inputs[i])
+                if self.inputs[i].SAT == False:
+                    remove.append(i)
+                    
+            for i in reversed(remove):
+                self.inputs = self.inputs[:i] + self.inputs[i+1:]
+            if len(self.inputs) == 0:
+                self.op = "F"
+                self.inputs = []
+
+        elif self.op == "!":
+            #print(str(self), "a")
+            if self.inputs[0].SAT == None:
+                self.inputs[0].SAT = SAT(self.inputs[0])
+            if self.inputs[0].SAT == False:
+                self.op = "T"
+                self.inputs = []
+                self.TAUTO = True
+            if self.inputs[0].TAUTO == None:
+                self.inputs[0].TAUTO = TAUTO(self.inputs[0])
+            if self.inputs[0].TAUTO == True:
+                self.op = "F"
+                self.inputs = []
+                self.SAT = False
+                
+    def __str__(self):
+        return "C" + tostr(self)
+    def basic_str(self): # iirc for debug
+        if self.op == "V":
+            return str(self.inputs[0])
+        if self.op == "!":
+            return "!" + self.inputs[0].basic_str()
+        return self.op + "(" + ", ".join(map(lambda a:a.basic_str(), self.inputs)) + ")"
+        #return "circuit with inputs %s" % list(sorted(self.collect_inputs()))
+    def collect_inputs(self, sofar = None):
+        if sofar == None:
+            sofar = set()
+        for q in self.inputs:
+            if isinstance(q, Circuit):
+                q.collect_inputs(sofar)
+            else:
+                print(q)
+                sofar.add(q)
+        return sofar
+    def copy(self, copies = None):
+        if copies == None:
+            copies = {}
+        if id(self) in copies:
+            return copies[id(self)]
+        if self.op == "V":
+            return V(*self.inputs)
+        else:
+            inputcopies = []
+            for q in self.inputs:
+                inputcopies.append(q.copy(copies))
+            ret = Circuit(self.op, *inputcopies)
+            copies[id(self)] = ret
+            return ret
+    def get_variables(self):
+        return get_vars(self)
+    def internal_nodes(self):
+        return int_nodes(self)
+    #def __eq__(self, other):
+    #    return models(self, other) and models(other, self)
+    #def __hash__(self):
+    #    return 0
+
+def tostr(c):
+    appearances = get_appearances(c)
+    #print(appearances)
+    appears_multiply = set()
+    for d in appearances:
+        if appearances[d] > 1:
+            appears_multiply.add(d)
+    #print(appears_multiply)
+    #print(val_by_id(list(appears_multiply)[0]))
+    return tostr_(c, appears_multiply)
+
+def get_appearances(c, appearances = None):
+    #print(type(c))
+    if appearances == None:
+        appearances = {}
+    if c.op == "V":
+        return appearances
+    else:
+        if id(c) not in appearances:
+            appearances[id(c)] = 0
+        appearances[id(c)] += 1
+        #print("added app for %s = %s" % (c.basic_str(), id(c)))
+        if appearances[id(c)] > 1:
+            return appearances
+        for q in c.inputs:
+            get_appearances(q, appearances)
+        return appearances
+    
+def tostr_(c, appears_multiply, alreadys = None, running = None):
+    if alreadys == None:
+        alreadys = {}
+        running = [0]
+    if c.op == "V":
+        return str(c.inputs[0])
+    if id(c) in alreadys:
+        return "[" + alreadys[id(c)] + "]"
+    if c.op != "!":
+        s = c.op + "("
+        first = True
+        for i in c.inputs:
+            if not first:
+                s += ", "
+            first = False
+            s += tostr_(i, appears_multiply, alreadys, running)
+        s += ")"
+    else:
+        s = c.op + tostr_(c.inputs[0], appears_multiply, alreadys, running)
+
+    if id(c) in appears_multiply:    
+        s = str(running[0]) + "=" + s
+        alreadys[id(c)] = str(running[0])
+        running[0] += 1
+        return s
+    
+    return s
+
+def evaluate(c, values):
+    #print(c, values)
+    values = dict(values)
+    c = Circuit.copy(c)
+    for v in c.get_variables():
+        if v not in values:
+            values[v] = F
+    for a in values:
+        val = values[a]
+        if val == False:
+            val = F
+        elif val == True:
+            val = T
+        substitute(c, a, val)
+    if c.op == "T":
+        return True
+    elif c.op == "F":
+        return False
+    raise Exception("problem")
+
+    
+
+# substitute b for a in c, in place
+def substitute(c, a, b):
+    #print("sube")
+    if type(a) == Circuit:
+        assert a.op == "V"
+        substitute(c, a.inputs[0], b)
+        return
+    #print(c, a, b)
+    dealts = set()
+    ##isi = Circuit.internal_sweep_int
+    #Circuit.internal_sweep_int += 1
+    substitute_(c, a, b, dealts)
+    #print(c)
+
+def substitute_(c, a, b, dealts):
+
+    #print("subbin' %s for %s in %s" % (b, a, c))
+
+    if c.op == "V":
+        #print("circuit is V(", c.inputs, ")")
+        if c.inputs[0] == a:
+            #print("subbing", a)
+            c.op = b.op
+            c.inputs = b.inputs
+        #else:
+        #    print("not subbing", a)
+        return
+  
+    elif c.op in "TF":
+        return
+
+    elif c in dealts:# .isi == isi: # already substituted
+        return
+    dealts.add(c)
+    #c.isi = isi
+
+    if c.op == "&":
+        newinputs = []
+        for q in c.inputs:
+            substitute_(q, a, b, dealts)
+            if type(q) != Circuit:
+                newinputs.append(q)
+            elif q.op == "T":
+                pass
+            elif q.op == "F":
+                c.op = "F"
+                c.inputs = []
+                return
+            else:
+                newinputs.append(q)
+        c.inputs = newinputs
+        if len(c.inputs) == 0:
+            c.op = "T"
+            c.inputs = []
+        #elif len(c.inputs) == 1: bad idea!
+        #    c.op = c[0].op
+        #    c.inputs = c[1].inputs
+    elif c.op == "|":
+        newinputs = []
+        for q in c.inputs:
+            substitute_(q, a, b, dealts)
+            if type(q) != Circuit:
+                newinputs.append(q)
+            elif q.op == "F":
+                pass
+            elif q.op == "T":
+                c.op = "T"
+                c.inputs = []
+                return
+            else:
+                newinputs.append(q)
+        c.inputs = newinputs
+        if len(c.inputs) == 0:
+            c.op = "F"
+            c.inputs = []
+        #elif len(c.inputs) == 1: bad idea!
+        #    c.op = c.inputs[0].op
+        #    c.inputs = c.inputs[0].inputs
+    elif c.op == "!":
+        assert len(c.inputs) == 1
+        substitute_(c.inputs[0], a, b, dealts)
+        if type(c.inputs[0]) != Circuit:
+            newinputs.append(c.inputs[0])
+        elif c.inputs[0].op == "T":
+            c.op = "F"
+            c.inputs = []
+        elif c.inputs[0].op == "F":
+            c.op = "T"
+            c.inputs = []
+        else:
+            if type(c.inputs[0]) == Circuit and c.inputs[0].op == "!":
+                c.op = c.inputs[0].inputs[0].op
+                c.inputs = c.inputs[0].inputs[0].inputs
+    else:
+        raise NotImplementedError("Operator %s not implemented." % c.op)
+
+# apply transformation to all variables of c, in place
+def transform(c, f):
+    #print("transforming", c)
+    dealts = set()
+    ##isi = Circuit.internal_sweep_int
+    #Circuit.internal_sweep_int += 1
+    transform_(c, f, dealts)
+    #print(c)
+
+def transform_(c, f, dealts):
+
+    #print("subbin' %s for %s in %s" % (b, a, c))
+
+    if c.op == "V":
+        c.inputs = [f(a) for a in c.inputs]
+        return
+  
+    elif c.op in "TF":
+        return
+
+    elif c in dealts:# .isi == isi: # already substituted
+        return
+    dealts.add(c)
+    #c.isi = isi
+
+    if c.op == "&":
+        newinputs = []
+        for q in c.inputs:
+            transform_(q, f, dealts)
+            if type(q) != Circuit:
+                newinputs.append(q)
+            elif q.op == "T":
+                pass
+            elif q.op == "F":
+                c.op = "F"
+                c.inputs = []
+                return
+            else:
+                newinputs.append(q)
+        c.inputs = newinputs
+        if len(c.inputs) == 0:
+            c.op = "T"
+            c.inputs = []
+        #elif len(c.inputs) == 1: bad idea!
+        #    c.op = c[0].op
+        #    c.inputs = c[1].inputs
+    elif c.op == "|":
+        newinputs = []
+        for q in c.inputs:
+            transform_(q, f, dealts)
+            if type(q) != Circuit:
+                newinputs.append(q)
+            elif q.op == "F":
+                pass
+            elif q.op == "T":
+                c.op = "T"
+                c.inputs = []
+                return
+            else:
+                newinputs.append(q)
+        c.inputs = newinputs
+        if len(c.inputs) == 0:
+            c.op = "F"
+            c.inputs = []
+        #elif len(c.inputs) == 1: bad idea!
+        #    c.op = c.inputs[0].op
+        #    c.inputs = c.inputs[0].inputs
+    elif c.op == "!":
+        assert len(c.inputs) == 1
+        transform_(c.inputs[0], f, dealts)
+        if type(c.inputs[0]) != Circuit:
+            newinputs.append(c.inputs[0])
+        elif c.inputs[0].op == "T":
+            c.op = "F"
+            c.inputs = []
+        elif c.inputs[0].op == "F":
+            c.op = "T"
+            c.inputs = []
+        else:
+            if type(c.inputs[0]) == Circuit and c.inputs[0].op == "!":
+                c.op = c.inputs[0].inputs[0].op
+                c.inputs = c.inputs[0].inputs[0].inputs
+    else:
+        raise NotImplementedError("Operator %s not implemented." % c.op)
+
+def get_vars(c):
+    #print("Kemme", type(c), c.op, c.inputs)
+    #isi = Circuit.internal_sweep_int
+    #Circuit.internal_sweep_int += 1
+    dealts = set()
+    return get_vars_(c, dealts)
+
+def get_vars_(c, dealts):
+    if c in dealts: #.isi == isi:
+        return set()
+    #c.isi = isi
+    dealts.add(c)
+    
+    if c.op == "V":
+        return set([c.inputs[0]])
+    else:
+        s = set()
+        for t in c.inputs:
+            #print(t)
+            s.update(get_vars_(t, dealts))
+        return s
+
+def int_nodes(c):
+    #isi = Circuit.internal_sweep_int
+    #Circuit.internal_sweep_int += 1
+    dealts = set()
+    return int_nodes_(c, dealts)
+
+def int_nodes_(c, dealts):
+    #if c.isi == isi:
+    #    return list()
+    if c in dealts:
+        return list()
+    dealts.add(c)
+    #c.isi = isi
+    
+    if c.op == "V":
+        return []
+    ret = []
+    for t in c.inputs:
+        ret.extend(int_nodes_(t, dealts))
+    ret.append(c)
+    return ret
+
+"""
+C1 and C2 are lists of circuits
+we want to know if it is possible to
+satisfy C1 so that C2 is not satisfied...
+in other words, we want to know whether C1 \models C2.
+
+We should find all variables in C1 and C2, and
+they will be variables 1 through n.
+Then for each internal node in Ci, we add a
+variable, and depending on the .op, we force its
+value.
+
+Finally, we force that the variables corresponding
+to top levels of C1 circuits have value 1, but
+some C2 value has 0...
+"""
+def models(C1, C2, return_sep = False):
+    sm = Circuit.smart_simplify
+    Circuit.smart_simplify = False
+    #print(C1, C2)
+    #print(C1)
+    if type(C1) != Circuit:
+        C1 = AND(*C1)
+    if type(C2) != Circuit:
+        C2 = AND(*C2)
+    #print(C2.op, C2.inputs)
+
+    #print(C1, C2)
+    
+    #a = bbb
+    #print(C2.internal_nodes(), "killo")
+    
+    variables = set(C1.get_variables())
+    variables.update(set(C2.get_variables()))
+    #print(variables)
+    next_name = 1
+    var_to_name = {}
+    clauses = []
+    for v in variables:
+        var_to_name[v] = next_name
+        # if v in variables1:
+        #    clauses.append([next_name])
+        next_name += 1
+    if C1.op == "V":
+        var_to_name[id(C1)] = var_to_name[C1.inputs[0]]
+    if C2.op == "V":
+        var_to_name[id(C2)] = var_to_name[C2.inputs[0]]
+    #print (var_to_name)
+    #for v in var_to_name:
+    #    print(type(v))
+    # these come topologically sorted
+    nodes = list(C1.internal_nodes()) + list(C2.internal_nodes())
+    newnodes = []
+    for n in nodes:
+        if n not in newnodes:
+            newnodes.append(n)
+    nodes = newnodes
+    #print(nodes, list(map(str, nodes)), list(map(id, nodes)), "node")
+    for q in nodes:
+        assert q.op != "V"
+        var_to_name[id(q)] = next_name
+        inps = []
+        for i in q.inputs:
+            if i.op == "V":
+                inps.append(var_to_name[i.inputs[0]])
+            else:
+                inps.append(var_to_name[id(i)])
+        #print(q.op, len(inps))
+        if q.op == "!":
+            nam = inps[0]
+            clauses.append([nam, next_name])
+            clauses.append([-nam, -next_name])
+        elif q.op == "&":
+            for inp in inps:
+                clauses.append([inp, -next_name])
+            clauses.append(list([-inp for inp in inps]) + [next_name])
+        elif q.op == "|":
+            for inp in inps:
+                clauses.append([-inp, next_name])
+            clauses.append(inps + [-next_name])
+        elif q.op == "T":
+            clauses.append([var_to_name[id(q)]])
+        elif q.op == "F":
+            clauses.append([-var_to_name[id(q)]])
+        else:
+            raise Exception("nope")
+        next_name += 1
+    #somefalse = []
+    
+    #print(clauses)
+    #print(var_to_name)
+    """
+    for v in variables:
+        if v not in variables1:
+            somefalse.append(-var_to_name[v])
+    """
+    clauses.append([var_to_name[id(C1)]])
+    clauses.append([-var_to_name[id(C2)]])
+    #print(clauses)
+    Circuit.smart_simplify = sm
+    with Glucose4(bootstrap_with=clauses) as s:
+        if s.solve():
+            if return_sep:
+                m = s.get_model()
+                varvals = {}
+                for v in variables:
+                    if m[var_to_name[v] - 1] > 0:
+                        varvals[v] = True
+                    else:
+                        varvals[v] = False
+                return varvals
+            return False
+        return True
+
+# can both change c and return something different...
+# use only on top level
+def tech_simp(c, dones = None):
+    if type(c) != Circuit:
+        return c
+    if dones == None:
+        dones = set()
+    if c in dones:
+        return c
+    if c.op in "&|" and len(c.inputs) == 1:
+        return tech_simp(c.inputs[0])
+    else:
+        newinputs = []
+        for i in c.inputs:
+            newinputs.append(tech_simp(i))
+        c.inputs = newinputs
+    dones.add(c)
+    return c
+
+def UNSAT(C, return_sep = False):
+    m = models(C, F, return_sep)
+    if not return_sep:
+        return m
+    else:
+        if m == True:
+            return True
+        else:
+            return m
+def SAT(C, return_model = False):
+    if not return_model:
+        return not UNSAT(C)
+    else:
+        m = UNSAT(C, True)
+        if m == True:
+            return False
+        return m
+        
+        
+def TAUTO(C):
+    #print(C)
+    """sm = Circuit.smart_simplify
+    Circuit.smart_simplify = False
+    C = NOT(C)
+    Circuit.smart_simplify = sm
+    """
+    return models(T, C)
+
+def equivalent(C1, C2, return_sep = False):
+    m = models(C1, C2, return_sep)
+    #print(C1, C2, m)
+    if m != True:
+        return m
+    return models(C2, C1, return_sep)
+
+def V(inputs):
+    return Circuit("V", inputs)
+def AND(*inputs):
+    #print(Circuit.smart_simplify)
+    #print("making ADN", list(map(str, inputs)))
+    #print("res", Circuit("&", *inputs))
+    return Circuit("&", *inputs)
+
+def OR(*inputs):
+    #Circuit.vidi = inputs[3]
+    #print(Circuit.smart_simplify)
+    #print("making ÖR", list(map(str, inputs)))
+    #print("res", Circuit("|", *inputs))
+    return Circuit("|", *inputs)
+def NOT(*inputs):
+    assert len(inputs) == 1
+    return Circuit("!", *inputs)
+T = Circuit("T")
+F = Circuit("F")
+def IMP(*inputs):
+    assert len(inputs) == 2
+    # while
+    return OR(NOT(inputs[0]), inputs[1])
+    #return Circuit("->", *inputs)
+def IFF(*inputs):
+    assert len(inputs) == 2
+    return AND(IMP(inputs[0], inputs[1]), IMP(inputs[1], inputs[0]))
+    #return Circuit("<->", *inputs)
+# this is just used for small sets when we have larger than binary alphabets;
+# note that for very large alphabets one should instead use
+# smth like binary configurations written in N
+def ATMOSTONE(*inputs):
+    inps = []
+    for a in range(len(inputs)):
+        for b in range(a+1, len(inputs)):
+            inps.append(OR(NOT(inputs[a]), NOT(inputs[b])))
+    return AND(inps)
+
+
+#c = OR(AND(V("b"), V("a")), NOT(V("b")), NOT(V("b")))
+#print(evaluate(c, {"a": True, "b": True}))
+
+
+#print(evaluate(V("a"), {}))
+#a = bbb
+
+#equivalent(F, T)
+
+#print(TAUTO(NOT(T)))
+
+#a = V("a")
+#print(SAT(a))
+#print(SAT(V("a"), True))
+
+
+#c = OR(T)
+
+#3AND(Circuit("T"), Circuit("T"))
+#print(models(T, Circuit("T")))
+    
+"""
+c = OR(OR(V("a"), V("b")), V("a"))
+cc = AND(c, c, c, c, c, c, c, c, c)
+qq = cc.copy()
+print(cc)
+substitute(cc, "a", T)
+print(cc)
+print(qq)
+substitute(qq, "a", T)
+print(qq)
+"""
+
+"""
+t = time.time()
+a = OR(V("a"), V("b"), V("c"))
+b = AND(OR(V("b"), V("a")), V("c"))
+print(models([a], [b]))
+print (time.time() - t)
+"""

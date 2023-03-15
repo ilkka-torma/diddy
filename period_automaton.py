@@ -135,7 +135,8 @@ class PeriodAutomaton:
         self.pmat = pmat
         self.frontier = set()
         self.border_forbs = []
-        for vec in hyperrectangle([pmat[i][i+1] for i in range(sft.dim-1)]):
+        heights = [pmat[i][i+1] for i in range(sft.dim-1)]
+        for vec in hyperrectangle(heights):
             x = self.border_at(vec)
             self.frontier.add((x,) + vec)
             for forb in sft.forbs:
@@ -229,7 +230,8 @@ class PeriodAutomaton:
                 qq = []
         for pr in processes:
             pr.terminate()
-        print("done with #states", len(self.states))
+        if verbose:
+            print("done with #states", len(self.states))
 
     def relabel(self):
         if self.immediately_relabel:
@@ -360,7 +362,8 @@ class PeriodAutomaton:
                         lock=False)
         # sparse_mins represents rows int(i*sqrt(n)) for 0 <= i <= ceil(sqrt(n))
         sparse_rows = [max(0, min(m, (m*k)//sqrtm)) for k in range(sqrtm+1)]
-        print("using rows", sparse_rows)
+        if verbose:
+            print("using rows", sparse_rows)
         sparse_mins = mp.Array('i', [max_w
                                      for _ in sparse_rows
                                      for q in range(n)],
@@ -408,7 +411,8 @@ class PeriodAutomaton:
             res = res_q.get()
             min_things = min(min_things, res)
         min_d, min_len, min_q = min_things
-        print("min density", min_d/(len(self.sft.nodes)*len(self.frontier)), "min len", min_len)
+        if verbose:
+            print("min density", min_d/(len(self.sft.nodes)*len(self.frontier)), "min len", min_len)
 
         # phase 3: compute path from q
         path = [min_q]
@@ -568,7 +572,7 @@ class PeriodAutomaton:
                             break
                 else:
                     # choose minimal state along rotations
-                    if rotate:
+                    if self.rotate:
                         min_state = math.inf
                         for rots in hyperrectangle(heights):
                             new_state = 0
