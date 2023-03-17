@@ -625,12 +625,22 @@ def equivalent(C1, C2, return_sep = False):
 def V(inputs):
     return Circuit("V", inputs)
 def AND(*inputs):
+    if len(inputs) == 1:
+        assert type(inputs[0]) == Circuit
+        return inputs[0]
+    if len(inputs) == 0:
+        return T
     #print(Circuit.smart_simplify)
     #print("making ADN", list(map(str, inputs)))
     #print("res", Circuit("&", *inputs))
     return Circuit("&", *inputs)
 
 def OR(*inputs):
+    if len(inputs) == 1:
+        assert type(inputs[0]) == Circuit
+        return inputs[0]
+    if len(inputs) == 0:
+        return F
     #Circuit.vidi = inputs[3]
     #print(Circuit.smart_simplify)
     #print("making ÖR", list(map(str, inputs)))
@@ -658,7 +668,7 @@ def ATMOSTONE(*inputs):
     for a in range(len(inputs)):
         for b in range(a+1, len(inputs)):
             inps.append(OR(NOT(inputs[a]), NOT(inputs[b])))
-    return AND(inps)
+    return AND(*inps)
 
 
 #c = OR(AND(V("b"), V("a")), NOT(V("b")), NOT(V("b")))

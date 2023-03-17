@@ -57,16 +57,28 @@ def minimize_solution_(circuit, vals, necessary_vals):
         return minimize_solution_(circuit, rest, necessary_vals)
 
     return minimize_solution_(circuit, rest, necessary_vals + [first])
+    
+def add_uniqueness_constraints(nodes, alphabet, circuits, all_positions):
+    for p in all_positions:
+        for n in nodes:
+            pnvars = []
+            for a in alphabet:
+                #print(alphabet)
+                pnvars.append(V(p + (n, a, 0)))
+            #print(list(map(str, pnvars)))
+            #print(ATMOSTONE(*pnvars))
+            circuits[p + (n, "alldiff")] = AND(ATMOSTONE(*pnvars), OR(*pnvars))
 
 class SFT:
     "Two-dimensional SFT on a gridlike graph"
 
-    def __init__(self, dim, nodes, alph, forbs=None, circuit=None):
+    def __init__(self, dim, nodes, alph, forbs=None, circuit=None, formula=None):
         self.dim = dim
         self.nodes = nodes
         self.alph = alph
         self.forbs = forbs
         self.circuit = circuit
+        self.formula = formula # just for display, not actually used in computations
         if self.circuit is None:
             self.deduce_circuit()
 
@@ -76,7 +88,8 @@ class SFT:
     # find periodic configuration in c1 which is not in c2
     def exists_periodic_not_in(self, other, r):
         #print("exper", r)
-        assert len(self.alph) == 2
+        if len(self.alph) > 2:
+            return self.exists_periodic_not_in_big_alphabet(other, r)
 
         c1 = self.circuit.copy()
         c2 = other.circuit.copy()
@@ -112,9 +125,57 @@ class SFT:
             return False
         print(m)
         return True
+        
+    # find periodic configuration in c1 which is not in c2
+    def exists_periodic_not_in_big_alphabet(self, other, r):
+
+        c1 = self.circuit.copy()
+        c2 = other.circuit.copy()
+        #print(c1)
+        #print(c2)
+        all_positions = set()
+        circuits = {}
+        
+        for v in Z2onesidedsquare(r):
+            #print(v, "vee")
+            circuits[v] = c1.copy()
+            
+            for var in c1.get_variables():
+
+                #print(var, "to", vmod(r, vadd(v, var[:-1])) + (var[-1], 0) )
+                rel_pos = vmod(r, vadd(v, var[:-2])) + (var[-2:]) + (0,)
+                #print(var, rel_pos)
+                substitute(circuits[v], var, V(rel_pos))
+                all_positions.add(rel_pos[:-3])
+                #print(circuits[v])
+
+        circuits[None] = NOT(c2)
+        #print("init", circuits[None])
+        for var in c2.get_variables():
+            #print("c2", var, "to", V(vmod(r, var[:-1]) + (var[-1], 0)))
+            #print("cee", var, vmod(r, var[:-1]) + (var[-1], 0))
+            substitute(circuits[None], var, V(vmod(r, var[:-2]) + var[-2:] + (0,)))
+            #print(circuits[None])
+            all_positions.add(rel_pos[:-2])
+        #print(circuits)
+        add_uniqueness_constraints(self.nodes, self.alph, circuits, all_positions)
+        #print(circuits)
+        #a = bbb
+
+        #for k in circuits:
+        #    print(k, circuits[k])
+        #print("no22")
+        m = SAT(AND(*(list(circuits.values()))), True)
+        #print(AND(*(list(circuits.values()))))
+        if m == False:
+            return False
+        #for t in sorted(m):
+        #    print (t, m[t])
+        return True
 
     def ball_forces_allowed(self, other, r):
-        assert len(self.alph) == 2
+        if len(self.alph) > 2:
+            return self.ball_forces_allowed_big_alphabet(other, r)
 
         circuits = {}
 
@@ -129,6 +190,31 @@ class SFT:
         for var in other.circuit.get_variables():
             substitute(circuits[None], var, V(var + (0,)))
 
+        #print("no22")
+        m = SAT(AND(*(list(circuits.values()))))
+        if m == False:
+            return True
+        return False
+        
+    def ball_forces_allowed_big_alphabet(self, other, r):
+        all_positions = set()
+        circuits = {}
+        
+        for v in Z2square(r):
+            circuits[v] = self.circuit.copy()
+            for var in self.circuit.get_variables():
+                rel_pos = vadd(v, var[:-2]) + var[-2:] + (0,)
+                all_positions.add(rel_pos[:-3]) # drop node, letter and the zero
+                substitute(circuits[v], var, V(rel_pos))
+                #print(rel_pos)
+
+        circuits[None] = NOT(other.circuit.copy())
+        for var in other.circuit.get_variables():
+            all_positions.add(var[:-2])
+            substitute(circuits[None], var, V(var + (0,)))
+
+        add_uniqueness_constraints(self.nodes, self.alph, circuits, all_positions)
+            
         #print("no22")
         m = SAT(AND(*(list(circuits.values()))))
         if m == False:
@@ -180,8 +266,7 @@ class SFT:
             self.circuit = AND(*anded)
 
     def deduce_forbs(self, domain=None):
-        if self.forbs is None:
-            self.forbs = []
+        self.forbs = []
         if type(domain) == int:
             domain = [vec + (node,) for vec in Z2square(domain) for node in self.nodes]
         if domain is None:

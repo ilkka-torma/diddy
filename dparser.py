@@ -53,7 +53,7 @@ def parse_command(s):
                 _, s = ignore_space(s)
             else:
                 break
-        return simplices, s
+        return ("topology", simplices), s
     elif op == "alphabet":
         l, s = read_simple_token_list(s)
         global alphabet
@@ -101,7 +101,7 @@ def parse_command(s):
                 break
         return ("minimum_density", name, periods), s
 
-    elif op in ["show_formula", "show_forbidden_patterns"]:
+    elif op in ["show_formula", "show_forbidden_patterns", "show_parsed"]:
         name, s = read_name(s, True)
         return (op, name), s
 
@@ -110,7 +110,7 @@ def parse_command(s):
         rad, s = read_number(s)
         return (op, name, rad), s
 
-    elif op == "equal" or op == "contains":
+    elif op[:5] == "equal" or op[:8] == "contains":
         name, s = read_name(s, True)
         name2, s = read_name(s, True)
         return (op, name, name2), s
@@ -119,8 +119,7 @@ def parse_command(s):
         return (op,), s
     
     else:
-        print(op)
-        raise Exception("Bad command at: " + s[:30])
+        raise Exception("Bad command %s near: " % op + s[:30])
     
 # ignore space, including comments
 def ignore_space(s):
@@ -326,15 +325,23 @@ def read_simplex(s):
         aa.append(a[i][1])
         bb.append(b[i][1])
     v = vsub(bb, aa)
-    assert a[-1][0] == b[-1][0] == None # no variable in node
-    return (name, (0,)*(len(a)-1) + (a[-1][1],), v + (b[-1][1],)), s
+    #assert a[-1][0] == b[-1][0] == None # no variable in node
+    if a[-1][0] != None:
+        lasta = a[-1][0]
+    else:
+        lasta = a[-1][1]
+    if b[-1][0] != None:
+        lastb = b[-1][0]
+    else:
+        lastb = b[-1][1]
+    return (name, (0,)*(len(a)-1) + (lasta,), v + (lastb,)), s
     
 def read_vector_for_simplex(s):
     #print("vect", s[:20])
     _, ss = ignore_space(s)
     if ss[:1] == "(":
         #print("je")
-        ss = s[1:]
+        ss = ss[1:]
         vector = []
         while True:
             #print("Ki", ss[:15])
@@ -636,7 +643,7 @@ def read_not_expression(s):
         assert ss[0] == ")"
         ss = ss[1:]
     elif ss[:1] in "AEO":
-        return read_formula(ss)
+        form, ss = read_formula(ss)
     else:
         form, ss = read_basic(ss)
     if neg:

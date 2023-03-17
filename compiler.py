@@ -35,11 +35,15 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
             variables_new[a] = closure[a][1]
         for i,a in enumerate(arg_names):
             if type(args[i]) != tuple:
-                variables_new[a] = args[i]
+                if type(args[i]) != tuple:
+                    #variables_new[a] = args[i]
+                    pos = eval_to_position(dim, topology, args[i], variables, nodes)
+                    variables_new[a] = pos
             # if argument is a formula, we will evaluate it
             else:
                 circ = formula_to_circuit_(nodes, dim, topology, alphabet, args[i], variables, aux_var, all_vars)
                 variables_new[a] = circ
+        """
         for i in args:
             if type(i) == tuple:
                 #col = collect_unbound_vars(i)
@@ -51,6 +55,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
             for j in col:
                 if j in variables:
                     variables_new[j] = variables[j]
+        """
         ret = formula_to_circuit_(nodes, dim, topology, alphabet, code, variables_new, aux_var, all_vars)
     elif op in ["CELLFORALL", "CELLEXISTSCELL", "NODEFORALL", "NODEEXISTS"]:
         var = formula[1]
@@ -189,10 +194,15 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         p1 = eval_to_position(dim, topology, formula[1], variables, nodes)
         if p1 == None:
             ret = F
+        # evaluates to cell
+        if len(p1) != dim+1:
+            raise Exception("Cannot compare value of cell, only node.")
         all_vars.add(var_of_pos_expr(formula[1]))
         p2 = eval_to_position(dim, topology, formula[2], variables, nodes)
         if p2 == None:
             ret = F
+        if len(p2) != dim+1:
+            raise Exception("Cannot compare value of cell, only node.")
         all_vars.add(var_of_pos_expr(formula[2]))
         dems = []
         #print("glak", p1, p2)
@@ -201,7 +211,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         if ret == None:
             args = []
             for a in alphabet:
-                args.append(IFF(V(p1 + (a,)), V(p1 + (b,))))
+                args.append(IFF(V(p1 + (a,)), V(p2 + (a,))))
             ret = AND(*args)
     elif op == "ISNEIGHBOR" or op == "ISPROPERNEIGHBOR":
         #print("test nbr")
@@ -241,31 +251,7 @@ def formula_to_circuit(nodes, dim, topology, alphabet, formula):
     aux_var = [0] # da fuck is this?
     all_vars = set()
     form = formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_var, all_vars)
-    if len(alphabet) == 2:
-        return tech_simp(form)
-    # if len(alphabet) = 2 we use nodes directly as variables,
-    # otherwise we use a longer tuple that has var value at end, so you
-    # have to make sure that exactly one of them has value 1...
-    alpha_reqs = []
-    for v in all_vars:
-        place, val = v[:-1], v[-1]
-        others_in = []
-        for a in alphabet:
-            if a == val:
-                continue
-            if place + (a,) in all_vars:
-                if a < val:
-                    break
-                others_in.append(place + (a,))
-        # so that we do this just for the minimal that's there
-        else:
-            # at most one can have 1
-            if len(others_in) > 0:
-                alpha_reqs.append(ATMOSTONE(*([v] + others_in)))
-            if len(others_in) == len(alphabet) - 1:
-                alpha_reqs.append(OR(*([v] + others_in)))
-    alpha_reqs = AND(*alpha_reqs)
-    return tech_simp(AND(form, alpha_reqs))
+    return tech_simp(form)
 
 def collect_unbound_vars(formula, bound = None):
     #print("collecting", formula)
@@ -366,7 +352,10 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes):
                 a, b = t[1], t[2]
                 if t[0] == i and (pos[dim] == None or pos[dim] == a[dim]):
                     #print("lauk")
-                    pos = vadd(vsub(pos[:-1], a[:-1]), b[:-1]) + (a[dim],)
+                    if pos[dim] == None:
+                        pos = vadd(vsub(pos[:-1], a[:-1]), b[:-1]) + (None,)
+                    else:
+                        pos = vadd(vsub(pos[:-1], a[:-1]), b[:-1]) + (a[dim],)
                     break
         else:
             if i in nodes: # single thing => change node
@@ -396,6 +385,9 @@ def get_area(dim, topology, pos_variables, bound, typ, nodes):
     area = set()
     for u in pos_variables:
         p = pos_variables[u]
+        while type(p) != tuple:
+            u = p
+            p = pos_variables[u]
         #print(p, bound)
         if u not in bound:
             continue

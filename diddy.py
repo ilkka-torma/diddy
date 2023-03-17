@@ -1,4 +1,4 @@
-import parser
+import dparser
 import compiler
 import sft
 import period_automaton
@@ -166,7 +166,7 @@ def forbos_to_formula(fof):
     #print(ret, "MIL")
     return ret
         
-def report_SFT_contains(a, b):
+def report_SFT_contains(a, b, mode="report", truth=True):
     aname, aSFT = a
     bname, bSFT = b
     print("Testing whether %s contains %s." % (aname, bname))
@@ -178,8 +178,11 @@ def report_SFT_contains(a, b):
     else:
         print("%s DOES NOT CONTAIN %s (radius %s, time %s)" % (aname, bname, rad, tim))
     print()
+    if mode == "assert":
+        print(res, truth)
+        assert res == (truth == "T")
 
-def report_SFT_equal(a, b):
+def report_SFT_equal(a, b, mode="report", truth=True):
     aname, aSFT = a
     bname, bSFT = b
     print("Testing whether %s and %s are equal." % (aname, bname))
@@ -191,6 +194,9 @@ def report_SFT_equal(a, b):
     else:
         print("They are DIFFERENT (radius %s, time %s)." % (rad, tim))
     print()
+    if mode == "assert":
+        print(res, truth)
+        assert res == (truth == "T")
 
 grid = [("up", (0,0,0), (0,1,0)),
         ("dn", (0,0,0), (0,-1,0)),
@@ -203,8 +209,8 @@ hexgrid = [("up", (0,0,0), (0,1,1)),
            ("rt", (0,0,1), (1,0,0)),
            ("lt", (0,0,1), (0,0,0))]
 
-def run_diddy(code):
-    parsed = parser.parse(code)
+def run_diddy(code, mode="report"):
+    parsed = dparser.parse(code)
     nodes = [0]
     alphabet = [0, 1]
     dim = 2
@@ -233,7 +239,7 @@ def run_diddy(code):
             #print(i)
             if i[2] == "formula":
                 circ = compiler.formula_to_circuit(nodes, dim, topology, alphabet, i[3])
-                SFTs[i[1]] = sft.SFT(dim, nodes, alphabet, circuit=circ)
+                SFTs[i[1]] = sft.SFT(dim, nodes, alphabet, circuit=circ, formula=i[3])
                 #print(formula)
             elif i[2] == "forbos":
                 #print(i[3])
@@ -268,7 +274,7 @@ def run_diddy(code):
             print([(period_automaton.nvadd(nvec,(tr,)+(0,)*(dim-1)),c) for (tr,pat) in enumerate(cyc) for (nvec,c) in sorted(pat.items())])
             
 
-        elif i[0] == "show_formula":
+        elif i[0] == "show_formula" and mode == "report":
             if i[1] in SFTs:
                 formula = SFTs[i[1]].circuit
             elif i[1] in clopens:
@@ -278,36 +284,48 @@ def run_diddy(code):
             print("Showing compiled formula for %s." % i[1])
             print(formula)
             print()
+            
+        elif i[0] == "show_parsed" and mode == "report":
+            if i[1] in SFTs:
+                formula = SFTs[i[1]].formula
+            elif i[1] in clopens:
+                formula = clopens[i[1]][2]
+            else:
+                raise Exception("No set named %s" % i[1])
+            print("Showing parsed formula for %s." % i[1])
+            print(formula)
+            print()
 
-        elif i[0] == "equal":
+        elif i[0][:5] == "equal":
             if i[1] in SFTs:
                 SFT1 = SFTs[i[1]]
                 SFT2 = SFTs[i[2]]
-                report_SFT_equal((i[1], SFT1), (i[2], SFT2))
+                report_SFT_equal((i[1], SFT1), (i[2], SFT2), mode=mode, truth=i[0][5:])
 
             else:
                 clopen1 = clopens[i[1]]
                 clopen2 = clopens[i[2]]
                 raise Exception("Comparison of clopen sets not implemented.")
-        elif i[0] == "contains":
+                
+        elif i[0][:8] == "contains":
 
             if i[1] in SFTs:
                 SFT1 = SFTs[i[1]]
                 SFT2 = SFTs[i[2]]
-                report_SFT_contains((i[1], SFT1), (i[2], SFT2))
+                report_SFT_contains((i[1], SFT1), (i[2], SFT2), mode=mode, truth=i[0][8:])
             else:
                 clopen1 = clopens[i[1]]
                 clopen2 = clopens[i[2]]
                 raise Exception("Comparison of clopen sets not implemented.")
 
-        elif i[0] == "compare_SFT_pairs":
+        elif i[0] == "compare_SFT_pairs" and mode == "report":
             for a in SFTs:
                 for b in SFTs:
                     if a == b:
                         continue
                     report_SFT_contains((a, SFTs[a]), (b, SFTs[b]))
 
-        elif i[0] == "compare_SFT_pairs_equality":
+        elif i[0] == "compare_SFT_pairs_equality" and mode == "report":
             print(SFTs_as_list)
             for (i, (aname, a)) in enumerate(SFTs_as_list):
                 for (bname, b) in SFTs_as_list[i+1:]:
@@ -327,12 +345,15 @@ def run_diddy(code):
             
             the_sft = SFTs[i[1]]
             rad = i[2]
-            print("Computing forbidden patterns for %s using radius %s." % (i[1], rad))
-            print()
+            if mode == "report":
+                print("Computing forbidden patterns for %s using radius %s." % (i[1], rad))
+                if the_sft.forbs is not None:
+                    print("It already had forbidden patterns; overwriting them.")
+                print()
             the_sft.deduce_forbs(rad)
 
 
-        else:
+        elif mode == "report":
             raise Exception("Unknown command %s." % i[0])
 
 
