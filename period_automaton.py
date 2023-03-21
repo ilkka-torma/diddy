@@ -7,6 +7,7 @@ import sys
 import pickle
 import argparse
 import fractions
+import frozendict as fd
 from sft import *
 
 NUM_THREADS = 2
@@ -113,14 +114,14 @@ def nvadd(nvec, vec):
     return tuple(a+b for (a,b) in zip(nvec, vec)) + (nvec[-1],)
 
 class PeriodAutomaton:
-    # Alphabet is weights
+    # Transition labels are either frontier patterns or their weights
     # Frontier has size len(nodes) x height, and is slanted
     # States are collections of forbidden sets that intersect frontier and its right side
     # They are stored as integers to save space
-    # Height must be positive, nodes must be nonempty
-    # trans has type dict[state] -> (dict[state] -> weight) and only stores minimum weights
+    # trans has type dict[state] -> (dict[state] -> label(s))
+    # After minimization, only the lowest weights are kept
 
-    def __init__(self, sft, periods, rotate=False, sym_bound=None, verbose=False, immediately_relabel=True, check_periods=True):
+    def __init__(self, sft, periods, rotate=False, sym_bound=None, verbose=False, immediately_relabel=True, check_periods=True, frontier_label=True):
         if verbose:
             print("constructing period automaton with periods", periods, "no symmetry" if sym_bound is None else "symmetry %s"%sym_bound, "rotated" if rotate else "not rotated")
         self.sft = sft
@@ -165,6 +166,7 @@ class PeriodAutomaton:
         self.immediately_relabel = immediately_relabel
         self.sym_bound = sym_bound
         self.rotate = rotate
+        self.frontier_label = frontier_label
 
     def populate(self, verbose=False, report=5000):
         self.s2idict = {}
@@ -187,7 +189,7 @@ class PeriodAutomaton:
         task_q = mp.Queue()
         res_q = mp.Queue()
         processes = [mp.Process(target=populate_worker,
-                                args=(self.pmat, self.sft.alph, self.border_forbs, self.node_frontier, self.sym_bound, self.rotate,
+                                args=(self.pmat, self.sft.alph, self.border_forbs, self.node_frontier, self.sym_bound, self.rotate, self.frontier_label,
                                       task_q, res_q))
                      for _ in range(NUM_THREADS)]
         for pr in processes:
@@ -221,9 +223,15 @@ class PeriodAutomaton:
                 if state_idx not in self.trans:
                     self.trans[state_idx] = dict()
                 try:
-                    self.trans[state_idx][new_state_idx] = min(self.trans[state_idx][new_state_idx], front_or_weight)
+                    if self.frontier_label:
+                        self.trans[state_idx][new_state_idx].add(fd.frozendict(front_or_weight))
+                    else:
+                        self.trans[state_idx][new_state_idx] = min(self.trans[state_idx][new_state_idx], front_or_weight)
                 except KeyError:
-                    self.trans[state_idx][new_state_idx] = front_or_weight
+                    if self.frontier_label:
+                        self.trans[state_idx][new_state_idx] = set([fd.frozendict(front_or_weight)])
+                    else:
+                        self.trans[state_idx][new_state_idx] = front_or_weight
             if qq != []:
                 task_q.put(qq)
                 undone += len(qq)
@@ -232,6 +240,79 @@ class PeriodAutomaton:
             pr.terminate()
         if verbose:
             print("done with #states", len(self.states))
+            
+    def minimize(self, verbose=False):
+        """Minimize using Moore's algorithm.
+           Assumes that all states are reachable, and that the transitions are frontier patterns.
+           In the minimized automaton, transitions are weights and only minimal ones are kept.
+        """
+        assert self.frontier_label
+        if verbose:
+            print("minimizing")
+        
+        #print("before min")
+        #print("trans", set(self.trans.keys()))
+        #print("states", self.states)
+        #print("i2s", self.i2sdict)
+        #print("s2i", self.s2idict)
+        # Maintain a coloring of the states; states with different colors are provably non-equivalent
+        # Color 0 is "no state"
+        coloring = {st : 1 for st in self.trans}
+        colors = set([1])
+        num_colors = 1
+        #for tr in self.trans.values():
+        #    print(tr)
+        #    break
+        alph = list(set(sym for tr in self.trans.values() for syms in tr.values() for sym in syms))
+        #print(alph)
+        
+        # Iteratively update coloring based on the colors of successors
+        i = 0
+        while True:
+            if verbose:
+                i += 1
+                print("{}: {} states separated.".format(i, num_colors))
+            # First, use tuples of colors as new colors
+            new_coloring = {}
+            new_colors = set()
+            for st in self.trans:
+                next_colors = {sym : 0 for sym in alph}
+                for (st2, syms) in self.trans[st].items():
+                    for sym in syms:
+                        next_colors[sym] = coloring[st2]
+                new_color = (coloring[st],) + tuple(next_colors[sym] for sym in alph)
+                new_coloring[st] = new_color
+                new_colors.add(new_color)
+            # Then, encode new colors as positive integers
+            color_nums = { color : i for (i, color) in enumerate(new_colors, start=1) }
+            new_coloring = { st : color_nums[color] for (st, color) in new_coloring.items() }
+            new_num_colors = len(new_colors)
+            # If strictly more colors were needed, repeat
+            if num_colors == new_num_colors:
+                break
+            else:
+                colors = new_colors
+                coloring = new_coloring
+                num_colors = new_num_colors
+        
+        # Compute new transition function and state set
+        new_trans = {}
+        for (st, tr) in self.trans.items():
+            new_trans[new_coloring[st]-1] = dict()
+            for (st2, syms) in tr.items():
+                new_trans[new_coloring[st]-1][new_coloring[st2]-1] = min(sum(sym.values()) for sym in syms)
+                
+        self.trans = new_trans
+        self.i2sdict = {(new_coloring[ix]-1):st for (st, ix) in self.s2idict.items()}
+        self.s2idict = {st:ix for (ix, st) in self.i2sdict.items()}
+        self.states = set(self.s2idict.keys())
+        self.frontier_label = False
+        
+        #print("after min")
+        #print("trans", set(self.trans.keys()))
+        #print("states", self.states)
+        #print("i2s", self.i2sdict)
+        #print("s2i", self.s2idict)
 
     def relabel(self):
         if self.immediately_relabel:
@@ -623,6 +704,10 @@ class PeriodAutomaton:
     def strong_components(self):
         "Tarjan's algorithm, implicit recursion"
         self.compute_i2sdict()
+        #print("trans", self.trans)
+        #print("states", self.states)
+        #print("i2s", self.i2sdict)
+        #print("s2i", self.s2idict)
         comps = []
         lows = {}
         stack = []
@@ -667,7 +752,7 @@ class PeriodAutomaton:
 def border_at(pmat, vec):
     return 0 # TODO: change
 
-def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_queue, res_queue):
+def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, frontier_label, task_queue, res_queue):
     numf = len(border_forbs)
     #border_sets = [set(forb) for forb in border_forbs]
     if rotate:
@@ -739,7 +824,7 @@ def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_
                                 sym_pairs[ix%(numf//2), tr] = 1 - sym_pairs.get((ix%(numf//2), tr), 0)
                             new_state += 2**(numf*tr + ix)
                     if sym_bound is None or sum(sym_pairs.values()) <= sym_bound:
-                        ret.append((state, sum(new_front.values()), new_state))
+                        ret.append((state, new_front if frontier_label else sum(new_front.values()), new_state))
                         if len(ret) >= CHUNK_SIZE:
                             res_queue.put(ret)
                             ret = []
@@ -1018,10 +1103,13 @@ if __name__ == "__main__":
         hex_iden_sft = SFT(2, nodes, alph, forbs)
         print("using", hex_iden_sft)
                      
-        nfa = PeriodAutomaton(hex_iden_sft,[(s,h)],sym_bound=sym_b,verbose=True,immediately_relabel=True,rotate=rotate)
+        nfa = PeriodAutomaton(hex_iden_sft,[(s,h)],sym_bound=sym_b,verbose=True,immediately_relabel=True,rotate=rotate, frontier_label=True)
         nfa.populate(verbose=True, report=reportpop)
         print("time taken after pop:", time.time()-starttime, "seconds")
         nfa.relabel()
+        nfa.minimize(verbose=True)
+        print("done with #states", len(nfa.trans))
+        print("time taken after minimization:", time.time()-starttime, "seconds")
         if PRINT_NFA:
             print(nfa.trans)
         if args.outfile is not None or args.autosave:
