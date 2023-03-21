@@ -167,6 +167,8 @@ class PeriodAutomaton:
         self.rotate = rotate
 
     def populate(self, verbose=False, report=5000):
+        debug_verbose = False
+        if debug_verbose: print("asdf")
         self.s2idict = {}
         self.running = 0
         def state_to_idx(s):
@@ -190,8 +192,10 @@ class PeriodAutomaton:
                                 args=(self.pmat, self.sft.alph, self.border_forbs, self.node_frontier, self.sym_bound, self.rotate,
                                       task_q, res_q))
                      for _ in range(NUM_THREADS)]
+        if debug_verbose: print("processes built")
         for pr in processes:
             pr.start()
+        if debug_verbose: print("processes started")
         undone = len(self.states)
         for state in self.states:
             task_q.put([state])
@@ -200,7 +204,9 @@ class PeriodAutomaton:
 
         qq = []
         while undone:
+            if debug_verbose: print("undoine")
             res = res_q.get()
+            if debug_verbose: print("gottends")
             if type(res) == int: 
                 undone -= res
                 continue

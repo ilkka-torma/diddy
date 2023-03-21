@@ -15,10 +15,26 @@ def Z2square(rad):
         for y in range(-rad, rad+1):
             yield (x, y)
 
+def centered_hypercube(dim, rad):
+    if dim == 0:
+        yield ()
+        return
+    for v in centered_hypercube(dim-1, rad):
+        for a in range(-rad, rad+1):
+            yield v + (a,)
+
 def Z2onesidedsquare(rad):
     for x in range(0, rad):
         for y in range(0, rad):
             yield (x, y)
+
+def onesided_hypercube(dim, rad):
+    if dim == 0:
+        yield ()
+        return
+    for v in centered_hypercube(dim-1, rad):
+        for a in range(0, rad):
+            yield v + (a,)
 
 # check that circuit is forced to be true when variable set
 def forced_by(circuit, vals_as_list):
@@ -70,7 +86,7 @@ def add_uniqueness_constraints(nodes, alphabet, circuits, all_positions):
             circuits[p + (n, "alldiff")] = AND(ATMOSTONE(*pnvars), OR(*pnvars))
 
 class SFT:
-    "Two-dimensional SFT on a gridlike graph"
+    "dim-dimensional SFT on a gridlike graph"
 
     def __init__(self, dim, nodes, alph, forbs=None, circuit=None, formula=None):
         self.dim = dim
@@ -97,7 +113,7 @@ class SFT:
         #print(c2)
         circuits = {}
 
-        for v in Z2onesidedsquare(r):
+        for v in onesided_hypercube(self.dim, r): #Z2onesidedsquare(r):
             #print(v, "vee")
             circuits[v] = c1.copy()
 
@@ -136,7 +152,7 @@ class SFT:
         all_positions = set()
         circuits = {}
         
-        for v in Z2onesidedsquare(r):
+        for v in onesided_hypercube(self.dim, r):
             #print(v, "vee")
             circuits[v] = c1.copy()
             
@@ -179,7 +195,7 @@ class SFT:
 
         circuits = {}
 
-        for v in Z2square(r):
+        for v in centered_hypercube(self.dim, r):
             circuits[v] = self.circuit.copy()
             for var in self.circuit.get_variables():
                 rel_pos = vadd(v, var[:-1]) + (var[-1], 0)
@@ -200,7 +216,7 @@ class SFT:
         all_positions = set()
         circuits = {}
         
-        for v in Z2square(r):
+        for v in onesided_hypercube(self.dim, r):
             circuits[v] = self.circuit.copy()
             for var in self.circuit.get_variables():
                 rel_pos = vadd(v, var[:-2]) + var[-2:] + (0,)
@@ -222,7 +238,7 @@ class SFT:
         return False
 
     def deduce(self, known_values, domain):
-        if self.alph != [0,1]:
+        if len(self.alph) != 2:
             raise Exception("Only binary alphabets supported in deduce")
         if not (self.deftype & SFTType.CIRCUIT):
             raise Exception("SFT must have a circuit in deduce")
@@ -260,19 +276,58 @@ class SFT:
 
     def deduce_circuit(self):
         if self.circuit is None:
-            anded = []
-            for forb in self.forbs:
-                anded.append(OR(*((NOT(V(nvec)) if c else V(nvec)) for (nvec, c) in forb.items())))
-            self.circuit = AND(*anded)
+            if len(self.alph) == 2:
+                anded = []
+                for forb in self.forbs:
+                    anded.append(OR(*((NOT(V(nvec)) if c else V(nvec))
+                                      for (nvec, c) in forb.items())))
+                self.circuit = AND(*anded)
+            else:
+                anded = []
+                for forb in self.forbs:
+                    anded.append(OR(*(NOT(V(nvec + (c,)))
+                                      for (nvec, c) in forb.items())))
+                self.circuit = AND(*anded)
 
     def deduce_forbs(self, domain=None):
         self.forbs = []
+        self.deduce_forbs_(domain)
+        # deduce forbs gives the forbs with true/false variables,
+        # we want to simplify them into an alphabet size independent form
+        self.clean_forbs()
+
+    def clean_forbs(self):
+        new_forbs = []
+        for f in self.forbs:
+            new_forb = {}
+            for q in f:
+                if len(self.alph) == 2:
+                    if f[q]:
+                        new_forb[q] = self.alph[1]
+                    else:
+                        new_forb[q] = self.alph[0]
+                else:
+                    if f[q]:
+                        new_forb[q[:-1]] = q[-1]
+            new_forbs.append(new_forb)
+        self.forbs = new_forbs
+
+    def deduce_forbs_(self, domain=None):
         if type(domain) == int:
-            domain = [vec + (node,) for vec in Z2square(domain) for node in self.nodes]
+            if len(alphabet) == 2:
+                domain = [vec + (node,) for vec in centered_hypercube(self.dim, domain)
+                          for node in self.nodes]
+            else:
+                domain = [vec + (node, a) for vec in centered_hypercube(self.dim, domain)
+                          for node in self.nodes for a in self.alph]
         if domain is None:
             domain = list(self.circuit.get_variables())
-        assert len(self.alph) == 2
-        assert all(v in domain for v in self.circuit.get_variables())
+        #assert len(self.alph) == 2
+        if len(self.alph) == 2:
+            for v in self.circuit.get_variables():
+                #print(v, domain, self.dim)
+                pass
+            assert all(v in domain for v in self.circuit.get_variables())
 
         # we want to tile domain so that it has no existing forbos, but
         # the circuit fails at the origin
@@ -289,16 +344,22 @@ class SFT:
                         continue
                 # we go here if the entire forbidden pattern translate fits in domain
                 else:
-                    # we make a circuit that says the we differ from the pattern somewhere
+                    # we make a circuit that says that we differ from the pattern somewhere
                     oreds = []
                     for t in f:
                         u = vadd(v, vsub(t[:-1], anchor)) + (t[-1],)
                         value = f[t]
-                        if value == self.alph[1]:
-                            oreds.append(NOT(V(u)))
+                        if len(self.alph) == 2:
+                            if value == self.alph[1]:
+                                oreds.append(NOT(V(u)))
+                            else:
+                                oreds.append(V(u))
                         else:
-                            oreds.append(V(u))
+                            oreds.append(NOT(V(u + (value,))))
                     forbiddens.append(OR(*oreds))
+
+        if len(self.alph) != 2:
+            add_uniqueness_constraints(self.nodes, self.alph, forbiddens, domain)
 
         m = SAT(AND(complemented, *forbiddens), True)
         if m == False:
@@ -316,7 +377,7 @@ class SFT:
         # print("new minimal", minimal)
 
         self.forbs.append(minimal)
-        self.deduce_forbs(domain)
+        self.deduce_forbs_(domain)
 
     def contains(self, other, limit = None, return_radius = False):
         r = 1

@@ -252,14 +252,19 @@ def run_diddy(code, mode="report"):
             clopens[i[1]] = i[2]
             
         elif i[0] == "minimum_density":
+            verbose_here = False
             if i[1] not in SFTs:
                 raise Exception("Density can only be calculated for SFTs, not %s." % i[1])
+            tim = time.time()
             the_sft = SFTs[i[1]]
             periods = i[2]
             print("Computing minimum density for %s restricted to period(s) %s"%(i[1], periods))
             nfa = period_automaton.PeriodAutomaton(the_sft, periods)
+            if verbose_here: print("const")
             nfa.populate()
+            if verbose_here: print("popula")
             comps = list(nfa.strong_components())
+            if verbose_here: print("strng com")
             del nfa
             min_data = (math.inf,)
             min_comp = None
@@ -268,11 +273,13 @@ def run_diddy(code, mode="report"):
                 if data[:1] < min_data[:1]:
                     min_data = data
                     min_aut = comp
+            if verbose_here: print("kikek")
             dens, minlen, stcyc, cyc = min_data
             border_size = len(the_sft.nodes)*len(min_aut.frontier)
-            print("Density", fractions.Fraction(sum(b for fr in cyc for b in fr.values()), len(cyc)*border_size), "~", dens/border_size, "realized by cycle of length", len(cyc))
+            print("Density", fractions.Fraction(sum(b for fr in cyc for b in fr.values()),
+                                                len(cyc)*border_size), "~", dens/border_size, "realized by cycle of length", len(cyc))
             print([(period_automaton.nvadd(nvec,(tr,)+(0,)*(dim-1)),c) for (tr,pat) in enumerate(cyc) for (nvec,c) in sorted(pat.items())])
-            
+            print("Calculation took", time.time() - tim, "seconds.") 
 
         elif i[0] == "show_formula" and mode == "report":
             if i[1] in SFTs:
@@ -326,9 +333,9 @@ def run_diddy(code, mode="report"):
                     report_SFT_contains((a, SFTs[a]), (b, SFTs[b]))
 
         elif i[0] == "compare_SFT_pairs_equality" and mode == "report":
-            print(SFTs_as_list)
-            for (i, (aname, a)) in enumerate(SFTs_as_list):
-                for (bname, b) in SFTs_as_list[i+1:]:
+            #print(SFTs_as_list)
+            for (i, (aname, a)) in enumerate(SFTs.items()):# SFTs_as_list):
+                for (bname, b) in list(SFTs.items())[i+1:]: #SFTs_as_list[i+1:]:
                     report_SFT_equal((aname, a), (bname, b))
 
         elif i[0] == "show_forbidden_patterns":
