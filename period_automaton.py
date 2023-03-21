@@ -241,17 +241,17 @@ class PeriodAutomaton:
         if verbose:
             print("done with #states", len(self.states))
             
-    def minimize(self, verbose=False):
+    def minimize(self, verbose=False, min_trans=False):
         """Minimize using Moore's algorithm.
            Assumes that all states are reachable, and that the transitions are frontier patterns.
            In the minimized automaton, transitions are weights and only minimal ones are kept.
         """
         assert self.all_labels
         if verbose:
-            print("minimizing")
+            print("minimizing (round {})".format(2 if min_trans else 1))
         
         #print("before min")
-        #print("trans", set(self.trans.keys()))
+        #print("trans", self.trans)
         #print("states", self.states)
         #print("i2s", self.i2sdict)
         #print("s2i", self.s2idict)
@@ -300,16 +300,22 @@ class PeriodAutomaton:
         for (st, tr) in self.trans.items():
             new_trans[new_coloring[st]-1] = dict()
             for (st2, syms) in tr.items():
-                new_trans[new_coloring[st]-1][new_coloring[st2]-1] = min(sym for sym in syms)
+                if min_trans:
+                    new_trans[new_coloring[st]-1][new_coloring[st2]-1] = min(sym for sym in syms)
+                else:
+                    new_trans[new_coloring[st]-1][new_coloring[st2]-1] = set([min(sym for sym in syms)])
                 
         self.trans = new_trans
-        self.i2sdict = {(new_coloring[ix]-1):st for (st, ix) in self.s2idict.items()}
-        self.s2idict = {st:ix for (ix, st) in self.i2sdict.items()}
-        self.states = set(self.s2idict.keys())
-        self.all_labels = False
+        self.s2idict = {st:(new_coloring[ix]-1) for (st, ix) in self.s2idict.items()}
+        self.i2sdict = {ix:st for (st, ix) in self.s2idict.items()}
         
+        #print("heheh")
+        if not min_trans:
+            self.minimize(min_trans=True, verbose=verbose)
+        else:
+            self.all_labels = False
         #print("after min")
-        #print("trans", set(self.trans.keys()))
+        #print("trans", self.trans)
         #print("states", self.states)
         #print("i2s", self.i2sdict)
         #print("s2i", self.s2idict)
@@ -328,7 +334,7 @@ class PeriodAutomaton:
         "Assume states are relabeled to range(len(states))"
         if verbose:
             print("finding min density cycle in O(n^2) space")
-        n = len(self.states)
+        n = len(self.trans)
         if bound_len is None:
             m = n+1
         else:
@@ -413,10 +419,10 @@ class PeriodAutomaton:
         return min_num, len(min_cycle), min_cycle, self.get_cycle_labels(min_cycle, verbose=verbose)
 
     def linsqrt_min_density_cycle(self, bound_len=None, verbose=False, report=50):
-        "Assume states are relabeled to range(len(states))"
+        "Assume states are relabeled to range(len(self.trans))"
         if verbose:
             print("finding min density cycle on O(n^(2/3)) space")
-        n = len(self.states)
+        n = len(self.trans)
         if bound_len is None:
             m = n+1
         else:
@@ -518,6 +524,8 @@ class PeriodAutomaton:
             proc.terminate()
             
         # check path length and weight
+        #print(path)
+        #print(self.trans)
         assert len(path) == m+1
         assert sum(self.trans[path[k]][path[k+1]] for k in range(m)) == sparse_mins[n*(len(sparse_rows)-1)+path[0]]
 
@@ -541,7 +549,7 @@ class PeriodAutomaton:
         "Assume states are relabeled to range(len(states))"
         if verbose:
             print("finding min density of cycle in O(n) space")
-        n = len(self.states)
+        n = len(self.trans)
         if bound_len is None:
             m = n+1
         else:
@@ -667,7 +675,7 @@ class PeriodAutomaton:
                         for (forb, tr) in new_pairs:
                             ix = self.border_forbs.index(forb)
                             new_state += 2**(numf*tr + ix)
-                    if new_state == b:
+                    if self.s2idict[new_state] == self.s2idict[b]:
                         labels.append(new_front)
                         break
             else:
@@ -738,9 +746,8 @@ class PeriodAutomaton:
                                 break
                         if len(comp) > 1 or cur in self.trans.get(cur, []):
                             aut = PeriodAutomaton(self.sft, self.pmat, self.rotate, self.sym_bound, False, self.immediately_relabel, check_periods=False)
-                            aut.states = set(st for st in self.states if self.s2idict[st] in comp)
-                            aut.s2idict = {st : i
-                                           for (i,st) in enumerate(aut.states)}
+                            aut.s2idict = {st:ix for (st, ix) in self.s2idict.items() if ix in comp}
+                            aut.states = set(aut.s2idict)
                             aut.trans = {aut.s2idict[self.i2sdict[st]] : {aut.s2idict[self.i2sdict[st2]] : c
                                                                           for (st2, c) in self.trans[st].items()
                                                                           if st2 in comp}
@@ -1132,7 +1139,7 @@ if __name__ == "__main__":
     min_comp = None
     for (ic, comp) in enumerate(comps):
         # TODO: special case components that are cycles
-        print("analyzing connected component", ic+1, "/", len(comps), "with", len(comp.states), "states")
+        print("analyzing connected component", ic+1, "/", len(comps), "with", len(comp.trans), "states")
         if COMP_MODE == CompMode.SQUARE_CYCLE:
             data = comp.square_min_density_cycle(bound_len=bound_len, verbose=True, report=reportcyc)
         elif COMP_MODE == CompMode.LINSQRT_CYCLE:        
@@ -1144,7 +1151,7 @@ if __name__ == "__main__":
             min_aut = comp
     print("height %s, shear %s, bound %s, symmetry %s, rotation %s completed" % (h, s, bound_len, sym_b, rotate))
     #print(dens,minlen,stcyc,cyc)
-    if bound_len is not None and all(len(comp.states) for comp in comps) <= bound_len:
+    if bound_len is not None and all(len(comp.trans) for comp in comps) <= bound_len:
         print("bound was not needed")
     
     # the known bounds are for identifying codes on the infinite hexagonal grid
