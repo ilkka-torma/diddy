@@ -276,11 +276,11 @@ class PeriodAutomaton:
             new_coloring = {}
             new_colors = set()
             for st in self.trans:
-                next_colors = {sym : 0 for sym in alph}
+                next_colors = {sym : {0} for sym in alph}
                 for (st2, syms) in self.trans[st].items():
                     for sym in syms:
-                        next_colors[sym] = coloring[st2]
-                new_color = (coloring[st],) + tuple(next_colors[sym] for sym in alph)
+                        next_colors[sym].add(coloring[st2])
+                new_color = (coloring[st],) + tuple(frozenset(next_colors[sym]) for sym in alph)
                 new_coloring[st] = new_color
                 new_colors.add(new_color)
             # Then, encode new colors as positive integers
