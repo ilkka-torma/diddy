@@ -359,6 +359,8 @@ def run_diddy(code, mode="report"):
                 print()
             the_sft.deduce_forbs(rad)
 
+        elif i[0] == "set_weights":
+            print (i[1])
 
         elif mode == "report":
             raise Exception("Unknown command %s." % i[0])

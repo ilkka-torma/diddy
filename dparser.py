@@ -6,7 +6,10 @@ token means string or integers or whatever
 name is a string
 """
 
+import fractions
+
 alphabet = [0, 1]
+accept_repeats_in_forbos = True
 
 def parse(s):
     commands =[]
@@ -89,6 +92,16 @@ def parse_command(s):
                 raise Exception("When giving explicit forbidden patterns, use SFT or clopen command.")
             forbos, s = read_forbidden_patterns(s)
             return (op, name, "forbos", forbos), s
+
+    elif op == "set_weights":
+        weights = {}
+        while True:
+            symbol, s = read_simple_token(s)
+            if symbol == None:
+                break
+            weight, s = read_fraction(s)
+            weights[symbol] = weight
+        return (op, weights), s
             
     elif op == "minimum_density":
         name, s = read_name(s, True)
@@ -223,6 +236,38 @@ def read_signed_number(s):
         return int(s) * sign, ""
     return None, s
 
+def read_fraction(s):
+    _, ss = ignore_space(s)
+    sign = 1
+    while ss[:1] == "-":
+        sign *= -1
+        ss = ss[1:]
+        _, ss = ignore_space(ss)
+    i = 0
+    numerator = ""
+    while i < len(ss):
+        if not ss[i].isdigit():
+            if i > 0:
+                numerator = int(ss[:i]) * sign
+                break
+            else:
+                return None, s
+        i += 1
+    if ss[i:i+1] != "/":
+        return "", s
+    ss = ss[i+1:]
+    denominator = ""
+    while i <= len(ss):
+        if i == len(ss) or not ss[i].isdigit():
+            if i > 0:
+                denominator = int(ss[:i])
+                break
+            else:
+                return None, s
+        i += 1
+            
+    return fractions.Fraction(numerator, denominator), ss[i:]
+
 def read_vector(s):
     _, s = ignore_space(s)
     if s and s[0] == "(":
@@ -275,7 +320,8 @@ def read_forbidden_pattern(s):
         value, s = read_simple_token(s)
         #print(value, "lkois")
         vector = tuple(vector)
-        assert vector not in pattern
+        if not accept_repeats_in_forbos:
+            assert vector not in pattern
         pattern[vector] = value
         _, s = ignore_space_except_eol(s)
         _, s = ignore_symbol(s, ",")

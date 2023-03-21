@@ -313,8 +313,9 @@ class SFT:
         self.forbs = new_forbs
 
     def deduce_forbs_(self, domain=None):
+        verbose_deb = True
         if type(domain) == int:
-            if len(alphabet) == 2:
+            if len(self.alph) == 2:
                 domain = [vec + (node,) for vec in centered_hypercube(self.dim, domain)
                           for node in self.nodes]
             else:
@@ -332,7 +333,6 @@ class SFT:
         # we want to tile domain so that it has no existing forbos, but
         # the circuit fails at the origin
         complemented = NOT(self.circuit.copy())
-
         forbiddens = []
         for f in self.forbs:
             # anchor is just some position in domain of forbo (without node info)
@@ -374,9 +374,10 @@ class SFT:
         minimal = minimize_solution(complemented, minimal)
         #a = bbb
 
-        # print("new minimal", minimal)
+        if verbose_deb: print("new minimal", minimal)
 
         self.forbs.append(minimal)
+        
         self.deduce_forbs_(domain)
 
     def contains(self, other, limit = None, return_radius = False):
