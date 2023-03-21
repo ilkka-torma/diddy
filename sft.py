@@ -266,7 +266,6 @@ class SFT:
             self.circuit = AND(*anded)
 
     def deduce_forbs(self, domain=None):
-        self.forbs = []
         if type(domain) == int:
             domain = [vec + (node,) for vec in Z2square(domain) for node in self.nodes]
         if domain is None:
@@ -277,46 +276,47 @@ class SFT:
         # we want to tile domain so that it has no existing forbos, but
         # the circuit fails at the origin
         complemented = NOT(self.circuit.copy())
-
-        forbiddens = []
-        for f in self.forbs:
-            # anchor is just some position in domain of forbo (without node info)
-            # which we will position in various places
-            anchor = list(f)[0][:-1]
-            for v in domain:
-                for t in f:
-                    if vadd(vsub(t[:-1], anchor), v) not in domain:
-                        continue
-                # we go here if the entire forbidden pattern translate fits in domain
-                else:
-                    # we make a circuit that says the we differ from the pattern somewhere
-                    oreds = []
+        found_forbs = []
+        while True:
+            forbiddens = []
+            for f in found_forbs:
+                # anchor is just some position in domain of forbo (without node info)
+                # which we will position in various places
+                anchor = list(f)[0][:-1]
+                for v in domain:
                     for t in f:
-                        u = vadd(v, vsub(t[:-1], anchor)) + (t[-1],)
-                        value = f[t]
-                        if value == self.alph[1]:
-                            oreds.append(NOT(V(u)))
-                        else:
-                            oreds.append(V(u))
-                    forbiddens.append(OR(*oreds))
+                        if vadd(vsub(t[:-1], anchor), v) not in domain:
+                            continue
+                    # we go here if the entire forbidden pattern translate fits in domain
+                    else:
+                        # we make a circuit that says the we differ from the pattern somewhere
+                        oreds = []
+                        for t in f:
+                            u = vadd(v, vsub(t[:-1], anchor)) + (t[-1],)
+                            value = f[t]
+                            if value == self.alph[1]:
+                                oreds.append(NOT(V(u)))
+                            else:
+                                oreds.append(V(u))
+                        forbiddens.append(OR(*oreds))
 
-        m = SAT(AND(complemented, *forbiddens), True)
-        if m == False:
-            return None
+            m = SAT(AND(complemented, *forbiddens), True)
+            if m == False:
+                self.forbs = found_forbs
+                return None
 
-        # we now know that m is a forbidden thingy
-        # we then try to minimize it...
-        minimal = {}
-        for v in complemented.get_variables():
-            minimal[v] = m[v]
-        #print("minimizing", minimal)
-        minimal = minimize_solution(complemented, minimal)
-        #a = bbb
+            # we now know that m is a forbidden thingy
+            # we then try to minimize it...
+            minimal = {}
+            for v in complemented.get_variables():
+                minimal[v] = m[v]
+            #print("minimizing", minimal)
+            minimal = minimize_solution(complemented, minimal)
+            #a = bbb
 
-        # print("new minimal", minimal)
+            # print("new minimal", minimal)
 
-        self.forbs.append(minimal)
-        self.deduce_forbs(domain)
+            found_forbs.append(minimal)
 
     def contains(self, other, limit = None, return_radius = False):
         r = 1
