@@ -7,7 +7,7 @@ import sys
 import pickle
 import argparse
 import fractions
-import frozendict as fd
+#import frozendict as fd
 from sft import *
 
 NUM_THREADS = 2
@@ -121,7 +121,7 @@ class PeriodAutomaton:
     # trans has type dict[state] -> (dict[state] -> label(s))
     # After minimization, only the lowest weights are kept
 
-    def __init__(self, sft, periods, rotate=False, sym_bound=None, verbose=False, immediately_relabel=True, check_periods=True, frontier_label=True):
+    def __init__(self, sft, periods, rotate=False, sym_bound=None, verbose=False, immediately_relabel=True, check_periods=True, all_labels=True):
         if verbose:
             print("constructing period automaton with periods", periods, "no symmetry" if sym_bound is None else "symmetry %s"%sym_bound, "rotated" if rotate else "not rotated")
         self.sft = sft
@@ -166,7 +166,7 @@ class PeriodAutomaton:
         self.immediately_relabel = immediately_relabel
         self.sym_bound = sym_bound
         self.rotate = rotate
-        self.frontier_label = frontier_label
+        self.all_labels = all_labels
 
     def populate(self, verbose=False, report=5000):
         self.s2idict = {}
@@ -189,7 +189,7 @@ class PeriodAutomaton:
         task_q = mp.Queue()
         res_q = mp.Queue()
         processes = [mp.Process(target=populate_worker,
-                                args=(self.pmat, self.sft.alph, self.border_forbs, self.node_frontier, self.sym_bound, self.rotate, self.frontier_label,
+                                args=(self.pmat, self.sft.alph, self.border_forbs, self.node_frontier, self.sym_bound, self.rotate,
                                       task_q, res_q))
                      for _ in range(NUM_THREADS)]
         for pr in processes:
@@ -206,7 +206,7 @@ class PeriodAutomaton:
             if type(res) == int: 
                 undone -= res
                 continue
-            for (state, front_or_weight, new_state) in res:
+            for (state, weight, new_state) in res:
                 if new_state not in self.states:
                     self.states.add(new_state)
                     if verbose and len(self.states)%report == 0:
@@ -223,15 +223,15 @@ class PeriodAutomaton:
                 if state_idx not in self.trans:
                     self.trans[state_idx] = dict()
                 try:
-                    if self.frontier_label:
-                        self.trans[state_idx][new_state_idx].add(fd.frozendict(front_or_weight))
+                    if self.all_labels:
+                        self.trans[state_idx][new_state_idx].add(weight)
                     else:
-                        self.trans[state_idx][new_state_idx] = min(self.trans[state_idx][new_state_idx], front_or_weight)
+                        self.trans[state_idx][new_state_idx] = min(self.trans[state_idx][new_state_idx], weight)
                 except KeyError:
-                    if self.frontier_label:
-                        self.trans[state_idx][new_state_idx] = set([fd.frozendict(front_or_weight)])
+                    if self.all_labels:
+                        self.trans[state_idx][new_state_idx] = set([weight])
                     else:
-                        self.trans[state_idx][new_state_idx] = front_or_weight
+                        self.trans[state_idx][new_state_idx] = weight
             if qq != []:
                 task_q.put(qq)
                 undone += len(qq)
@@ -246,7 +246,7 @@ class PeriodAutomaton:
            Assumes that all states are reachable, and that the transitions are frontier patterns.
            In the minimized automaton, transitions are weights and only minimal ones are kept.
         """
-        assert self.frontier_label
+        assert self.all_labels
         if verbose:
             print("minimizing")
         
@@ -300,13 +300,13 @@ class PeriodAutomaton:
         for (st, tr) in self.trans.items():
             new_trans[new_coloring[st]-1] = dict()
             for (st2, syms) in tr.items():
-                new_trans[new_coloring[st]-1][new_coloring[st2]-1] = min(sum(sym.values()) for sym in syms)
+                new_trans[new_coloring[st]-1][new_coloring[st2]-1] = min(sym for sym in syms)
                 
         self.trans = new_trans
         self.i2sdict = {(new_coloring[ix]-1):st for (st, ix) in self.s2idict.items()}
         self.s2idict = {st:ix for (ix, st) in self.i2sdict.items()}
         self.states = set(self.s2idict.keys())
-        self.frontier_label = False
+        self.all_labels = False
         
         #print("after min")
         #print("trans", set(self.trans.keys()))
@@ -752,7 +752,7 @@ class PeriodAutomaton:
 def border_at(pmat, vec):
     return 0 # TODO: change
 
-def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, frontier_label, task_queue, res_queue):
+def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_queue, res_queue):
     numf = len(border_forbs)
     #border_sets = [set(forb) for forb in border_forbs]
     if rotate:
@@ -824,7 +824,7 @@ def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, front
                                 sym_pairs[ix%(numf//2), tr] = 1 - sym_pairs.get((ix%(numf//2), tr), 0)
                             new_state += 2**(numf*tr + ix)
                     if sym_bound is None or sum(sym_pairs.values()) <= sym_bound:
-                        ret.append((state, new_front if frontier_label else sum(new_front.values()), new_state))
+                        ret.append((state, sum(new_front.values()), new_state))
                         if len(ret) >= CHUNK_SIZE:
                             res_queue.put(ret)
                             ret = []
@@ -1103,7 +1103,7 @@ if __name__ == "__main__":
         hex_iden_sft = SFT(2, nodes, alph, forbs)
         print("using", hex_iden_sft)
                      
-        nfa = PeriodAutomaton(hex_iden_sft,[(s,h)],sym_bound=sym_b,verbose=True,immediately_relabel=True,rotate=rotate, frontier_label=True)
+        nfa = PeriodAutomaton(hex_iden_sft,[(s,h)],sym_bound=sym_b,verbose=True,immediately_relabel=True,rotate=rotate, all_labels=True)
         nfa.populate(verbose=True, report=reportpop)
         print("time taken after pop:", time.time()-starttime, "seconds")
         nfa.relabel()
