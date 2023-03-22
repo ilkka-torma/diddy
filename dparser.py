@@ -42,7 +42,7 @@ def parse_command(s):
         l, s = read_number(s)
         return ("dim", l), s
     elif op == "topology":
-        l, s = read_any_symbol(s, ["grid", "hexgrid", "hex"])
+        l, s = read_any_symbol(s, ["squaregrid", "square", "grid", "hexgrid", "hex", "king", "kinggrid", "triangle", "trianglegrid"])
         if l != None:
             return ("topology", l), s
         simplices = []

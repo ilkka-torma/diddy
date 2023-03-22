@@ -208,6 +208,20 @@ hexgrid = [("up", (0,0,0), (0,1,1)),
            ("lt", (0,0,0), (-1,0,1)),
            ("rt", (0,0,1), (1,0,0)),
            ("lt", (0,0,1), (0,0,0))]
+kinggrid = [("E", (0,0,0), (1,0,0)),
+            ("NE", (0,0,0), (1,1,0)),
+            ("N", (0,0,0), (0,1,0)),
+            ("NW", (0,0,0), (-1,1,0)),
+            ("W", (0,0,0), (-1,0,0)),
+            ("SW", (0,0,0), (-1,-1,0)),
+            ("S", (0,0,0), (0,-1,0)),
+            ("SE", (0,0,0), (1,-1,0))]
+trianglegrid = [("E", (0,0,0), (1,0,0)),
+            ("NE", (0,0,0), (1,1,0)),
+            ("N", (0,0,0), (0,1,0)),
+            ("W", (0,0,0), (-1,0,0)),
+            ("SW", (0,0,0), (-1,-1,0)),
+            ("S", (0,0,0), (0,-1,0))]
 
 def run_diddy(code, mode="report"):
     parsed = dparser.parse(code)
@@ -226,12 +240,18 @@ def run_diddy(code, mode="report"):
         elif i[0] == "alphabet":
             alphabet = i[1]
         elif i[0] == "topology":
-            if i[1] == "grid":
+            if i[1] in ["square", "grid", "squaregrid"]:
                 topology = grid
                 nodes = [0]
-            elif i[1] == "hex" or i[1] == "hexgrid":
+            elif i[1] in ["hex", "hexgrid"]:
                 topology = hexgrid
                 nodes = [0, 1]
+            elif i[1] in ["king", "kinggrid"]:
+                topology = kinggrid
+                nodes = [0]
+            elif i[1] in ["triangle", "trianglegrid"]:
+                topology = trianglegrid
+                nodes = [0]
             else:
                 topology = i[1]
             #print(topology)

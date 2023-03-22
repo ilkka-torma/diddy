@@ -374,7 +374,13 @@ class SFT:
         minimal = minimize_solution(complemented, minimal)
         #a = bbb
 
-        if verbose_deb: print("new minimal", minimal)
+        print("new minimal", minimal)
+        if verbose_deb and False: # todo
+            assert len(self.alph) == 2
+            forb_str = ""
+            for t in sorted(minimal):
+                 print(t, minimal[t])    
+            
 
         self.forbs.append(minimal)
         
