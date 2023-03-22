@@ -259,6 +259,7 @@ def run_diddy(code, mode="report"):
             print("Computing minimum density for %s restricted to period(s) %s"%(i[1], periods))
             nfa = period_automaton.PeriodAutomaton(the_sft, periods)
             nfa.populate()
+            nfa.minimize()
             comps = list(nfa.strong_components())
             del nfa
             min_data = (math.inf,)

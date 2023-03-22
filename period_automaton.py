@@ -241,14 +241,12 @@ class PeriodAutomaton:
         if verbose:
             print("done with #states", len(self.states))
             
-    def minimize(self, verbose=False, min_trans=False):
+    def minimize(self, verbose=False):
         """Minimize using Moore's algorithm.
            Assumes that all states are reachable, and that the transitions are frontier patterns.
            In the minimized automaton, transitions are weights and only minimal ones are kept.
         """
         assert self.all_labels
-        if verbose:
-            print("minimizing (round {})".format(2 if min_trans else 1))
         
         #print("before min")
         #print("trans", self.trans)
@@ -257,63 +255,80 @@ class PeriodAutomaton:
         #print("s2i", self.s2idict)
         # Maintain a coloring of the states; states with different colors are provably non-equivalent
         # Color 0 is "no state"
-        coloring = {st : 1 for st in self.trans}
-        colors = set([1])
-        num_colors = 1
         #for tr in self.trans.values():
         #    print(tr)
         #    break
         alph = list(set(sym for tr in self.trans.values() for syms in tr.values() for sym in syms))
-        #print(alph)
-        
-        # Iteratively update coloring based on the colors of successors
-        i = 0
+        #print("alph", alph)
+
+        coloring = {st : 1 for st in self.trans}
+        colors = set([1])
+        num_colors = 1
+        trans = self.trans
+        s2idict = self.s2idict
+
+        r = 1
         while True:
             if verbose:
-                i += 1
-                print("{}: {} states separated.".format(i, num_colors))
-            # First, use tuples of colors as new colors
-            new_coloring = {}
-            new_colors = set()
-            for st in self.trans:
-                next_colors = {sym : {0} for sym in alph}
-                for (st2, syms) in self.trans[st].items():
-                    for sym in syms:
-                        next_colors[sym].add(coloring[st2])
-                new_color = (coloring[st],) + tuple(frozenset(next_colors[sym]) for sym in alph)
-                new_coloring[st] = new_color
-                new_colors.add(new_color)
-            # Then, encode new colors as positive integers
-            color_nums = { color : i for (i, color) in enumerate(new_colors, start=1) }
-            new_coloring = { st : color_nums[color] for (st, color) in new_coloring.items() }
-            new_num_colors = len(new_colors)
-            # If strictly more colors were needed, repeat
-            if num_colors == new_num_colors:
+                print("minimizing (round {})".format(r))
+            r += 1
+            # Iteratively update coloring based on the colors of successors
+            i = 0
+            while True:
+                if verbose:
+                    i += 1
+                    print("{}: {} states separated.".format(i, num_colors))
+                # First, use tuples of colors as new colors
+                new_coloring = {}
+                new_colors = set()
+                for st in trans:
+                    next_colors = {sym : {0} for sym in alph}
+                    for (st2, syms) in trans[st].items():
+                        for sym in syms:
+                            next_colors[sym].add(coloring[st2])
+                    new_color = (coloring[st],) + tuple(frozenset(next_colors[sym]) for sym in alph)
+                    new_coloring[st] = new_color
+                    new_colors.add(new_color)
+                # Then, encode new colors as positive integers
+                #print("coloring", new_coloring)
+                color_nums = { color : i for (i, color) in enumerate(new_colors, start=1) }
+                new_coloring = { st : color_nums[color] for (st, color) in new_coloring.items() }
+                new_num_colors = len(new_colors)
+                # If strictly more colors were needed, repeat
+                if num_colors == new_num_colors:
+                    break
+                else:
+                    colors = new_colors
+                    coloring = new_coloring
+                    num_colors = new_num_colors
+
+            # Compute new transition function and state set
+            all_single = True
+            new_trans = {}
+            for (st, tr) in trans.items():
+                col = new_coloring[st]-1
+                if col not in new_trans:
+                    new_trans[col] = dict()
+                for (st2, syms) in tr.items():
+                    col2 = new_coloring[st2]-1
+                    if col2 not in new_trans[col]:
+                        new_trans[col][col2] = set()
+                    new_trans[col][col2].add(min(sym for sym in syms))
+
+            if all(len(syms) == 1 for tr in new_trans.values() for syms in tr.values()):
+                for tr in new_trans.values():
+                    for st in tr:
+                        tr[st] = min(tr[st])
+                self.trans = new_trans
+                self.s2idict = {st:(new_coloring[ix]-1) for (st, ix) in s2idict.items()}
+                self.i2sdict = {ix:st for (st, ix) in self.s2idict.items()}
+                self.all_labels = False
                 break
             else:
-                colors = new_colors
-                coloring = new_coloring
-                num_colors = new_num_colors
+                trans = new_trans
+                s2idict = {st:(new_coloring[ix]-1) for (st, ix) in s2idict.items()}
+                #print(new_trans)
         
-        # Compute new transition function and state set
-        new_trans = {}
-        for (st, tr) in self.trans.items():
-            new_trans[new_coloring[st]-1] = dict()
-            for (st2, syms) in tr.items():
-                if min_trans:
-                    new_trans[new_coloring[st]-1][new_coloring[st2]-1] = min(sym for sym in syms)
-                else:
-                    new_trans[new_coloring[st]-1][new_coloring[st2]-1] = set([min(sym for sym in syms)])
-                
-        self.trans = new_trans
-        self.s2idict = {st:(new_coloring[ix]-1) for (st, ix) in self.s2idict.items()}
-        self.i2sdict = {ix:st for (st, ix) in self.s2idict.items()}
-        
-        #print("heheh")
-        if not min_trans:
-            self.minimize(min_trans=True, verbose=verbose)
-        else:
-            self.all_labels = False
         #print("after min")
         #print("trans", self.trans)
         #print("states", self.states)
@@ -415,8 +430,10 @@ class PeriodAutomaton:
             else:
                 continue
             break
-        
-        return min_num, len(min_cycle), min_cycle, self.get_cycle_labels(min_cycle, verbose=verbose)
+
+        cyc_labels = self.get_cycle_labels(min_cycle, verbose=verbose)
+            
+        return min_num, len(cyc_labels), min_cycle, cyc_labels
 
     def linsqrt_min_density_cycle(self, bound_len=None, verbose=False, report=50):
         "Assume states are relabeled to range(len(self.trans))"
@@ -542,8 +559,10 @@ class PeriodAutomaton:
             else:
                 continue
             break
+
+        cyc_labels = self.get_cycle_labels(min_cycle, verbose=verbose)
             
-        return min_d, len(min_cycle), min_cycle, self.get_cycle_labels(min_cycle, verbose=verbose)
+        return min_d, len(cyc_labels), min_cycle, cyc_labels
 
     def linear_min_density_cycle(self, bound_len=None, verbose=False, report=50):
         "Assume states are relabeled to range(len(states))"
@@ -610,13 +629,13 @@ class PeriodAutomaton:
         border_sets = [set(forb) for forb in self.border_forbs]
         self.compute_i2sdict()
         labels = []
+        states = [self.i2sdict[cycle_as_states[0]]]
         if self.rotate:
             heights = [pmat[i][i] for i in range(len(pmat))]
-        for s in range(len(cycle_as_states)):
-            ass = cycle_as_states[s]
-            bss = cycle_as_states[(s+1)%len(cycle_as_states)]
-            a = self.i2sdict[ass]
-            b = self.i2sdict[bss]
+        s = 1
+        while True:
+            a = states[-1]
+            bix = cycle_as_states[s%len(cycle_as_states)]
             #if verbose: print("from", a, "to", b)
             shifted = [(f,0) for f in self.border_forbs]
             i = 0
@@ -631,7 +650,7 @@ class PeriodAutomaton:
             frontier = set(self.node_frontier)
             for new_front in pats(frontier, self.sft.alph):
                 try:
-                    if sum(new_front.values()) != self.trans[ass][bss]:
+                    if sum(new_front.values()) != self.trans[self.s2idict[a]][bix]:
                         continue
                 except KeyError:
                     print(ass, self.trans[ass], bss)
@@ -674,15 +693,19 @@ class PeriodAutomaton:
                         new_state = 0
                         for (forb, tr) in new_pairs:
                             ix = self.border_forbs.index(forb)
-                            new_state += 2**(numf*tr + ix)
-                    if self.s2idict[new_state] == self.s2idict[b]:
+                            new_state += 2**(numf*tr + ix)   
+                    if self.s2idict[new_state] == bix:
                         labels.append(new_front)
-                        break
+                        try:
+                            i = states.index(new_state)
+                            return labels[i:]
+                        except:
+                            states.append(new_state)
+                            break
             else:
-                print(ass,bss,self.trans)
+                print(a,b,self.trans)
                 raise Exception("bad cycle, no transition")
-        #if verbose: print("got labels", labels)
-        return labels
+            s += 1
 
 
     def compute_i2sdict(self):
@@ -1153,15 +1176,17 @@ if __name__ == "__main__":
     #print(dens,minlen,stcyc,cyc)
     if bound_len is not None and all(len(comp.trans) for comp in comps) <= bound_len:
         print("bound was not needed")
-    
+
+    denom = len(min_aut.frontier)*len(min_aut.sft.nodes)
+    #print(denom, min_data)
     # the known bounds are for identifying codes on the infinite hexagonal grid
     if COMP_MODE == CompMode.LINEAR_NOCYCLE:
         dens, minlen, minst = min_data
-        print("density", dens/(2*h), "known bounds", 23/55, 53/126)
+        print("density", dens/denom, "known bounds", 23/55, 53/126)
     else:
         dens, minlen, stcyc, cyc = min_data
-        print("density", fractions.Fraction(sum(b for fr in cyc for b in fr.values()), 2*h*len(cyc)), "~", dens/(2*h), "known bounds", 23/55, 53/126)
-    print("cycle length", minlen)
+        print("density", fractions.Fraction(sum(b for fr in cyc for b in fr.values()), denom*len(cyc)), "~", dens/denom, "known bounds", 23/55, 53/126)
+    print("cycle length", minlen, "in minimized automaton" if COMP_MODE == CompMode.LINEAR_NOCYCLE else "")
     if COMP_MODE != CompMode.LINEAR_NOCYCLE and PRINT_CYCLE:
         print("cycle:")
         print([tuple(sorted(pat.items())) for pat in cyc])
