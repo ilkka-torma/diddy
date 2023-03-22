@@ -7,6 +7,7 @@ import sys
 import pickle
 import argparse
 import fractions
+#import frozendict as fd
 from sft import *
 
 NUM_THREADS = 2
@@ -113,14 +114,14 @@ def nvadd(nvec, vec):
     return tuple(a+b for (a,b) in zip(nvec, vec)) + (nvec[-1],)
 
 class PeriodAutomaton:
-    # Alphabet is weights
+    # Transition labels are either frontier patterns or their weights
     # Frontier has size len(nodes) x height, and is slanted
     # States are collections of forbidden sets that intersect frontier and its right side
     # They are stored as integers to save space
-    # Height must be positive, nodes must be nonempty
-    # trans has type dict[state] -> (dict[state] -> weight) and only stores minimum weights
+    # trans has type dict[state] -> (dict[state] -> label(s))
+    # After minimization, only the lowest weights are kept
 
-    def __init__(self, sft, periods, rotate=False, sym_bound=None, verbose=False, immediately_relabel=True, check_periods=True):
+    def __init__(self, sft, periods, rotate=False, sym_bound=None, verbose=False, immediately_relabel=True, check_periods=True, all_labels=True):
         if verbose:
             print("constructing period automaton with periods", periods, "no symmetry" if sym_bound is None else "symmetry %s"%sym_bound, "rotated" if rotate else "not rotated")
         self.sft = sft
@@ -165,6 +166,7 @@ class PeriodAutomaton:
         self.immediately_relabel = immediately_relabel
         self.sym_bound = sym_bound
         self.rotate = rotate
+        self.all_labels = all_labels
 
     def populate(self, verbose=False, report=5000):
         debug_verbose = False
@@ -210,7 +212,7 @@ class PeriodAutomaton:
             if type(res) == int: 
                 undone -= res
                 continue
-            for (state, front_or_weight, new_state) in res:
+            for (state, weight, new_state) in res:
                 if new_state not in self.states:
                     self.states.add(new_state)
                     if verbose and len(self.states)%report == 0:
@@ -227,9 +229,15 @@ class PeriodAutomaton:
                 if state_idx not in self.trans:
                     self.trans[state_idx] = dict()
                 try:
-                    self.trans[state_idx][new_state_idx] = min(self.trans[state_idx][new_state_idx], front_or_weight)
+                    if self.all_labels:
+                        self.trans[state_idx][new_state_idx].add(weight)
+                    else:
+                        self.trans[state_idx][new_state_idx] = min(self.trans[state_idx][new_state_idx], weight)
                 except KeyError:
-                    self.trans[state_idx][new_state_idx] = front_or_weight
+                    if self.all_labels:
+                        self.trans[state_idx][new_state_idx] = set([weight])
+                    else:
+                        self.trans[state_idx][new_state_idx] = weight
             if qq != []:
                 task_q.put(qq)
                 undone += len(qq)
@@ -238,6 +246,100 @@ class PeriodAutomaton:
             pr.terminate()
         if verbose:
             print("done with #states", len(self.states))
+            
+    def minimize(self, verbose=False):
+        """Minimize using Moore's algorithm.
+           Assumes that all states are reachable, and that the transitions are frontier patterns.
+           In the minimized automaton, transitions are weights and only minimal ones are kept.
+        """
+        assert self.all_labels
+        
+        #print("before min")
+        #print("trans", self.trans)
+        #print("states", self.states)
+        #print("i2s", self.i2sdict)
+        #print("s2i", self.s2idict)
+        # Maintain a coloring of the states; states with different colors are provably non-equivalent
+        # Color 0 is "no state"
+        #for tr in self.trans.values():
+        #    print(tr)
+        #    break
+        alph = list(set(sym for tr in self.trans.values() for syms in tr.values() for sym in syms))
+        #print("alph", alph)
+
+        coloring = {st : 1 for st in self.trans}
+        colors = set([1])
+        num_colors = 1
+        trans = self.trans
+        s2idict = self.s2idict
+
+        r = 1
+        while True:
+            if verbose:
+                print("minimizing (round {})".format(r))
+            r += 1
+            # Iteratively update coloring based on the colors of successors
+            i = 0
+            while True:
+                if verbose:
+                    i += 1
+                    print("{}: {} states separated.".format(i, num_colors))
+                # First, use tuples of colors as new colors
+                new_coloring = {}
+                new_colors = set()
+                for st in trans:
+                    next_colors = {sym : {0} for sym in alph}
+                    for (st2, syms) in trans[st].items():
+                        for sym in syms:
+                            next_colors[sym].add(coloring[st2])
+                    new_color = (coloring[st],) + tuple(frozenset(next_colors[sym]) for sym in alph)
+                    new_coloring[st] = new_color
+                    new_colors.add(new_color)
+                # Then, encode new colors as positive integers
+                #print("coloring", new_coloring)
+                color_nums = { color : i for (i, color) in enumerate(new_colors, start=1) }
+                new_coloring = { st : color_nums[color] for (st, color) in new_coloring.items() }
+                new_num_colors = len(new_colors)
+                # If strictly more colors were needed, repeat
+                if num_colors == new_num_colors:
+                    break
+                else:
+                    colors = new_colors
+                    coloring = new_coloring
+                    num_colors = new_num_colors
+
+            # Compute new transition function and state set
+            all_single = True
+            new_trans = {}
+            for (st, tr) in trans.items():
+                col = new_coloring[st]-1
+                if col not in new_trans:
+                    new_trans[col] = dict()
+                for (st2, syms) in tr.items():
+                    col2 = new_coloring[st2]-1
+                    if col2 not in new_trans[col]:
+                        new_trans[col][col2] = set()
+                    new_trans[col][col2].add(min(sym for sym in syms))
+
+            if all(len(syms) == 1 for tr in new_trans.values() for syms in tr.values()):
+                for tr in new_trans.values():
+                    for st in tr:
+                        tr[st] = min(tr[st])
+                self.trans = new_trans
+                self.s2idict = {st:(new_coloring[ix]-1) for (st, ix) in s2idict.items()}
+                self.i2sdict = {ix:st for (st, ix) in self.s2idict.items()}
+                self.all_labels = False
+                break
+            else:
+                trans = new_trans
+                s2idict = {st:(new_coloring[ix]-1) for (st, ix) in s2idict.items()}
+                #print(new_trans)
+        
+        #print("after min")
+        #print("trans", self.trans)
+        #print("states", self.states)
+        #print("i2s", self.i2sdict)
+        #print("s2i", self.s2idict)
 
     def relabel(self):
         if self.immediately_relabel:
@@ -253,7 +355,7 @@ class PeriodAutomaton:
         "Assume states are relabeled to range(len(states))"
         if verbose:
             print("finding min density cycle in O(n^2) space")
-        n = len(self.states)
+        n = len(self.trans)
         if bound_len is None:
             m = n+1
         else:
@@ -334,14 +436,16 @@ class PeriodAutomaton:
             else:
                 continue
             break
-        
-        return min_num, len(min_cycle), min_cycle, self.get_cycle_labels(min_cycle, verbose=verbose)
+
+        cyc_labels = self.get_cycle_labels(min_cycle, verbose=verbose)
+            
+        return min_num, len(cyc_labels), min_cycle, cyc_labels
 
     def linsqrt_min_density_cycle(self, bound_len=None, verbose=False, report=50):
-        "Assume states are relabeled to range(len(states))"
+        "Assume states are relabeled to range(len(self.trans))"
         if verbose:
             print("finding min density cycle on O(n^(2/3)) space")
-        n = len(self.states)
+        n = len(self.trans)
         if bound_len is None:
             m = n+1
         else:
@@ -443,6 +547,8 @@ class PeriodAutomaton:
             proc.terminate()
             
         # check path length and weight
+        #print(path)
+        #print(self.trans)
         assert len(path) == m+1
         assert sum(self.trans[path[k]][path[k+1]] for k in range(m)) == sparse_mins[n*(len(sparse_rows)-1)+path[0]]
 
@@ -459,14 +565,16 @@ class PeriodAutomaton:
             else:
                 continue
             break
+
+        cyc_labels = self.get_cycle_labels(min_cycle, verbose=verbose)
             
-        return min_d, len(min_cycle), min_cycle, self.get_cycle_labels(min_cycle, verbose=verbose)
+        return min_d, len(cyc_labels), min_cycle, cyc_labels
 
     def linear_min_density_cycle(self, bound_len=None, verbose=False, report=50):
         "Assume states are relabeled to range(len(states))"
         if verbose:
             print("finding min density of cycle in O(n) space")
-        n = len(self.states)
+        n = len(self.trans)
         if bound_len is None:
             m = n+1
         else:
@@ -527,13 +635,13 @@ class PeriodAutomaton:
         border_sets = [set(forb) for forb in self.border_forbs]
         self.compute_i2sdict()
         labels = []
+        states = [self.i2sdict[cycle_as_states[0]]]
         if self.rotate:
             heights = [pmat[i][i] for i in range(len(pmat))]
-        for s in range(len(cycle_as_states)):
-            ass = cycle_as_states[s]
-            bss = cycle_as_states[(s+1)%len(cycle_as_states)]
-            a = self.i2sdict[ass]
-            b = self.i2sdict[bss]
+        s = 1
+        while True:
+            a = states[-1]
+            bix = cycle_as_states[s%len(cycle_as_states)]
             #if verbose: print("from", a, "to", b)
             shifted = [(f,0) for f in self.border_forbs]
             i = 0
@@ -548,7 +656,7 @@ class PeriodAutomaton:
             frontier = set(self.node_frontier)
             for new_front in pats(frontier, self.sft.alph):
                 try:
-                    if sum(new_front.values()) != self.trans[ass][bss]:
+                    if sum(new_front.values()) != self.trans[self.s2idict[a]][bix]:
                         continue
                 except KeyError:
                     print(ass, self.trans[ass], bss)
@@ -591,15 +699,19 @@ class PeriodAutomaton:
                         new_state = 0
                         for (forb, tr) in new_pairs:
                             ix = self.border_forbs.index(forb)
-                            new_state += 2**(numf*tr + ix)
-                    if new_state == b:
+                            new_state += 2**(numf*tr + ix)   
+                    if self.s2idict[new_state] == bix:
                         labels.append(new_front)
-                        break
+                        try:
+                            i = states.index(new_state)
+                            return labels[i:]
+                        except:
+                            states.append(new_state)
+                            break
             else:
-                print(ass,bss,self.trans)
+                print(a,b,self.trans)
                 raise Exception("bad cycle, no transition")
-        #if verbose: print("got labels", labels)
-        return labels
+            s += 1
 
 
     def compute_i2sdict(self):
@@ -629,6 +741,10 @@ class PeriodAutomaton:
     def strong_components(self):
         "Tarjan's algorithm, implicit recursion"
         self.compute_i2sdict()
+        #print("trans", self.trans)
+        #print("states", self.states)
+        #print("i2s", self.i2sdict)
+        #print("s2i", self.s2idict)
         comps = []
         lows = {}
         stack = []
@@ -659,9 +775,8 @@ class PeriodAutomaton:
                                 break
                         if len(comp) > 1 or cur in self.trans.get(cur, []):
                             aut = PeriodAutomaton(self.sft, self.pmat, self.rotate, self.sym_bound, False, self.immediately_relabel, check_periods=False)
-                            aut.states = set(st for st in self.states if self.s2idict[st] in comp)
-                            aut.s2idict = {st : i
-                                           for (i,st) in enumerate(aut.states)}
+                            aut.s2idict = {st:ix for (st, ix) in self.s2idict.items() if ix in comp}
+                            aut.states = set(aut.s2idict)
                             aut.trans = {aut.s2idict[self.i2sdict[st]] : {aut.s2idict[self.i2sdict[st2]] : c
                                                                           for (st2, c) in self.trans[st].items()
                                                                           if st2 in comp}
@@ -1024,10 +1139,13 @@ if __name__ == "__main__":
         hex_iden_sft = SFT(2, nodes, alph, forbs)
         print("using", hex_iden_sft)
                      
-        nfa = PeriodAutomaton(hex_iden_sft,[(s,h)],sym_bound=sym_b,verbose=True,immediately_relabel=True,rotate=rotate)
+        nfa = PeriodAutomaton(hex_iden_sft,[(s,h)],sym_bound=sym_b,verbose=True,immediately_relabel=True,rotate=rotate, all_labels=True)
         nfa.populate(verbose=True, report=reportpop)
         print("time taken after pop:", time.time()-starttime, "seconds")
         nfa.relabel()
+        nfa.minimize(verbose=True)
+        print("done with #states", len(nfa.trans))
+        print("time taken after minimization:", time.time()-starttime, "seconds")
         if PRINT_NFA:
             print(nfa.trans)
         if args.outfile is not None or args.autosave:
@@ -1050,7 +1168,7 @@ if __name__ == "__main__":
     min_comp = None
     for (ic, comp) in enumerate(comps):
         # TODO: special case components that are cycles
-        print("analyzing connected component", ic+1, "/", len(comps), "with", len(comp.states), "states")
+        print("analyzing connected component", ic+1, "/", len(comps), "with", len(comp.trans), "states")
         if COMP_MODE == CompMode.SQUARE_CYCLE:
             data = comp.square_min_density_cycle(bound_len=bound_len, verbose=True, report=reportcyc)
         elif COMP_MODE == CompMode.LINSQRT_CYCLE:        
@@ -1062,17 +1180,19 @@ if __name__ == "__main__":
             min_aut = comp
     print("height %s, shear %s, bound %s, symmetry %s, rotation %s completed" % (h, s, bound_len, sym_b, rotate))
     #print(dens,minlen,stcyc,cyc)
-    if bound_len is not None and all(len(comp.states) for comp in comps) <= bound_len:
+    if bound_len is not None and all(len(comp.trans) for comp in comps) <= bound_len:
         print("bound was not needed")
-    
+
+    denom = len(min_aut.frontier)*len(min_aut.sft.nodes)
+    #print(denom, min_data)
     # the known bounds are for identifying codes on the infinite hexagonal grid
     if COMP_MODE == CompMode.LINEAR_NOCYCLE:
         dens, minlen, minst = min_data
-        print("density", dens/(2*h), "known bounds", 23/55, 53/126)
+        print("density", dens/denom, "known bounds", 23/55, 53/126)
     else:
         dens, minlen, stcyc, cyc = min_data
-        print("density", fractions.Fraction(sum(b for fr in cyc for b in fr.values()), 2*h*len(cyc)), "~", dens/(2*h), "known bounds", 23/55, 53/126)
-    print("cycle length", minlen)
+        print("density", fractions.Fraction(sum(b for fr in cyc for b in fr.values()), denom*len(cyc)), "~", dens/denom, "known bounds", 23/55, 53/126)
+    print("cycle length", minlen, "in minimized automaton" if COMP_MODE == CompMode.LINEAR_NOCYCLE else "")
     if COMP_MODE != CompMode.LINEAR_NOCYCLE and PRINT_CYCLE:
         print("cycle:")
         print([tuple(sorted(pat.items())) for pat in cyc])

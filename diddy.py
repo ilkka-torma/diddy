@@ -283,6 +283,7 @@ def run_diddy(code, mode="report"):
             if verbose_here: print("const")
             nfa.populate()
             if verbose_here: print("popula")
+            nfa.minimize()
             comps = list(nfa.strong_components())
             if verbose_here: print("strng com")
             del nfa
