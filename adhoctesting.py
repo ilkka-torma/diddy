@@ -374,15 +374,15 @@ let sep s a b := (s~a & s!~b) | (s~b & s!~a) in -- s separates a from b, assumes
 #unit_tests.append(("redu", redundant_id))
 
 default_parse = """
-%Wang kek
-0 0 1 0;
-1 1 1 0;
-0 0 0 0
-%Wang kek2
-0 0 1 0;
-1 1 0 1;
-0 0 0 0;
-%contains kek kek2
+%topology hex
+%Wang mes @topology inverses=[[up dn] [rt lt]]
+[variable] a [0 1]; -- variable for symbols
+[variable] b [0 1]; -- same
+[0] up=0 rt=1 lt=0; -- we can explicitly name the directions
+-- by default in same order as in inverses list, so here dn rt lt
+[1] dn=1 lt=1 rt=0;
+-- %contains kek kek2
+%show_formula mes
 """
 unit_tests.append(("default parse test", default_parse))
 

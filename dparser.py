@@ -182,19 +182,38 @@ def parse_command(s):
         must_be_done = False
 
         kwargs = {}
+        flags = {}
         while True: # this parses list of argument lists
             if len(args) > 0:
                 must_be_done = True
             while True: # this parses a single argument list
                 #print("largs", repr(s))
                 kwarg, s = read_keyword_arg(s)
+                #print(kwarg)
                 if kwarg != None:
                     #args.append(kwarg)
                     assert kwarg[0] == "KWARG"
-                    if len(arglists) != 0:
-                        raise Exception("Keyword arguments not allowed in list of argument lists.")
-                    kwargs[kwarg[1]] = kwarg[2]
+                    #if len(arglists) != 0:
+                    #    raise Exception("Keyword arguments not allowed in list of argument lists.")
+
+                    # it turns out that it's nice to allow "keyword args" also in list,
+                    # namely in Wang tiles...
+                    # but then we won't put them on the kwargs list but return a SET-tuple...
+
+                    if len(arglists) == 0 and len(args) <= initial_args:
+                        kwargs[kwarg[1]] = kwarg[2]
+                    else:
+                        if must_be_done:
+                            raise Exception("%s wants a simple argument list, but is given a list of lists." % op)
+                        args.append(("SET", kwarg[1], kwarg[2]))
+                    continue
                     #print(kwarg)
+                flag, s = read_flag(s)
+                if flag != None:
+                    assert flag[0] == "FLAG"
+                    if len(arglists) != 0:
+                        raise Exception("Flags not allowed in list of argument lists.")
+                    flags[flag[2]] = flag[1]
                 else:
                     arg, s = read_object(s)
                     if arg == None:
@@ -224,11 +243,11 @@ def parse_command(s):
         if list_command == True:
             #print("mois")
             #if first_is_name:
-            return (op,) + tuple(initials) + (arglists, kwargs), s
+            return (op,) + tuple(initials) + (arglists, kwargs, flags), s
             #print(arglists)
             # return (op, arglists), s
         #print("her")
-        return (op, args, kwargs), s
+        return (op, args, kwargs, flags), s
     
 # ignore space, including comments
 def ignore_space(s):
@@ -324,8 +343,12 @@ def read_keyword_arg(s):
         return None, s
     return ("KWARG", name, val), ss
 
+# read object for command language
 def read_object(s):
     _, ss = ignore_space(s)
+    ret, ss = read_list(ss)
+    if ret != None:
+        return ret, ss
     ret, ss = read_vector(ss)
     if ret != None:
         #print("vector", ret)
@@ -342,11 +365,49 @@ def read_object(s):
     if ret != None:
         #print("num", ret)
         return ret, ss
-    ret, ss = read_name(ss, True)
+    ret, ss = read_high_level_name(ss)
     if ret != None:
         #print("name", ret)
         return ret, ss
     return None, s
+
+# this is more or less the same as a vector, but reads general objects
+def read_list(s):
+    _, ss = ignore_space(s)
+    if ss[:1] == "[":
+        ss = ss[1:]
+    else:
+        return None, s
+    vec = []
+    _, ss = ignore_space(ss)
+    while True:
+        entry, ss = read_object(ss)
+        if entry == None:
+            break
+        vec.append(entry)
+        _, ss = ignore_space(ss)
+        _, ss = ignore_symbol(ss, ",") # it's fine to separate by comma
+        _, ss = ignore_space(ss)
+        # raise Exception("Unexpected token while reading list:", s[0])
+    _, ss = ignore_space(ss)
+    if ss[:1] != "]":
+        return None, s
+    return vec, ss[1:]
+
+def read_flag(s):
+    _, ss = ignore_space(s)
+    sym, ss = read_symbol(ss, "@")
+    if sym == None and ss[:1] != "!":
+        return None, s
+
+    # we either read a sign or ! which means negation and only used for flags...
+    sign = True
+    while ss[:1] == "!":
+        sign = not sign
+    obj, ss = read_object(ss)
+    if obj == None:
+        return None, s
+    return ("FLAG", sign, obj), ss
 
 def read_signed_number(s):
     _, s = ignore_space(s)

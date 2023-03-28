@@ -145,8 +145,139 @@ xor (xor o=1 o.up.up=1) o.rt.rt=1
 ('NOT', ('HASVAL', ['o', 'dn'], 1))))), '')
 """
 
+# for a dict with lists on the right, return all sections
+def get_sections(dicto):
+    #print(dicto)
+    # get an arbitrary key
+    if len(dicto) == 0:
+        yield {}
+        return
+    it = next(iter(dicto.items()))
+    # remove it
+    rest = dict(dicto)
+    del rest[it]
+    # recursive solution
+    for val in dicto[it]:
+        for sec in get_sections(rest):
+            sect = dict(sec)
+            sect[it] = val
+            yield sect
+
+# for each node, give the names of edges into it, and out of it, in order...
+def get_in_out_edges(topology):
+    in_edges = {}
+    out_edges = {}
+    for t in topology:
+        name, a, b = t
+        print(a, b)
+        if a[-1] not in out_edges:
+            out_edges[a[-1]] = []
+        out_edges[a[-1]].append(name)
+        if b[-1] not in in_edges:
+            in_edges[b[-1]] = []
+        in_edges[b[-1]].append(name)
+    return in_edges, out_edges
+
+# generate Wang tile SFT for the given topology...
+# this variant makes an explicit alphabet with a symbol for each Wang tile
+def general_Wang(tiles, nodes, topology, inverses):
+    raise Exception("I ran out of steam.")
+    # variables for symbols
+    var_ranges = {}
+    # for each node the variables usable there
+    node_tiles = {}
+
+    in_edges, out_edges = get_in_out_edges(topology)
+
+    # the inverses list is used as the default order for directions
+    directions = []
+    for dd in inverses:
+        directions.append(dd[0])
+        directions.append(dd[1])
+        
+    # given a tile as a tuple, return tile as dict
+    def fix_for_node(node, tile):
+        #print(node, tile,out_edges)
+        assert len(tile) == len(out_edges[node])
+
+        tile_colors = {}
+        remaining_colors = []
+        used_directions = set()
+        for t in tile:
+            if type(t) == tuple and t[0] == "SET":
+                tile_colors[t[1]] = t[2]
+                used_directions.add(t[1])
+            else:
+                #raise Exception("non-kw wangs not implemented yet")
+                remaining_colors.append(t)
+                
+        i = 0
+        for d in directions:
+            if d in out_edges[node]:
+                if d not in used_directions:
+                    tile_colors[d] = remaining_colors[i]
+                    i += 1
+        return tile_colors
+            
+    for t in tiles:
+        if t[0] == ["variable"]:
+            var_ranges[t[1]] = t[2]
+        else:
+            if type(t[0]) == list:
+                node_list = t[0]
+                tile = t[1:]
+            else:
+                node_list = nodes
+                tile = t
+            for n in node_list:
+                if n not in node_tiles:
+                    node_tiles[n] = []
+                node_tiles[n].append(fix_for_node(n, tile))
+    
+    inverses_dict = {}
+    all_seen = set()
+    for k in inverses:
+        inverses_dict[k[0]] = k[1]
+        all_seen.add(k[0])
+        all_seen.add(k[1])
+
+    # we want that an inverse is specified for all  
+    assert all_seen == set([t[0] for t in topology])
+
+    actual_tiles_per_node = {}
+    for n in nodes:
+        actual_tiles_per_node[n] = []
+        for t in node_tiles[n]:
+            interesting_ranges = {}
+            for c in t:
+                if t[c] in var_ranges:
+                    interesting_ranges[t[c]] = var_ranges[t[c]]
+            for var_vals in get_sections(interesting_ranges):
+                actual_tile = {}
+                for c in t:
+                    if t[c] in var_ranges:
+                        val = var_vals[t[c]]
+                    else:
+                        val = t[c]
+                    actual_tile[c] = val
+                actual_tiles_per_node[n].append(actual_tile)
+                    
+    # print(actual_tiles_per_node)
+
+    formula = "Ao \n"
+    # for each positive direction, require that ugh...
+    for n in nodes:
+        nodeformula = "o = o.%s -> (\n" % n
+        
+        for d in inverses_dict:
+            pass
+        for t in topology:
+            if t[-1] == None:
+                pass
+            
+
 # given list of tiles, return colors and formula
-def Wang(tiles):
+def basic_2d_Wang(tiles):
     ENWS_colors = set(), set(), set(), set()
     for t in tiles:
         for i in range(4):
@@ -422,11 +553,23 @@ def run_diddy(code, mode="report"):
 
         elif i[0] == "Wang" or i[0] == "wang":
             name = i[1]
-            print(i[1])
+            #print(i[1])
             tiles = i[2]
-            # for now, Wang tiles are always two-dimensional
-            colors, formula = Wang(tiles)
-            # print(formula)
+            kwargs = i[3]
+            flags = i[4]
+            custom_topology = False
+
+            #print(flags)
+            
+            # a flag can be used to make this use the current topology
+            if flags.get("topology", False) or flags.get("use_topology", False) or \
+               flags.get("custom_topology", False):
+                custom_topology = True
+                colors, formula = general_Wang(tiles, nodes, topology, kwargs.get("inverses", []))
+            # ad hoc code for 2d Wang tiles
+            else:
+                colors, formula = basic_2d_Wang(tiles)
+                
             circ = compiler.formula_to_circuit(Wang_nodes, 2, Wang_topology, colors, formula)
             SFTs[name] = sft.SFT(2, Wang_nodes, alphabet, circuit=circ, formula=formula)
 
