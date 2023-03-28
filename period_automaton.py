@@ -18,10 +18,10 @@ class CompMode(Enum):
     LINSQRT_CYCLE = 1 # recompute twice, use O(n^{3/2}) space, return cycle
     LINEAR_NOCYCLE = 2 # recompute once, use O(n) space, return only density and length
 
-COMP_MODE = None
+COMP_MODE = CompMode.LINEAR_NOCYCLE
 
 PRINT_NFA = False
-PRINT_CYCLE = True
+PRINT_CYCLE = False
 
 def vrot(vec, rots, heights):
     "Translate a vector cyclically in a hyperrectangle"
@@ -176,6 +176,7 @@ class PeriodAutomaton:
             #print("fiwejif")
             denoms = []
             for a in weights:
+                print(weights[a])
                 denoms.append(fr(weights[a], 1).denominator)
             self.weight_denominator = math.lcm(*denoms)
             self.weight_numerators = {}
@@ -461,7 +462,7 @@ class PeriodAutomaton:
     def linsqrt_min_density_cycle(self, bound_len=None, verbose=False, report=50):
         "Assume states are relabeled to range(len(self.trans))"
         if verbose:
-            print("finding min density cycle on O(n^(2/3)) space")
+            print("finding min density cycle in O(n^(2/3)) space")
         n = len(self.trans)
         if bound_len is None:
             m = n+1
@@ -567,7 +568,7 @@ class PeriodAutomaton:
         #print(path)
         #print(self.trans)
         assert len(path) == m+1
-        # this assert seems to assume weight = symbol
+        # this assert seems to assume weight = symbol... oh and for good reason because the code assumes it...
         if self.weight_numerators == None:
             #print(self.weight_numerators)
             assert sum(self.trans[path[k]][path[k+1]] for k in range(m)) == sparse_mins[n*(len(sparse_rows)-1)+path[0]]

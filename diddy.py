@@ -551,6 +551,7 @@ def run_diddy(code, mode="report"):
 
         elif i[0] == "set_weights":
             weights = i[1]
+            print(weights)
 
         elif i[0] == "Wang" or i[0] == "wang":
             name = i[1]

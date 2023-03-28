@@ -113,6 +113,8 @@ def parse_command(s):
             if symbol == None:
                 break
             weight, s = read_fraction(s)
+            if weight == None:
+                weight, s = read_signed_number(s)
             weights[symbol] = weight
         return (op, weights), s
             
