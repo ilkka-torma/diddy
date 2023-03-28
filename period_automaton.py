@@ -677,7 +677,7 @@ class PeriodAutomaton:
             frontier = set(self.node_frontier)
             for new_front in pats(frontier, self.sft.alph):
                 try:
-                    if sum(new_front.values()) != self.trans[self.s2idict[a]][bix]:
+                    if weighted_sum(self.weight_numerators, new_front.values()) != self.trans[self.s2idict[a]][bix]:
                         continue
                 except KeyError:
                     print(ass, self.trans[ass], bss)
