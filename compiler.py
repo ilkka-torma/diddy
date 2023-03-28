@@ -16,7 +16,7 @@ circuit_variables are aa little tricky... they should be functions
 """
 def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_var, all_vars):
     #print ("formula", formula)
-    ##print("variables", variables)
+    #print("variables", variables)
     #print ("vars", variables)
     #print ("aux vars", aux_var)
     #print ("alls", all_vars)
@@ -180,8 +180,10 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         if ret == None:
             #print("here", p1, v, type(v), alphabet)
             if v not in alphabet:
-                #print("v not ")
-                v = variables[v]
+                #print("%s not in", alphabet)
+                if v not in variables:
+                    raise Exception("%s is not in alphabet nor a variable" % v)
+                v = variables[v] # variables can also contain symbols
             if len(alphabet) == 2:
                 if v == alphabet[1]:
                     ret = V(p1)

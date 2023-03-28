@@ -145,6 +145,30 @@ xor (xor o=1 o.up.up=1) o.rt.rt=1
 ('NOT', ('HASVAL', ['o', 'dn'], 1))))), '')
 """
 
+# given list of tiles, return colors and formula
+def Wang(tiles):
+    ENWS_colors = set(), set(), set(), set()
+    for t in tiles:
+        for i in range(4):
+            ENWS_colors[i].add(t[i])
+    colors = ENWS_colors[0]
+    colors = colors.union(ENWS_colors[1])
+    colors = colors.union(ENWS_colors[2])
+    colors = colors.union(ENWS_colors[3])
+    formula = "ACo o.N = o.up.S & o.E = o.rt.W & (\n"
+    if len(tiles) == 0:
+        raise Exception("Empty list of Wang tiles not implemented.")
+    for t in tiles:
+        tile_formula = "("
+        # (o.E=3 & o.N=1 & o.W=3 & o.S=3) |
+        for d,i in zip("ENWS", t):
+            # i[1] is already parsed but is rewritten to formula...
+            tile_formula += "o.%s=%s & " % (d, str(i))
+        formula += tile_formula[:-3] + ") |\n"
+    formula = formula[:-3] + ")"
+    #print(formula)
+    return list(colors), dparser.read_formula(formula)[0]
+
 # given fof (formula or forbos), convert to a (parsed) formula
 def forbos_to_formula(fof):
     #print("gille", fof)
@@ -223,7 +247,14 @@ trianglegrid = [("E", (0,0,0), (1,0,0)),
             ("SW", (0,0,0), (-1,-1,0)),
             ("S", (0,0,0), (0,-1,0))]
 
+Wang_nodes = ["E", "N", "W", "S"]
+Wang_topology = [("up", (0,0,"N"), (0,1,"S")),
+                 ("dn", (0,0,"S"), (0,-1,"N")),
+                 ("rt", (0,0,"E"), (1,0,"W")),
+                 ("lt", (0,0,"W"), (-1,0,"E"))]
+
 def run_diddy(code, mode="report"):
+    print(code)
     parsed = dparser.parse(code)
     nodes = [0]
     alphabet = [0, 1]
@@ -255,9 +286,11 @@ def run_diddy(code, mode="report"):
             else:
                 topology = i[1]
             #print(topology)
+                
         elif i[0] == "SFT":
             #print(i)
             if i[2] == "formula":
+                #print (i[3])
                 circ = compiler.formula_to_circuit(nodes, dim, topology, alphabet, i[3])
                 SFTs[i[1]] = sft.SFT(dim, nodes, alphabet, circuit=circ, formula=i[3])
                 #print(formula)
@@ -325,15 +358,19 @@ def run_diddy(code, mode="report"):
             print()
 
         elif i[0][:5] == "equal":
-            if i[1] in SFTs:
+            if i[1] in SFTs and i[2] in SFTs:
                 SFT1 = SFTs[i[1]]
                 SFT2 = SFTs[i[2]]
                 report_SFT_equal((i[1], SFT1), (i[2], SFT2), mode=mode, truth=i[0][5:])
 
             else:
-                clopen1 = clopens[i[1]]
-                clopen2 = clopens[i[2]]
-                raise Exception("Comparison of clopen sets not implemented.")
+                raise Exception("%s or %s is not an SFT." % i[1:])
+            
+                #if i[1] not in clopens or i[2] not in clopens:
+                #    raise Exception("%s not a clopen set"i[1] )                
+                #clopen1 = clopens[i[1]]
+                #clopen2 = clopens[i[2]]
+                #raise Exception("Comparison of clopen sets not implemented.")
                 
         elif i[0][:8] == "contains":
 
@@ -382,6 +419,16 @@ def run_diddy(code, mode="report"):
 
         elif i[0] == "set_weights":
             print (i[1])
+
+        elif i[0] == "Wang" or i[0] == "wang":
+            name = i[1]
+            print(i[1])
+            tiles = i[2]
+            # for now, Wang tiles are always two-dimensional
+            colors, formula = Wang(tiles)
+            # print(formula)
+            circ = compiler.formula_to_circuit(Wang_nodes, 2, Wang_topology, colors, formula)
+            SFTs[name] = sft.SFT(2, Wang_nodes, alphabet, circuit=circ, formula=formula)
 
         elif mode == "report":
             raise Exception("Unknown command %s." % i[0])

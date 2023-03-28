@@ -10,6 +10,7 @@ import fractions
 
 alphabet = [0, 1]
 accept_repeats_in_forbos = True
+parse_default = False
 
 def parse(s):
     commands =[]
@@ -22,6 +23,15 @@ def parse(s):
         commands.append(command)
     return commands
 
+"""
+arguments are: name, alternate names, list_command, initial_args
+list_command = True means we expect a ;-separated list of argument lists
+list_command = False means we read a list of arguments
+if list_command = True, then initial_args is how many
+arguments we read before going into the first list
+"""
+basic_commands = [("Wang", ["wang"], True, 1)]
+
 def parse_command(s):
     #print("parsin", s[:20], "---")
     _, s = ignore_space(s)
@@ -33,7 +43,10 @@ def parse_command(s):
         return True, s
     """
     
-    assert len(s) > 0 and s[0] == "%"
+    #assert len(s) > 0 and s[0] == "%"
+    if len(s) == 0 or s[0] != "%":
+        raise Exception("Parsing failed near %s." % s[:20])
+    
     op, s = read_word(s[1:])
     if op == "nodes":
         l, s = read_simple_token_list(s)
@@ -132,7 +145,90 @@ def parse_command(s):
         return (op,), s
     
     else:
-        raise Exception("Bad command %s near: " % op + s[:30])
+        args = []
+        """
+        some commands expect a list of argument lists separated by semicolon,
+        and we should set list_command = True so that they work correctly for
+        a single list without the semicolon; None means we don't know
+        """
+        arglists = []
+        list_command = None
+        """
+        some of the commands (%Wang) expecting a list have a name and _then_ the list
+        of argument, and we set initial_args = 1; some commands (%topology) just
+        have a list of argument lists
+        """
+        initial_args = 0
+
+        parse_as_default = True
+        
+        # cmd = e.g. ("Wang", ["wang"], True, 1)
+        for cmd in basic_commands:
+            name, alts, lc, ia = cmd
+            if name == op or op in alts:
+                parse_as_default = False
+                list_command = lc
+                initial_args = ia
+                break
+            #print(name, op)
+        
+        if parse_as_default and not parse_default:
+            raise Exception("Bad command %s near: " % op + s[:30])
+
+        # this allows us to try to keep parsing after a semicolon,
+        # but we can raise an exception if we actually manage to parse
+        # something; the point is we don't punish for a semicolon after
+        # a command
+        must_be_done = False
+
+        kwargs = {}
+        while True: # this parses list of argument lists
+            if len(args) > 0:
+                must_be_done = True
+            while True: # this parses a single argument list
+                #print("largs", repr(s))
+                kwarg, s = read_keyword_arg(s)
+                if kwarg != None:
+                    #args.append(kwarg)
+                    assert kwarg[0] == "KWARG"
+                    if len(arglists) != 0:
+                        raise Exception("Keyword arguments not allowed in list of argument lists.")
+                    kwargs[kwarg[1]] = kwarg[2]
+                    #print(kwarg)
+                else:
+                    arg, s = read_object(s)
+                    if arg == None:
+                        break
+                    #print(repr(arg))
+                    if must_be_done: #list_command == False and len(arglists) > 0:
+                        raise Exception("%s wants a simple argument list, but is given a list of lists." % op)
+                    args.append(arg)
+            _, s = ignore_space(s)
+            if len(args) != 0 and (s[:1] == ";" or list_command == True) and (list_command != False):
+                #print("klu")
+                list_command = True
+                if len(arglists) == 0:
+                    initials = args[:initial_args]
+                    args = args[initial_args:]
+                if len(args) > 0: # if name is followed by ; we do not punish
+                    arglists.append(args)
+                args = []
+            #print(list_command, args, arglists)
+            #if list_command == False and len(args) != 0 and len(arglists) != 0:
+            #    raise Exception("%s wants a simple argument list." % op)
+
+            sym, s = ignore_symbol(s, ";")
+            if sym == None: # or list_command == False:
+                break
+            
+        if list_command == True:
+            #print("mois")
+            #if first_is_name:
+            return (op,) + tuple(initials) + (arglists, kwargs), s
+            #print(arglists)
+            # return (op, arglists), s
+        #print("her")
+        return (op, args, kwargs), s
     
 # ignore space, including comments
 def ignore_space(s):
@@ -193,27 +289,63 @@ def read_word(s, allow_digits = False):
         return ss, ""
     return None, s
 
+# names in the command language allow combining numbers and letters
 def read_high_level_name(s):
     return read_word(s, True)
 
-# welp
+# names in the formula language are alpha only, so we just parse a word
 def read_name(s, allow_digits = False):
     return read_word(s, allow_digits)
 
 def read_number(s):
-    #print("num", s[:20])
     _, s = ignore_space(s)
     i = 0
     while i < len(s):
         if not s[i].isdigit():
             if i > 0:
-                #print("reht")
                 return int(s[:i]), s[i:]
-            #print("veli2")
             return None, s
         i += 1
     if len(s) > 0:
         return int(s), ""
+    return None, s
+
+def read_keyword_arg(s):
+    _, ss = ignore_space(s)
+    name, ss = read_name(ss)
+    if name == None:
+        return None, s
+    _, ss = ignore_space(ss)
+    sym, ss = read_symbol(ss, "=")
+    if sym == None:
+        return None, s
+    val, ss = read_object(ss)
+    if val == None:
+        return None, s
+    return ("KWARG", name, val), ss
+
+def read_object(s):
+    _, ss = ignore_space(s)
+    ret, ss = read_vector(ss)
+    if ret != None:
+        #print("vector", ret)
+        return ret, ss
+    ret, ss = read_signed_number(ss)
+    if ret != None:
+        #print("signed num", ret)
+        return ret, ss
+    ret, ss = read_fraction(ss)
+    if ret != None:
+        #print("fraction", ret)
+        return ret, ss
+    ret, ss = read_number(ss)
+    if ret != None:
+        #print("num", ret)
+        return ret, ss
+    ret, ss = read_name(ss, True)
+    if ret != None:
+        #print("name", ret)
+        return ret, ss
     return None, s
 
 def read_signed_number(s):
@@ -254,7 +386,7 @@ def read_fraction(s):
                 return None, s
         i += 1
     if ss[i:i+1] != "/":
-        return "", s
+        return None, s
     ss = ss[i+1:]
     denominator = ""
     while i <= len(ss):
@@ -344,7 +476,6 @@ def read_forbidden_pattern(s):
         fixed_pattern[fixed_vec] = pattern[vec]
     return fixed_pattern, s
 
-
 def read_simplex(s):
     #print("simp", s[:20])
     _, s = ignore_space(s)
@@ -408,12 +539,14 @@ def read_vector_for_simplex(s):
 
 def ignore_symbols(s, syms):
     for sym in syms:
-        _, s = ignore_symbol(s, sym)
+        sym_gotten, s = ignore_symbol(s, sym)
+        if sym_gotten != None:
+            return sym_gotten, s
     return None, s
 
 def ignore_symbol(s, sym):
     if len(s) > 0 and s[0] == sym:
-        return None, s[1:]
+        return s[0], s[1:]
     return None, s
 
 def read_symbol(s, sym):
