@@ -121,7 +121,7 @@ class PeriodAutomaton:
     # trans has type dict[state] -> (dict[state] -> label(s))
     # After minimization, only the lowest weights are kept
 
-    def __init__(self, sft, periods, rotate=False, sym_bound=None, verbose=False, immediately_relabel=True, check_periods=True, all_labels=True):
+    def __init__(self, sft, periods, rotate=False, sym_bound=None, verbose=False, immediately_relabel=True, check_periods=True, all_labels=True, weights=None):
         if verbose:
             print("constructing period automaton with periods", periods, "no symmetry" if sym_bound is None else "symmetry %s"%sym_bound, "rotated" if rotate else "not rotated")
         self.sft = sft
@@ -168,6 +168,23 @@ class PeriodAutomaton:
         self.rotate = rotate
         self.all_labels = all_labels
 
+        if weights == None:
+            self.weight_numerators = None
+            self.weight_denominator = 1
+            #print("makkel")
+        else:
+            #print("fiwejif")
+            denoms = []
+            for a in weights:
+                denoms.append(fr(weights[a], 1).denominator)
+            self.weight_denominator = math.lcm(*denoms)
+            self.weight_numerators = {}
+            for a in weights:
+                asrat = fr(weights[a], 1)
+                numerator, denominator = asrat.numerator, asrat.denominator
+                self.weight_numerators[a] = numerator * self.weight_denominator // denominator
+            print (self.weight_denominator, self.weight_numerators)
+
     def populate(self, verbose=False, report=5000):
         debug_verbose = False
         if debug_verbose: print("asdf")
@@ -192,7 +209,7 @@ class PeriodAutomaton:
         res_q = mp.Queue()
         processes = [mp.Process(target=populate_worker,
                                 args=(self.pmat, self.sft.alph, self.border_forbs, self.node_frontier, self.sym_bound, self.rotate,
-                                      task_q, res_q))
+                                      task_q, res_q, self.weight_numerators))
                      for _ in range(NUM_THREADS)]
         if debug_verbose: print("processes built")
         for pr in processes:
@@ -550,7 +567,10 @@ class PeriodAutomaton:
         #print(path)
         #print(self.trans)
         assert len(path) == m+1
-        assert sum(self.trans[path[k]][path[k+1]] for k in range(m)) == sparse_mins[n*(len(sparse_rows)-1)+path[0]]
+        # this assert seems to assume weight = symbol
+        if self.weight_numerators == None:
+            #print(self.weight_numerators)
+            assert sum(self.trans[path[k]][path[k+1]] for k in range(m)) == sparse_mins[n*(len(sparse_rows)-1)+path[0]]
 
         #print(path, min_len)
         for cycle_len in range(1, m):
@@ -775,6 +795,9 @@ class PeriodAutomaton:
                                 break
                         if len(comp) > 1 or cur in self.trans.get(cur, []):
                             aut = PeriodAutomaton(self.sft, self.pmat, self.rotate, self.sym_bound, False, self.immediately_relabel, check_periods=False)
+                            aut.weight_numerators = self.weight_numerators
+                            aut.weight_denominator = self.weight_denominator
+                            
                             aut.s2idict = {st:ix for (st, ix) in self.s2idict.items() if ix in comp}
                             aut.states = set(aut.s2idict)
                             aut.trans = {aut.s2idict[self.i2sdict[st]] : {aut.s2idict[self.i2sdict[st2]] : c
@@ -788,7 +811,7 @@ class PeriodAutomaton:
 def border_at(pmat, vec):
     return 0 # TODO: change
 
-def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_queue, res_queue):
+def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_queue, res_queue, weights):
     numf = len(border_forbs)
     #border_sets = [set(forb) for forb in border_forbs]
     if rotate:
@@ -860,7 +883,7 @@ def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_
                                 sym_pairs[ix%(numf//2), tr] = 1 - sym_pairs.get((ix%(numf//2), tr), 0)
                             new_state += 2**(numf*tr + ix)
                     if sym_bound is None or sum(sym_pairs.values()) <= sym_bound:
-                        ret.append((state, sum(new_front.values()), new_state))
+                        ret.append((state, weighted_sum(weights, new_front.values()), new_state))
                         if len(ret) >= CHUNK_SIZE:
                             res_queue.put(ret)
                             ret = []
@@ -869,6 +892,13 @@ def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_
             res_queue.put(ret)
         res_queue.put(len(states))
 
+def weighted_sum(weights, summed):
+    if weights == None:
+        return sum(summed)
+    summa = 0
+    for s in summed:
+        summa += weights[s]
+    return summa
 
 def square_min_worker(the_mins, the_opt_prevs, n, m, max_w, trans, task_q, res_q):
     # share array

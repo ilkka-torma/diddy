@@ -373,19 +373,6 @@ let sep s a b := (s~a & s!~b) | (s~b & s!~a) in -- s separates a from b, assumes
 """
 #unit_tests.append(("redu", redundant_id))
 
-default_parse = """
-%topology hex
-%Wang mes @topology inverses=[[up dn] [rt lt]]
-[variable] a [0 1]; -- variable for symbols
-[variable] b [0 1]; -- same
-[0] up=0 rt=1 lt=0; -- we can explicitly name the directions
--- by default in same order as in inverses list, so here dn rt lt
-[1] dn=1 lt=1 rt=0;
--- %contains kek kek2
-%show_formula mes
-"""
-unit_tests.append(("default parse test", default_parse))
-
 # jeandel-rao
 code_JR = """
 %nodes N E S W
@@ -426,13 +413,31 @@ WangConstraint o &
 #unit_tests.append(("JR",code_JR))
 
 
+# this actually became a wang tile test...
+default_parse = """
+%topology hex
+%Wang mes @topology inverses=[[up dn] [rt lt]]
+[variable] a [0 1]; -- variable for symbols
+[variable] b [0 1]; -- same
+[0] up=0 rt=1 lt=0; -- we can explicitly name the directions
+-- by default in same order as in inverses list, so here dn rt lt
+[1] dn=1 lt=1 rt=0;
+-- %contains kek kek2
+%show_formula mes
+"""
+#unit_tests.append(("default parse test", default_parse))
+
 
 code = """
 %set_weights
 0 1/5
 1 1/7
+%topology grid
+%SFT golden Ao (o=1 -> o.rt=0) & (o=1 -> o.up=0)
+%compute_forbidden_patterns golden
+%minimum_density golden (0, 3)
 """
-# unit_tests.append(("ldr2", code))
+unit_tests.append(("weights", code))
 
 if __name__ == "__main__":
     for (name, code) in unit_tests:

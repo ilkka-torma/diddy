@@ -394,6 +394,7 @@ def run_diddy(code, mode="report"):
     SFTs = {}
     clopens = {}
     formulae = []
+    weights = None
     for i in parsed:
         if i[0] == "nodes":
             nodes = i[1]
@@ -443,7 +444,7 @@ def run_diddy(code, mode="report"):
             the_sft = SFTs[i[1]]
             periods = i[2]
             print("Computing minimum density for %s restricted to period(s) %s"%(i[1], periods))
-            nfa = period_automaton.PeriodAutomaton(the_sft, periods)
+            nfa = period_automaton.PeriodAutomaton(the_sft, periods, weights=weights)
             if verbose_here: print("const")
             nfa.populate()
             if verbose_here: print("popula")
@@ -549,7 +550,7 @@ def run_diddy(code, mode="report"):
             the_sft.deduce_forbs(rad)
 
         elif i[0] == "set_weights":
-            print (i[1])
+            weights = i[1]
 
         elif i[0] == "Wang" or i[0] == "wang":
             name = i[1]
