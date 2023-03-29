@@ -443,7 +443,7 @@ def run_diddy(code, mode="report"):
             tim = time.time()
             the_sft = SFTs[i[1]]
             periods = i[2]
-            print("Computing minimum density for %s restricted to period(s) %s"%(i[1], periods))
+            print("Computing minimum density for %s restricted to period(s) %s"%(i[1], periods) + " using weights {}".format(weights) if weights is not None else "")
             nfa = period_automaton.PeriodAutomaton(the_sft, periods, weights=weights)
             if verbose_here: print("const")
             nfa.populate()
@@ -453,7 +453,7 @@ def run_diddy(code, mode="report"):
             if verbose_here: print("strng com")
             del nfa
             min_data = (math.inf,)
-            min_comp = None
+            min_aut = None
             for (ic, comp) in enumerate(comps):
                 data = comp.linsqrt_min_density_cycle()
                 if data[:1] < min_data[:1]:
@@ -462,8 +462,8 @@ def run_diddy(code, mode="report"):
             if verbose_here: print("kikek")
             dens, minlen, stcyc, cyc = min_data
             border_size = len(the_sft.nodes)*len(min_aut.frontier)
-            print("Density", fractions.Fraction(sum(b for fr in cyc for b in fr.values()),
-                                                len(cyc)*border_size), "~", dens/border_size, "realized by cycle of length", len(cyc))
+            print("Density", fractions.Fraction(sum(weights[b] for fr in cyc for b in fr.values()),
+                                                len(cyc)*border_size), "~", dens/(border_size*min_aut.weight_denominator), "realized by cycle of length", len(cyc))
             print([(period_automaton.nvadd(nvec,(tr,)+(0,)*(dim-1)),c) for (tr,pat) in enumerate(cyc) for (nvec,c) in sorted(pat.items())])
             print("Calculation took", time.time() - tim, "seconds.") 
 

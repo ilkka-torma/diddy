@@ -430,8 +430,8 @@ default_parse = """
 
 code = """
 %set_weights
-0 1 --1/5
-1 0 --1/7
+0 1/5
+1 1/7
 %topology grid
 %SFT golden Ao (o=1 -> o.rt=0) & (o=1 -> o.up=0)
 %compute_forbidden_patterns golden

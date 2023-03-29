@@ -176,7 +176,7 @@ class PeriodAutomaton:
             #print("fiwejif")
             denoms = []
             for a in weights:
-                print(weights[a])
+                #print(weights[a])
                 denoms.append(fr(weights[a], 1).denominator)
             self.weight_denominator = math.lcm(*denoms)
             self.weight_numerators = {}
@@ -184,7 +184,7 @@ class PeriodAutomaton:
                 asrat = fr(weights[a], 1)
                 numerator, denominator = asrat.numerator, asrat.denominator
                 self.weight_numerators[a] = numerator * self.weight_denominator // denominator
-            print (self.weight_denominator, self.weight_numerators)
+            #print (self.weight_denominator, self.weight_numerators)
 
     def populate(self, verbose=False, report=5000):
         debug_verbose = False
@@ -383,7 +383,7 @@ class PeriodAutomaton:
         # initialize with 2*height*m*max(alph), which is theoretical max val
         # access like mins[n*k+q]
         global mins, opt_prevs
-        max_w = len(self.frontier)*len(self.sft.nodes)*m*max(self.sft.alph)
+        max_w = len(self.frontier)*len(self.sft.nodes)*m*max(self.weight_numerators.values())
         mins = mp.Array('i', [0 if q==k==0 else max_w
                               for k in range(m+1)
                               for q in range(n)],
@@ -481,7 +481,7 @@ class PeriodAutomaton:
         #    this needs dense mins and opt prevs
         #    stitch together into a single path, find cycle on it
         global dense_mins, sparse_mins, opt_prevs
-        max_w = len(self.frontier)*len(self.sft.nodes)*m*max(self.sft.alph)
+        max_w = len(self.frontier)*len(self.sft.nodes)*m*max(self.weight_numerators.values())
         sqrtm = int(math.ceil(m**0.5))+1
         # dense_mins represents rows int(i*sqrt(n)) + j for 0 <= j <= ceil(sqrt(n)) for varying i
         dense_mins = mp.Array('i', [0 if k==q==0 else max_w
@@ -568,12 +568,9 @@ class PeriodAutomaton:
         #print(path)
         #print(self.trans)
         assert len(path) == m+1
-        # this assert seems to assume weight = symbol... oh and for good reason because the code assumes it...
-        if self.weight_numerators == None:
-            #print(self.weight_numerators)
-            assert sum(self.trans[path[k]][path[k+1]] for k in range(m)) == sparse_mins[n*(len(sparse_rows)-1)+path[0]]
+        assert sum(self.trans[path[k]][path[k+1]] for k in range(m)) == sparse_mins[n*(len(sparse_rows)-1)+path[0]]
 
-        #print(path, min_len)
+        #print(path)
         for cycle_len in range(1, m):
             for i in range(m - cycle_len):
                 if path[i] == path[i+cycle_len]:
@@ -606,7 +603,7 @@ class PeriodAutomaton:
         # initialize with 2*height*n, which is theoretical max val
         # 0 and 1 are "workspace" arrays, 2 is where we store values for n
         global mins
-        max_w = len(self.frontier)*len(self.sft.nodes)*m*max(self.sft.alph)
+        max_w = len(self.frontier)*len(self.sft.nodes)*m*max(self.weight_numerators.values())
         mins = mp.Array('i', [0 if q==k==0 else max_w
                               for k in range(3)
                               for q in range(n)],
@@ -894,6 +891,7 @@ def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_
         res_queue.put(len(states))
 
 def weighted_sum(weights, summed):
+    #print(weights, summed)
     if weights == None:
         return sum(summed)
     summa = 0
