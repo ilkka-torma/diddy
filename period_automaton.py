@@ -807,6 +807,9 @@ class PeriodAutomaton:
 
 
 def border_at(pmat, vec):
+    if len(pmat) == 1:
+        i, j = pmat[0]
+        return (vec[0]*i)//j
     return 0 # TODO: change
 
 def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_queue, res_queue, weights):
