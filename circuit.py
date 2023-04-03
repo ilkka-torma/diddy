@@ -339,7 +339,14 @@ def transform_(c, f, dealts):
     #print("subbin' %s for %s in %s" % (b, a, c))
 
     if c.op == "V":
-        c.inputs = [f(a) for a in c.inputs]
+        inputs = [f(a) for a in c.inputs]
+        assert len(inputs) == 1
+        # precisely the type of copying I wanted to avoid, but whatever
+        if type(inputs[0]) == Circuit:
+            c.op = inputs[0].op
+            c.inputs = inputs[0].inputs
+        else:
+            c.inputs = inputs
         return
   
     elif c.op in "TF":
@@ -453,6 +460,67 @@ def int_nodes_(c, dealts):
         ret.extend(int_nodes_(t, dealts))
     ret.append(c)
     return ret
+
+# given a circuit whose variables are tuples,
+# construct a circuit that states that last values
+# are different, and if we reach count, then one should
+# be true
+# of course very specific to our coding of 
+def last_diff_and_count(circs, count):
+    #print(count, list(map(str, circs)))
+    lasts = {}
+    for c in circs:
+        for v in c.get_variables():
+            #print(v)
+            if v[:-1] not in lasts:
+                lasts[v[:-1]] = set()
+            lasts[v[:-1]].add(v)
+    newlasts = {} # change to variables
+    for l in lasts:
+        newlasts[l] = list(map(lambda a : V(a), lasts[l]))
+    lasts = newlasts
+    andeds = []
+    for l in lasts:
+        #print("lasts", l, lasts[l])
+        if len(lasts[l]) > 1:
+            #print(l, "yers")
+            if len(lasts[l]) == count:
+                andeds.append(AND(ATMOSTONE(*lasts[l]), OR(*lasts[l])))
+            else:
+                andeds.append(ATMOSTONE(*lasts[l]))
+    #for a in andeds:
+    #    print(str(a))
+    return AND(*andeds)
+    
+    
+
+"""
+models_under tells whether C1 being true implies C2 is true,
+assuming the constraints given by under hold.
+Here, under is a function that gives constraints given a bunch of circuits.
+Note that
+a -> (b -> c)
+<==>
+!a | (!b | c)
+<==>
+(!a | !b) | c
+<==>
+!(a & b) | c
+<==>
+a & b -> c
+"""
+def models_under(C1, C2, under, return_sep = False):
+    sm = Circuit.smart_simplify
+    Circuit.smart_simplify = False
+    if type(C1) != Circuit:
+        C1 = AND(*C1)
+    if type(C2) != Circuit:
+        C2 = AND(*C2)
+    Circuit.smart_simplify = sm
+
+    C1 = AND(C1, under([C1, C2]))
+
+    return models(C1, C2)
 
 """
 C1 and C2 are lists of circuits
@@ -615,6 +683,13 @@ def TAUTO(C):
     """
     return models(T, C)
 
+def equivalent_under(C1, C2, under, return_sep = False):
+    m = models_under(C1, C2, under, return_sep)
+    #print(C1, C2, m)
+    if m != True:
+        return m
+    return models_under(C2, C1, under, return_sep)
+
 def equivalent(C1, C2, return_sep = False):
     m = models(C1, C2, return_sep)
     #print(C1, C2, m)
@@ -659,6 +734,14 @@ def IMP(*inputs):
 def IFF(*inputs):
     assert len(inputs) == 2
     return AND(IMP(inputs[0], inputs[1]), IMP(inputs[1], inputs[0]))
+def XOR(*inputs):
+    if len(inputs) == 1:
+        assert type(inputs[0]) == Circuit
+        return inputs[0]
+    if len(inputs) == 0:
+        return F
+    assert len(inputs) == 2 # I just didn't bother to implement in general
+    return AND(OR(*inputs), NOT(AND(*inputs)))
     #return Circuit("<->", *inputs)
 # this is just used for small sets when we have larger than binary alphabets;
 # note that for very large alphabets one should instead use
