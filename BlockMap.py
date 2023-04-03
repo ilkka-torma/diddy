@@ -91,7 +91,7 @@ class BlockMap:
         #print("he")
         for ns in self.circuits:
             #print(ns)
-            ldac = lambda a: last_diff_and_count(a, len(self.to_alphabet))
+            ldac = LDAC(self.from_alphabet) #lambda a: last_diff_and_count(a, len(self.to_alphabet))
             if not equivalent_under(self.circuits[ns], other.circuits[ns], ldac):
                 return False
         return True

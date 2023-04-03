@@ -461,6 +461,11 @@ def int_nodes_(c, dealts):
     ret.append(c)
     return ret
 
+def LDAC(n):
+    if type(n) != int:
+        n = len(n)
+    return lambda a: last_diff_and_count(a, (lambda m:m)(n))
+
 # given a circuit whose variables are tuples,
 # construct a circuit that states that last values
 # are different, and if we reach count, then one should
