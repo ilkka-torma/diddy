@@ -655,7 +655,7 @@ class PeriodAutomaton:
         labels = []
         states = [self.i2sdict[cycle_as_states[0]]]
         if self.rotate:
-            heights = [pmat[i][i] for i in range(len(pmat))]
+            heights = [self.pmat[i][i+1] for i in range(len(self.pmat))]
         s = 1
         while True:
             a = states[-1]
@@ -709,7 +709,7 @@ class PeriodAutomaton:
                         for rots in hyperrectangle(heights):
                             new_state = 0
                             for (forb, tr) in new_pairs:
-                                ix = border_forbs.index({(nvec[0],) + vrot(nvec[1:-1], rots, heights) + (nvec[-1],):c for (nvec, c) in forb.items()})
+                                ix = self.border_forbs.index({(nvec[0],) + vrot(nvec[1:-1], rots, heights) + (nvec[-1],):c for (nvec, c) in forb.items()})
                                 new_state += 2**(numf*tr + ix)
                             min_state = min(min_state, new_state)
                         new_state = min_state
@@ -816,7 +816,7 @@ def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_
     numf = len(border_forbs)
     #border_sets = [set(forb) for forb in border_forbs]
     if rotate:
-        heights = [pmat[i][i] for i in range(len(pmat))]
+        heights = [pmat[i][i+1] for i in range(len(pmat))]
     while True:
         states = task_queue.get()
         ret = []
