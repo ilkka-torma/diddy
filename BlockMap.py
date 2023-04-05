@@ -1,5 +1,7 @@
 from circuit import *
 from general import *
+import time
+
 """
 circuits is a dict of circuits : (node, symbol) -> circuit
 for each node exactly one should say yes or this is nondeterministic
@@ -100,6 +102,9 @@ class CA(BlockMap):
     def __init__(self, alphabet, nodes, dimension, circuits):
         super().__init__(alphabet, alphabet, nodes, nodes, dimension, circuits)
         
+
+
+
         
 
 #def that_action(CA):
@@ -145,6 +150,7 @@ print(x.then(x.then(x2).then(a)) == x2.then(x).then(x), True)
 print(x.then(x.then(x2)) == x2.then(a).then(x).then(x2), False)
 """
 
+"""
 # more interesting testing: lamplighter group; 
 
 alphabet = [0,1]
@@ -175,11 +181,13 @@ def evalstr(s):
     return ret
 
 """
+"""
 print(evalstr("ss") == evalstr("e"), True)
 print(evalstr("LR") == evalstr("RL"), True)
 print(evalstr("LR") == evalstr("R"), False)
 print(evalstr("RRRsLLLsRRRsLLLs") == evalstr("e"), True)
 print(evalstr("RRRsLLLsRRRLLLs") == evalstr("e"), False)
+"""
 """
 
 def addat(n):
@@ -194,6 +202,7 @@ def addats(ns):
         r += addat(n)
     return r
 
+t = time.time()
 A = evalstr(addats([0, 6, 3, 2, 3]))
 B = evalstr(addats([6, 2, 2, 3, 2, 3, 0]))
 C = evalstr(addats([6, 5, 4, 3, 2, 1, 0, -1, 5, 4, 3, 1, -1]))
@@ -203,8 +212,8 @@ print(B == C)
 print(C == D)
 #print(evalstr("RRRsLLLsRRRsLLLsL") == evalstr("L"), True)
 
-                        
-
+print(time.time() - t)                        
+"""
                         
 
 

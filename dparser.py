@@ -30,7 +30,10 @@ list_command = False means we read a list of arguments
 if list_command = True, then initial_args is how many
 arguments we read before going into the first list
 """
-basic_commands = [("Wang", ["wang"], True, 1)]
+basic_commands = [("Wang", ["wang"], True, 1),
+                  ("start_cache", [], False, 0),
+                  ("end_cache", [], False, 0),
+                  ("compose_CA", [], False, 0)]
 
 def parse_command(s):
     #print("parsin", s[:20], "---")
@@ -167,7 +170,28 @@ def parse_command(s):
 
     elif op == "compare_SFT_pairs" or op == "compare_SFT_pairs_equality":
         return (op,), s
-    
+
+    elif op == "CA":
+        name, s = read_high_level_name(s)
+        #print(name)
+        rules = []
+        while True:
+            node, s = read_simple_token(s)
+            if node == None:
+                #print("nonw")
+                break
+            #print(node)
+            sym, s = read_simple_token(s)
+            #print(sym)
+            formula, s = read_formula(s)
+            #print(formula)
+            _, s = ignore_symbol(s, ";")
+            rules.append((node, sym, formula))
+        return (op, name, rules), s
+
+    #This is the default parser. It's complicated partly because of
+    #list commands, which have rather complicated syntax and since
+    #I tried to make this robust in some ways.
     else:
         args = []
         """

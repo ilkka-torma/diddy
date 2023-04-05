@@ -18,15 +18,49 @@ Probably not parallelizable.
 
 from pysat.solvers import Glucose4
 import time
+#from circuitset import CircuitSet
+import circuitset
+
+def circuit(op, *inputs):
+    c = Circuit(op, *inputs)
+    if not hasattr(Circuit, "global_simplify"):
+        Circuit.global_simplify = False
+    #if Circuit.global_simplify:
+    #    assert hasattr(Circuit, "global_simplify_threshold_min")
+    if Circuit.global_simplify and Circuit.global_simplify_threshold_min <= c.complexity <= Circuit.global_simplify_threshold_max:
+        #print("a")
+        if Circuit.global_set == None:
+            Circuit.global_set = circuitset.CircuitSet()
+        added = Circuit.global_set.add(c)
+        """
+        if added != c:
+            print(len(Circuit.global_set))
+        else:
+            print("new")
+        """
+        return added
+    else:
+        #if not Circuit.global_simplify:
+        #    print("WHAT")
+        #print("a")
+        return c
 
 class Circuit:
-    smart_simplify = True
+    smart_simplify = False
+    #global_simplify = False
+    #global_simplify_threshold_min = 10
+    #global_simplify_threshold_max = 60
+    global_set = None
     #internal_sweep_int = 1
     verbose = False
     def __init__(self, op, *inputs):
         self.op = op
         self.inputs = inputs
         #self.isi = 0
+        self.complexity = 1
+        for i in inputs:
+            if type(i) == Circuit:
+                self.complexity += i.complexity
         if Circuit.smart_simplify:
             self.SAT = None
             self.TAUTO = None
@@ -108,7 +142,9 @@ class Circuit:
                 self.op = "F"
                 self.inputs = []
                 self.SAT = False
-                
+
+    def __repr__(self):
+        return str(self)
     def __str__(self):
         return "C" + tostr(self)
     def basic_str(self): # iirc for debug
@@ -150,6 +186,8 @@ class Circuit:
     #    return models(self, other) and models(other, self)
     #def __hash__(self):
     #    return 0
+
+#print(Circuit.global_simplify_threshold_min, Circuit.global_simplify_threshold_max)
 
 def tostr(c):
     appearances = get_appearances(c)
@@ -207,13 +245,22 @@ def tostr_(c, appears_multiply, alreadys = None, running = None):
     
     return s
 
+#kiliman = False
+
 def evaluate(c, values):
+    eve = c
+    #if str(eve) == "C!T()":
+    #    global kiliman
+    #    kiliman = True
     #print(c, values)
     values = dict(values)
     c = Circuit.copy(c)
     for v in c.get_variables():
         if v not in values:
             values[v] = F
+    #if kiliman:
+    #    print(c)
+    values[None] = None
     for a in values:
         val = values[a]
         if val == False:
@@ -221,10 +268,15 @@ def evaluate(c, values):
         elif val == True:
             val = T
         substitute(c, a, val)
+    #if kiliman:
+    #    print(c)
+
     if c.op == "T":
         return True
     elif c.op == "F":
         return False
+    
+    print(c, eve)
     raise Exception("problem")
 
     
@@ -308,6 +360,7 @@ def substitute_(c, a, b, dealts):
         #    c.op = c.inputs[0].op
         #    c.inputs = c.inputs[0].inputs
     elif c.op == "!":
+        #print("here")
         assert len(c.inputs) == 1
         substitute_(c.inputs[0], a, b, dealts)
         if type(c.inputs[0]) != Circuit:
@@ -324,6 +377,8 @@ def substitute_(c, a, b, dealts):
                 c.inputs = c.inputs[0].inputs[0].inputs
     else:
         raise NotImplementedError("Operator %s not implemented." % c.op)
+
+
 
 # apply transformation to all variables of c, in place
 def transform(c, f):
@@ -706,6 +761,7 @@ def V(inputs):
     return Circuit("V", inputs)
 def AND(*inputs):
     if len(inputs) == 1:
+        #print(type(inputs[0]))
         assert type(inputs[0]) == Circuit
         return inputs[0]
     if len(inputs) == 0:
@@ -713,7 +769,7 @@ def AND(*inputs):
     #print(Circuit.smart_simplify)
     #print("making ADN", list(map(str, inputs)))
     #print("res", Circuit("&", *inputs))
-    return Circuit("&", *inputs)
+    return circuit("&", *inputs)
 
 def OR(*inputs):
     if len(inputs) == 1:
@@ -725,12 +781,12 @@ def OR(*inputs):
     #print(Circuit.smart_simplify)
     #print("making ÖR", list(map(str, inputs)))
     #print("res", Circuit("|", *inputs))
-    return Circuit("|", *inputs)
+    return circuit("|", *inputs)
 def NOT(*inputs):
     assert len(inputs) == 1
-    return Circuit("!", *inputs)
-T = Circuit("T")
-F = Circuit("F")
+    return circuit("!", *inputs)
+T = circuit("T")
+F = circuit("F")
 def IMP(*inputs):
     assert len(inputs) == 2
     # while
@@ -799,3 +855,4 @@ b = AND(OR(V("b"), V("a")), V("c"))
 print(models([a], [b]))
 print (time.time() - t)
 """
+
