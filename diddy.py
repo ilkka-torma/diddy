@@ -2,6 +2,7 @@ import dparser
 import compiler
 import sft
 import period_automaton
+import density_linear_program
 import time
 import argparse
 import fractions
@@ -465,7 +466,21 @@ def run_diddy(code, mode="report"):
             print("Density", fractions.Fraction(sum(weights[b] for fr in cyc for b in fr.values()),
                                                 len(cyc)*border_size), "~", dens/(border_size*min_aut.weight_denominator), "realized by cycle of length", len(cyc))
             print([(period_automaton.nvadd(nvec,(tr,)+(0,)*(dim-1)),c) for (tr,pat) in enumerate(cyc) for (nvec,c) in sorted(pat.items())])
-            print("Calculation took", time.time() - tim, "seconds.") 
+            print("Calculation took", time.time() - tim, "seconds.")
+
+        elif i[0] == "density_lower_bound":
+            if i[1] not in SFTs:
+                raise Exception("Density can only be calculated for SFTs, not %s." % i[1])
+            tim = time.time()
+            the_sft = SFTs[i[1]]
+            rad = i[2]
+            nhood = i[3]
+            vecs = i[4]
+            print("Computing lower bound for density in {} using neighborhood {}, additional radius {} and vectors {}".format(the_sft, nhood, rad, vecs))
+            patterns = list(the_sft.all_patterns(nhood))
+            dens = density_linear_program.optimal_density(the_sft, vecs, patterns, rad, verbose=False)
+            print("Density", dens)
+            print("Calculation took", time.time() - tim, "seconds.")
 
         elif i[0] == "show_formula" and mode == "report":
             if i[1] in SFTs:

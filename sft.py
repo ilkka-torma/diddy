@@ -10,6 +10,9 @@ def vsub(vec1, vec2):
 def vmod(m, v):
     return v[0]%m, v[1]%m
 
+def nvsub(nv, v):
+    return tuple(a-b for (a,b) in zip(nv,v)) + (nv[-1],)
+
 def Z2square(rad):
     for x in range(-rad, rad+1):
         for y in range(-rad, rad+1):
@@ -240,14 +243,12 @@ class SFT:
     def deduce(self, known_values, domain):
         if len(self.alph) != 2:
             raise Exception("Only binary alphabets supported in deduce")
-        if not (self.deftype & SFTType.CIRCUIT):
-            raise Exception("SFT must have a circuit in deduce")
         
         circuits = {}
     
         for v in domain:
-            circuits[v] = circuit.copy()
-            for var in circuit.get_variables():
+            circuits[v] = self.circuit.copy()
+            for var in self.circuit.get_variables():
                 # translate and add 0 at end so that we don't replace twice
                 rel_pos = vadd(v, var[:-1]) + (var[-1], 0) 
                 substitute(circuits[v], var, V(rel_pos))
@@ -267,12 +268,77 @@ class SFT:
         #print(m)
         mm = {}
         for v in domain:
-            for n in nodes:
+            for n in self.nodes:
                 if v + (n, 0) in m:
                     mm[v + (n,)] = m[v + (n, 0,)]
                 else:
                     mm[v + (n,)] = None # was not actually discussed by rules
         return mm
+
+    def all_patterns(self, domain):
+        if len(self.alph) != 2:
+            raise Exception("Only binary alphabets supported in all_patterns")
+
+        inv_vecs = [var[:-1] for var in get_vars(self.circuit)]
+
+        circuits = {}
+        for v in domain:
+            circuits[v] = self.circuit.copy()
+            for var in self.circuit.get_variables():
+                # translate and add 0 at end so that we don't replace twice
+                rel_pos = vadd(v, var[:-1]) + (var[-1], 0) 
+                substitute(circuits[v], var, V(rel_pos))
+                # print(circuits[v])
+
+        pat = dict()
+        vecs = list(domain)
+        pos = 0
+        while True:
+            #print("begin loop", pos)
+            if pos < len(vecs):
+                #print("entering 0", pos)
+                var = vecs[pos]
+                pat[var] = self.alph[0]
+                circs = []
+                for vec in inv_vecs:
+                    try:
+                        circs.append(circuits[nvsub(var, vec)])
+                    except KeyError:
+                        pass
+                for (var2, val) in pat.items():
+                    circs.append(V(var2 + (0,)) if val==self.alph[1] else NOT(V(var2 + (0,))))
+                #print("checking SAT", [str(c) for c in circs])
+                if SAT(AND(*circs)):
+                    #print("setting 0")
+                    pos += 1
+                    continue
+            # At end of position list, or no valid continuation
+            if pos == len(vecs):
+                #print("yielding", pat)
+                yield pat.copy()
+                pos -= 1
+            while pos >= 0:
+                var = vecs[pos]
+                if pat[var] == self.alph[1]:
+                    del pat[var]
+                    pos -= 1
+                    continue
+                #print("entering 1", pos)
+                pat[var] = self.alph[1]
+                circs = []
+                for vec in inv_vecs:
+                    try:
+                        circs.append(circuits[nvsub(var, vec)])
+                    except KeyError:
+                        pass
+                for (var2, val) in pat.items():
+                    circs.append(V(var2 + (0,)) if val==self.alph[1] else NOT(V(var2 + (0,))))
+                if SAT(AND(*circs)):
+                    #print("setting 1")
+                    pos += 1
+                    break
+            else:
+                break
 
     def deduce_circuit(self):
         if self.circuit is None:
