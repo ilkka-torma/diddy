@@ -20,7 +20,7 @@ from pysat.solvers import Glucose4
 import time
 
 class Circuit:
-    smart_simplify = True
+    smart_simplify = False
     #internal_sweep_int = 1
     verbose = False
     def __init__(self, op, *inputs):

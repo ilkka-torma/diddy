@@ -1,5 +1,6 @@
 from circuit import *
 from general import *
+import time
 """
 circuits is a dict of circuits : (node, symbol) -> circuit
 for each node exactly one should say yes or this is nondeterministic
@@ -194,6 +195,7 @@ def addats(ns):
         r += addat(n)
     return r
 
+t = time.time()
 A = evalstr(addats([0, 6, 3, 2, 3]))
 B = evalstr(addats([6, 2, 2, 3, 2, 3, 0]))
 C = evalstr(addats([6, 5, 4, 3, 2, 1, 0, -1, 5, 4, 3, 1, -1]))
@@ -203,7 +205,7 @@ print(B == C)
 print(C == D)
 #print(evalstr("RRRsLLLsRRRsLLLsL") == evalstr("L"), True)
 
-                        
+print(time.time() - t)                        
 
                         
 

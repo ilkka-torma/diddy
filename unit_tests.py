@@ -1,4 +1,5 @@
 import diddy
+import time
 
 unit_tests = []
 
@@ -209,6 +210,8 @@ o=0 -> (Et[o2] c o t) &
 """
 unit_tests.append(("loc dom rad 2", code_locdomrad2))
 
+t = time.time()
 for (name, code) in unit_tests:
     print("Running test", name)
     diddy.run_diddy(code, "assert")
+print("total time", time.time()-t)
