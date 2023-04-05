@@ -113,7 +113,7 @@ def optimal_density(the_sft, vectors, patterns, radius, weights=None, ret_shares
     if verbose:
         print("Found {} constraints in total, now solving".format(i))
 
-    prob.solve()
+    pulp.PULP_CBC_CMD(msg=0).solve(prob)
 
     if ret_shares:
         return density.varValue, {(x, y.varValue) for (x,y) in send.items()}
