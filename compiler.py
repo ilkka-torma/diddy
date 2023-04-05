@@ -1,4 +1,7 @@
-from circuit import *
+#from circuit import *
+import circuit
+from circuit import NOT, V, AND, OR, T, F, IMP, IFF, tech_simp
+from general import *
 
 """
 # we construct a circuit whose input variables are of the form (u, n)->a --
@@ -458,6 +461,7 @@ def get_nbhd(dim, topology, pos):
              ret.add(v + (b[-1],))
     return ret
 
+"""
 def vsub(a, b):
     c = []
     for i in range(len(a)):
@@ -469,7 +473,20 @@ def vadd(a, b):
     for i in range(len(a)):
         c.append(a[i] + b[i])
     return tuple(c)
+"""
 
+def start_cache(mini, maxi):
+    #print("cahcae stat")
+    circuit.Circuit.global_simplify = True
+    circuit.Circuit.global_set = None
+    #print(mini, maxi)
+    circuit.Circuit.global_simplify_threshold_min = mini
+    circuit.Circuit.global_simplify_threshold_max = maxi
+
+def end_cache():
+    #print("end ca")
+    circuit.Circuit.global_simplify = False
+    circuit.Circuit.global_set = None
 
 
 """

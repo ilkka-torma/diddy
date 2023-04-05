@@ -437,10 +437,23 @@ code = """
 %compute_forbidden_patterns golden
 %minimum_density golden (0, 3)
 """
-unit_tests.append(("weights", code))
+#unit_tests.append(("weights", code))
+
+code = """
+%CA a
+0 1 Ao o!=o.rt;
+%equal a a
+%compose_CA aa a a
+%compose_CA aa_a aa a
+%compose_CA a_aa a aa
+%equal a_aa aa_a
+"""
+unit_tests.append(("CA", code))
 
 if __name__ == "__main__":
     for (name, code) in unit_tests:
+        diddy_inst = diddy.Diddy()
         print("Running test", name)
-        diddy.run_diddy(code, "report")
-    
+        diddy_inst.run(code, "report")
+        #if "a" in diddy_inst.CAs:
+        #    print(diddy_inst.CAs["a"])

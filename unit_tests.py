@@ -3,6 +3,9 @@ import time
 
 unit_tests = []
 
+# whether we test the ones that take like 10 seconds
+long_ones_too = False
+
 # just some basic checks
 code_basic_comparisons = """
 %nodes 0
@@ -187,6 +190,9 @@ WangConstraint o &
 """
 
 code_locdomrad2 = """
+-- using a cache multiplies time usage by up to 5
+-- but drops memory usage to fraction
+--%start_cache 10 60 
 %topology grid
 
 %SFT locdomrad22 Ao
@@ -207,11 +213,51 @@ o=0 -> (Et[o2] c o t) &
 -- %compare_SFT_pairs
 %equalT locdomrad22 locdomrad24
 %equalT locdomrad22 locdomrad2x
+--%end_cache
 """
-unit_tests.append(("loc dom rad 2", code_locdomrad2))
+if long_ones_too:
+    unit_tests.append(("loc dom rad 2", code_locdomrad2))
 
-t = time.time()
-for (name, code) in unit_tests:
-    print("Running test", name)
-    diddy.run_diddy(code, "assert")
-print("total time", time.time()-t)
+code = """
+%CA a
+0 1 Ao o!=o.rt;
+%equalT a a
+%compose_CA aa a a
+%compose_CA aa_a aa a
+%compose_CA a_aa a aa
+%equalT a_aa aa_a
+"""
+unit_tests.append(("trivial CA associativity", code))
+
+code = """
+%CA a
+0 1 Ao o!=o.rt;
+%equalT a a
+%compose_CA aa a a
+%compose_CA aa_a aa a
+%compose_CA a_aa a aa
+%equalT a_aa aa_a
+"""
+unit_tests.append(("trivial CA associativity", code))
+
+
+
+if __name__ == "__main__":
+
+    t = time.time()
+
+    import os
+    import psutil
+    process = psutil.Process(os.getpid())
+    start_mem = process.memory_info().rss/1000
+
+    for (name, code) in unit_tests:
+        diddy_inst = diddy.Diddy()
+        print("Running test", name)
+        diddy_inst.run(code, "assert")
+#print("total time", time.time()-t)
+    
+    total_time = time.time() - t
+    end_mem = process.memory_info().rss/1000
+
+    print("time", total_time, "memory", start_mem, "->", end_mem)

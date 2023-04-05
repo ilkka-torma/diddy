@@ -6,144 +6,240 @@ import time
 import argparse
 import fractions
 import math
+import blockmap
 
-# just some basic checks
-code_basic_comparisons = """
-%nodes 0
-%dim 2
-%topology grid
-%alphabet 0 1
-%SFT full_shift              Ao 0 = 0
-%SFT ver_golden_mean_shift  Ao o = 1 -> o.dn = 0
-%SFT ver_golden_mean_shift2 Ao o.dn = 1 -> o = 0
-%SFT hor_golden_mean_shift  Ao o = 1 -> o.rt = 0
-%SFT golden_mean_shift      Ao o = 1 -> o.up = 0 & o.rt = 0
-%SFT hor_golden_mean_shift2
-(0,0,0):1 (1,0,0):1
-%contains ver_golden_mean_shift hor_golden_mean_shift
-%contains golden_mean_shift hor_golden_mean_shift
-%contains ver_golden_mean_shift golden_mean_shift
-%contains ver_golden_mean_shift full_shift
-%contains full_shift hor_golden_mean_shift
-%equal hor_golden_mean_shift2 hor_golden_mean_shift
-%equal ver_golden_mean_shift ver_golden_mean_shift2
-"""
+class Diddy:
+    def __init__(self):
+        self.SFTs = {}
+        self.CAs = {}
+        self.clopens = {}
+        self.nodes = [0]
+        self.alphabet = [0, 1]
+        self.dim = 2
+        self.topology = grid
+        self.formulae = []
+        self.weights = None
 
-code_basic_comparisons = """
-%nodes 0
-%dim 2
-%topology grid
-%alphabet 0 1
-%SFT full_shift             Ao 0 = 0
-%SFT ver_golden_mean_shift  Ao o = 1 -> o.dn = 0
-%SFT ver_golden_mean_shift2 Ao o.dn = 1 -> o = 0
-%SFT hor_golden_mean_shift  Ao o = 1 -> o.rt = 0
-%SFT golden_mean_shift      Ao o = 1 -> o.up = 0 & o.rt = 0
-%SFT hor_golden_mean_shift2
-(0,0,0):1 (1,0,0):1
-%contains ver_golden_mean_shift hor_golden_mean_shift
-%contains golden_mean_shift hor_golden_mean_shift
-%contains ver_golden_mean_shift golden_mean_shift
-%contains ver_golden_mean_shift full_shift
-%contains full_shift hor_golden_mean_shift
-%equal hor_golden_mean_shift2 hor_golden_mean_shift
-%equal ver_golden_mean_shift ver_golden_mean_shift2
-"""
+    def run(self, code, mode="report"):
+        print(code)
+        parsed = dparser.parse(code)
+        for i in parsed:
+            if i[0] == "nodes":
+                self.nodes = i[1]
+            elif i[0] == "dim":
+                self.dim = i[1]        
+            elif i[0] == "alphabet":
+                self.alphabet = i[1]
+            elif i[0] == "topology":
+                if i[1] in ["square", "grid", "squaregrid"]:
+                    self.topology = grid
+                    self.nodes = [0]
+                elif i[1] in ["hex", "hexgrid"]:
+                    self.topology = hexgrid
+                    self.nodes = [0, 1]
+                elif i[1] in ["king", "kinggrid"]:
+                    self.topology = kinggrid
+                    self.nodes = [0]
+                elif i[1] in ["triangle", "trianglegrid"]:
+                    self.topology = trianglegrid
+                    self.nodes = [0]
+                else:
+                    self.topology = i[1]
+                #print(topology)
+                    
+            elif i[0] == "SFT":
+                #print(i)
+                if i[2] == "formula":
+                    #print (i[3])
+                    circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, i[3])
+                    self.SFTs[i[1]] = sft.SFT(self.dim, self.nodes, self.alphabet, circuit=circ, formula=i[3])
+                    #print(formula)
+                elif i[2] == "forbos":
+                    #print(i[3])
+                    self.SFTs[i[1]] = sft.SFT(self.dim, self.nodes, self.alphabet, forbs=i[3])
+                else:
+                    raise Exception("??")
 
-# crazy golden mean shift formula / forbs
-code_crazy_gms = """
-%SFT hor_golden_mean_shift  Ao (o.rt.rt = 1 -> o.rt = 0) & Ae[o3] e.up = 0 | e.lt.up != e.rt.up.lt
-%SFT hor_golden_mean_shift2
-(0,0,0):1 (1,0,0):1 (0,3,0):0
-(-1,1,0):1 (0,2,0):1 (0,3,0):1
-(0,0,0):1 (1,0,0):1 (2,2,0):0
-(0,0,0):1 (1,0,0):1 (2,2,0):1
-%show_formula hor_golden_mean_shift
-%show_formula hor_golden_mean_shift2
-%equal hor_golden_mean_shift2 hor_golden_mean_shift
-"""
+            elif i[0] == "clopen":
+                compiled = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, i[2])
+                self.clopens[i[1]] = i[2]
+                
+            elif i[0] == "minimum_density":
+                verbose_here = False
+                if i[1] not in self.SFTs:
+                    raise Exception("Density can only be calculated for SFTs, not %s." % i[1])
+                tim = time.time()
+                the_sft = self.SFTs[i[1]]
+                periods = i[2]
+                print("Computing minimum density for %s restricted to period(s) %s"%(i[1], periods) + " using weights {}".format(self.weights) if self.weights is not None else "")
+                nfa = period_automaton.PeriodAutomaton(the_sft, periods, weights=self.weights)
+                if verbose_here: print("const")
+                nfa.populate()
+                if verbose_here: print("popula")
+                nfa.minimize()
+                comps = list(nfa.strong_components())
+                if verbose_here: print("strng com")
+                del nfa
+                min_data = (math.inf,)
+                min_aut = None
+                for (ic, comp) in enumerate(comps):
+                    data = comp.linsqrt_min_density_cycle()
+                    if data[:1] < min_data[:1]:
+                        min_data = data
+                        min_aut = comp
+                if verbose_here: print("kikek")
+                dens, minlen, stcyc, cyc = min_data
+                border_size = len(the_sft.nodes)*len(min_aut.frontier)
+                print("Density", fractions.Fraction(sum(weights[b] for fr in cyc for b in fr.values()),
+                                                    len(cyc)*border_size), "~", dens/(border_size*min_aut.weight_denominator), "realized by cycle of length", len(cyc))
+                print([(period_automaton.nvadd(nvec,(tr,)+(0,)*(dim-1)),c) for (tr,pat) in enumerate(cyc) for (nvec,c) in sorted(pat.items())])
+                print("Calculation took", time.time() - tim, "seconds.") 
 
-# golden mean shift on hexagon grid
-code_hex_gms = """
-%topology hex
-%set gms Ao Ae[o1] o=0|e=0|o@e
-%set gms2 Ao Ae[o5] o~~e -> (o=0| e = 0)
-%set broken_gms Ao Ae[o1] o=0|e=0
-%set broken_gms2 Ao Ae[o5] o~e -> (o=0| e = 0)
-%set empty Ao 0=1
-%set all_zero Ao o=0
-%set fullshift Ao 0=0
-%SFT byforbs
-(0,0,0):1 (0,0,1):1
-(0,0,0):1 (-1,0,1):1
-(0,0,0):1 (0,1,1):1
-%compare_SFT_pairs_equality
-"""
+            elif i[0] == "show_formula" and mode == "report":
+                if i[1] in self.SFTs:
+                    formula = self.SFTs[i[1]].circuit
+                elif i[1] in self.clopens:
+                    formula = self.clopens[i[1]][2]
+                else:
+                    raise Exception("No set named %s" % i[1])
+                print("Showing compiled formula for %s." % i[1])
+                print(formula)
+                print()
+                
+            elif i[0] == "show_parsed" and mode == "report":
+                if i[1] in self.SFTs:
+                    formula = self.SFTs[i[1]].formula
+                elif i[1] in self.clopens:
+                    formula = self.clopens[i[1]][2]
+                else:
+                    raise Exception("No set named %s" % i[1])
+                print("Showing parsed formula for %s." % i[1])
+                print(formula)
+                print()
 
+            elif i[0][:5] == "equal":
+                if i[1] in self.SFTs and i[2] in self.SFTs:
+                    SFT1 = self.SFTs[i[1]]
+                    SFT2 = self.SFTs[i[2]]
+                    report_SFT_equal((i[1], SFT1), (i[2], SFT2), mode=mode, truth=i[0][5:])
 
-#_hex_idcodes = ""
-code = """ 
-%topology hex
-%SFT idcode Ao let c u v := v = 1 & u ~ v in
-(Ed[o1] c o d) & (Ap[o2] p !@ o -> Eq[o1p1] (c o q & ! c p q) | (c p q & !c o q))
-%SFT idcode2
-(0,0,1):0 (0,0,0):0 (1,0,0):0 (0,-1,0):0
-(0,0,1):0 (1,1,1):0 (2,0,0):0 (1,-1,0):0
-(0,0,1):0 (1,1,0):0 (1,0,1):0 (2,1,0):0
-(0,0,0):0 (0,0,1):0 (0,-1,0):0 (1,1,0):0 (1,1,1):0 (2,1,0):0
-(0,0,0):0 (0,0,1):0 (1,0,0):0 (0,-1,1):0 (1,-1,0):0 (0,-2,0):0
-(0,0,0):0 (0,0,1):0 (0,-1,0):0 (1,0,1):0 (2,0,0):0 (1,-1,0):0
-(0,0,1):0 (1,0,0):0 (1,0,1):0 (1,1,1):0
-(0,0,0):0 (0,-1,0):0 (1,0,1):0 (1,1,1):0
-(0,0,1):0 (1,0,0):0 (1,1,1):0 (0,-1,1):0 (1,-1,0):0 (1,-1,1):0
-(0,0,1):0 (1,0,0):0 (1,0,1):0 (2,1,0):0 (2,1,1):0 (2,2,1):0
-(0,0,1):0 (1,0,0):0 (1,1,1):0 (2,0,0):0 (2,0,1):0 (2,1,1):0
---%compare_SFT_pairs
-%calculate_forbidden_patterns idcode idcode3 3
-%show_formula idcode2
-%show_formula idcode3
-"""
+                elif i[1] in self.CAs and i[2] in self.CAs:
+                    CA1 = self.CAs[i[1]]
+                    CA2 = self.CAs[i[2]]
+                    report_CA_equal((i[1], CA1), (i[2], CA2), mode=mode, truth=i[0][5:])
+                
+                else:
+                    raise Exception("%s or %s is not an SFT." % i[1:])
+                
+                    #if i[1] not in clopens or i[2] not in clopens:
+                    #    raise Exception("%s not a clopen set"i[1] )                
+                    #clopen1 = clopens[i[1]]
+                    #clopen2 = clopens[i[2]]
+                    #raise Exception("Comparison of clopen sets not implemented.")
+                    
+            elif i[0][:8] == "contains":
 
-code_basic = """
-%alphabet 0 1
-%SFT fullshift      Ao 0=0
-%SFT fullshift2      Ao o=o
-%SFT not_fullshift  Ao o=0
--- %compare_SFT_pairs
-%calculate_forbidden_patterns not_fullshift nf 2
-"""
+                if i[1] in self.SFTs:
+                    SFT1 = self.SFTs[i[1]]
+                    SFT2 = self.SFTs[i[2]]
+                    report_SFT_contains((i[1], SFT1), (i[2], SFT2), mode=mode, truth=i[0][8:])
+                else:
+                    clopen1 = self.clopens[i[1]]
+                    clopen2 = self.clopens[i[2]]
+                    raise Exception("Comparison of clopen sets not implemented.")
 
-#testing one-dimensional XORs
-code_basic_xors = """
-%topology grid
-%SFT test Ao Ap let xor a b := (a & !b) | (!a & b) in
-xor (xor o=1 o.up=1) (xor o.dn=1 o.up.up=1)
-%SFT test2 Ao Ap let xor a b := (a & !b) | (!a & b) in
-xor (xor (xor o=1 o.dn=1) o.up.up!=0) o.up=1
-%SFT test3 Ao Ap let xor a b := (a & !b) | (!a & b) in
-xor (xor (xor o=1 o.dn.up=1) o.up.up!=0) o.up=1
-%show_formula test2
-%compare_SFT_pairs_equality
-"""
+            elif i[0] == "compare_SFT_pairs" and mode == "report":
+                for a in self.SFTs:
+                    for b in self.SFTs:
+                        if a == b:
+                            continue
+                        report_SFT_contains((a, self.SFTs[a]), (b, self.SFTs[b]))
 
-# ledrappier test
-code_ledra = """
-%topology grid
-%SFT Ledrappier Ao let xor a b := (a & !b) | (!a & b) in
-xor (xor o=1 o.up=1) o.rt=1
-%SFT LedrappierSquare Ao let xor a b := (a & !b) | (!a & b) in
-xor (xor o=1 o.up.up=1) o.rt.rt=1
-%compare_SFT_pairs
-"""
+            elif i[0] == "compare_SFT_pairs_equality" and mode == "report":
+                #print(SFTs_as_list)
+                for (i, (aname, a)) in enumerate(self.SFTs.items()):# SFTs_as_list):
+                    for (bname, b) in list(self.SFTs.items())[i+1:]: #SFTs_as_list[i+1:]:
+                        report_SFT_equal((aname, a), (bname, b))
 
-#print(dparser.read_formula("Ao o!=1|o.rt!=1&o!=1|o.dn!=1"))
-#a = bb
+            elif i[0] == "show_forbidden_patterns":
+                
+                the_sft = self.SFTs[i[1]]
+                print("Showing forbidden patterns for %s." % i[1])
+                if the_sft.forbs is None:
+                    print("Forbidden patterns not yet computed.")
+                else:
+                    print(the_sft.forbs)
+                print()
 
-"""
-(('NODEFORALL', 'o', None, ('AND', ('OR', ('NOT', ('HASVAL', 'o', 1)),
-('NOT', ('HASVAL', ['o', 'rt'], 1))), ('OR', ('NOT', ('HASVAL', 'o', 1)),
-('NOT', ('HASVAL', ['o', 'dn'], 1))))), '')
-"""
+            elif i[0] == "compute_forbidden_patterns":
+                
+                the_sft = self.SFTs[i[1]]
+                rad = i[2]
+                if mode == "report":
+                    print("Computing forbidden patterns for %s using radius %s." % (i[1], rad))
+                    if the_sft.forbs is not None:
+                        print("It already had forbidden patterns; overwriting them.")
+                    print()
+                the_sft.deduce_forbs(rad)
+
+            elif i[0] == "set_weights":
+                self.weights = i[1]
+                print(self.weights)
+
+            elif i[0] == "Wang" or i[0] == "wang":
+                name = i[1]
+                #print(i[1])
+                tiles = i[2]
+                kwargs = i[3]
+                flags = i[4]
+                custom_topology = False
+
+                #print(flags)
+                
+                # a flag can be used to make this use the current topology
+                if flags.get("topology", False) or flags.get("use_topology", False) or \
+                   flags.get("custom_topology", False):
+                    custom_topology = True
+                    raise Exception("Work in progress...")
+                    colors, formula = general_Wang(tiles, nodes, topology, kwargs.get("inverses", []))
+                # ad hoc code for 2d Wang tiles
+                else:
+                    colors, formula = basic_2d_Wang(tiles)
+                    
+                circ = compiler.formula_to_circuit(Wang_nodes, 2, Wang_topology, colors, formula)
+                self.SFTs[name] = sft.SFT(2, Wang_nodes, self.alphabet, circuit=circ, formula=formula)
+
+            # caching is global, is that dangerous?
+            # in principle we could have a circuitset here in diddy,
+            # and (through compiler) tell Circuit that we are using one,
+            elif i[0] == "start_cache":
+                compiler.start_cache(i[1][0], i[1][1])
+            elif i[0] == "end_cache":
+                compiler.end_cache()
+
+            elif i[0] == "CA":
+                name = i[1]
+                rules = i[2]
+                circuits = {}
+                for r in rules:
+                    circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, r[2])
+                    circuits[(r[0], r[1])] = circ
+                print(circuits)
+                self.CAs[name] = blockmap.CA(self.alphabet, self.nodes, self.dim, circuits)
+
+            elif i[0] == "compose_CA":
+                composands = i[1]
+                print(composands, self.CAs)
+                result_name = composands[0]
+                result_CA = self.CAs[composands[1]]
+                for name in composands[2:]:
+                    result_CA = result_CA.then(self.CAs[name])
+                self.CAs[result_name] = result_CA
+                
+                                        
+            elif mode == "report":
+                raise Exception("Unknown command %s." % i[0])
+
 
 # for a dict with lists on the right, return all sections
 def get_sections(dicto):
@@ -340,7 +436,7 @@ def report_SFT_contains(a, b, mode="report", truth=True):
 def report_SFT_equal(a, b, mode="report", truth=True):
     aname, aSFT = a
     bname, bSFT = b
-    print("Testing whether %s and %s are equal." % (aname, bname))
+    print("Testing whether SFTs %s and %s are equal." % (aname, bname))
     tim = time.time()
     res, rad = aSFT.equals(bSFT, return_radius = True)
     tim = time.time() - tim
@@ -352,6 +448,23 @@ def report_SFT_equal(a, b, mode="report", truth=True):
     if mode == "assert":
         print(res, truth)
         assert res == (truth == "T")
+
+def report_CA_equal(a, b, mode="report", truth=True):
+    aname, aCA = a
+    bname, bCA = b
+    print("Testing whether CA %s and %s are equal." % (aname, bname))
+    tim = time.time()
+    res = aCA == bCA
+    tim = time.time() - tim
+    if res: 
+        print("They are EQUAL (time %s)." % (tim))
+    else:
+        print("They are DIFFERENT (time %s)." % (tim))
+    print()
+    if mode == "assert":
+        print(res, truth)
+        assert res == (truth == "T")
+
 
 grid = [("up", (0,0,0), (0,1,0)),
         ("dn", (0,0,0), (0,-1,0)),
@@ -384,199 +497,7 @@ Wang_topology = [("up", (0,0,"N"), (0,1,"S")),
                  ("rt", (0,0,"E"), (1,0,"W")),
                  ("lt", (0,0,"W"), (-1,0,"E"))]
 
-def run_diddy(code, mode="report"):
-    print(code)
-    parsed = dparser.parse(code)
-    nodes = [0]
-    alphabet = [0, 1]
-    dim = 2
-    topology = grid
-    SFTs = {}
-    clopens = {}
-    formulae = []
-    weights = None
-    for i in parsed:
-        if i[0] == "nodes":
-            nodes = i[1]
-        elif i[0] == "dim":
-            dim = i[1]        
-        elif i[0] == "alphabet":
-            alphabet = i[1]
-        elif i[0] == "topology":
-            if i[1] in ["square", "grid", "squaregrid"]:
-                topology = grid
-                nodes = [0]
-            elif i[1] in ["hex", "hexgrid"]:
-                topology = hexgrid
-                nodes = [0, 1]
-            elif i[1] in ["king", "kinggrid"]:
-                topology = kinggrid
-                nodes = [0]
-            elif i[1] in ["triangle", "trianglegrid"]:
-                topology = trianglegrid
-                nodes = [0]
-            else:
-                topology = i[1]
-            #print(topology)
-                
-        elif i[0] == "SFT":
-            #print(i)
-            if i[2] == "formula":
-                #print (i[3])
-                circ = compiler.formula_to_circuit(nodes, dim, topology, alphabet, i[3])
-                SFTs[i[1]] = sft.SFT(dim, nodes, alphabet, circuit=circ, formula=i[3])
-                #print(formula)
-            elif i[2] == "forbos":
-                #print(i[3])
-                SFTs[i[1]] = sft.SFT(dim, nodes, alphabet, forbs=i[3])
-            else:
-                raise Exception("??")
 
-        elif i[0] == "clopen":
-            compiled = compiler.formula_to_circuit(nodes, dim, topology, alphabet, i[2])
-            clopens[i[1]] = i[2]
-            
-        elif i[0] == "minimum_density":
-            verbose_here = False
-            if i[1] not in SFTs:
-                raise Exception("Density can only be calculated for SFTs, not %s." % i[1])
-            tim = time.time()
-            the_sft = SFTs[i[1]]
-            periods = i[2]
-            print("Computing minimum density for %s restricted to period(s) %s"%(i[1], periods) + " using weights {}".format(weights) if weights is not None else "")
-            nfa = period_automaton.PeriodAutomaton(the_sft, periods, weights=weights)
-            if verbose_here: print("const")
-            nfa.populate()
-            if verbose_here: print("popula")
-            nfa.minimize()
-            comps = list(nfa.strong_components())
-            if verbose_here: print("strng com")
-            del nfa
-            min_data = (math.inf,)
-            min_aut = None
-            for (ic, comp) in enumerate(comps):
-                data = comp.linsqrt_min_density_cycle()
-                if data[:1] < min_data[:1]:
-                    min_data = data
-                    min_aut = comp
-            if verbose_here: print("kikek")
-            dens, minlen, stcyc, cyc = min_data
-            border_size = len(the_sft.nodes)*len(min_aut.frontier)
-            print("Density", fractions.Fraction(sum(weights[b] for fr in cyc for b in fr.values()),
-                                                len(cyc)*border_size), "~", dens/(border_size*min_aut.weight_denominator), "realized by cycle of length", len(cyc))
-            print([(period_automaton.nvadd(nvec,(tr,)+(0,)*(dim-1)),c) for (tr,pat) in enumerate(cyc) for (nvec,c) in sorted(pat.items())])
-            print("Calculation took", time.time() - tim, "seconds.") 
-
-        elif i[0] == "show_formula" and mode == "report":
-            if i[1] in SFTs:
-                formula = SFTs[i[1]].circuit
-            elif i[1] in clopens:
-                formula = clopens[i[1]][2]
-            else:
-                raise Exception("No set named %s" % i[1])
-            print("Showing compiled formula for %s." % i[1])
-            print(formula)
-            print()
-            
-        elif i[0] == "show_parsed" and mode == "report":
-            if i[1] in SFTs:
-                formula = SFTs[i[1]].formula
-            elif i[1] in clopens:
-                formula = clopens[i[1]][2]
-            else:
-                raise Exception("No set named %s" % i[1])
-            print("Showing parsed formula for %s." % i[1])
-            print(formula)
-            print()
-
-        elif i[0][:5] == "equal":
-            if i[1] in SFTs and i[2] in SFTs:
-                SFT1 = SFTs[i[1]]
-                SFT2 = SFTs[i[2]]
-                report_SFT_equal((i[1], SFT1), (i[2], SFT2), mode=mode, truth=i[0][5:])
-
-            else:
-                raise Exception("%s or %s is not an SFT." % i[1:])
-            
-                #if i[1] not in clopens or i[2] not in clopens:
-                #    raise Exception("%s not a clopen set"i[1] )                
-                #clopen1 = clopens[i[1]]
-                #clopen2 = clopens[i[2]]
-                #raise Exception("Comparison of clopen sets not implemented.")
-                
-        elif i[0][:8] == "contains":
-
-            if i[1] in SFTs:
-                SFT1 = SFTs[i[1]]
-                SFT2 = SFTs[i[2]]
-                report_SFT_contains((i[1], SFT1), (i[2], SFT2), mode=mode, truth=i[0][8:])
-            else:
-                clopen1 = clopens[i[1]]
-                clopen2 = clopens[i[2]]
-                raise Exception("Comparison of clopen sets not implemented.")
-
-        elif i[0] == "compare_SFT_pairs" and mode == "report":
-            for a in SFTs:
-                for b in SFTs:
-                    if a == b:
-                        continue
-                    report_SFT_contains((a, SFTs[a]), (b, SFTs[b]))
-
-        elif i[0] == "compare_SFT_pairs_equality" and mode == "report":
-            #print(SFTs_as_list)
-            for (i, (aname, a)) in enumerate(SFTs.items()):# SFTs_as_list):
-                for (bname, b) in list(SFTs.items())[i+1:]: #SFTs_as_list[i+1:]:
-                    report_SFT_equal((aname, a), (bname, b))
-
-        elif i[0] == "show_forbidden_patterns":
-            
-            the_sft = SFTs[i[1]]
-            print("Showing forbidden patterns for %s." % i[1])
-            if the_sft.forbs is None:
-                print("Forbidden patterns not yet computed.")
-            else:
-                print(the_sft.forbs)
-            print()
-
-        elif i[0] == "compute_forbidden_patterns":
-            
-            the_sft = SFTs[i[1]]
-            rad = i[2]
-            if mode == "report":
-                print("Computing forbidden patterns for %s using radius %s." % (i[1], rad))
-                if the_sft.forbs is not None:
-                    print("It already had forbidden patterns; overwriting them.")
-                print()
-            the_sft.deduce_forbs(rad)
-
-        elif i[0] == "set_weights":
-            weights = i[1]
-            print(weights)
-
-        elif i[0] == "Wang" or i[0] == "wang":
-            name = i[1]
-            #print(i[1])
-            tiles = i[2]
-            kwargs = i[3]
-            flags = i[4]
-            custom_topology = False
-
-            #print(flags)
-            
-            # a flag can be used to make this use the current topology
-            if flags.get("topology", False) or flags.get("use_topology", False) or \
-               flags.get("custom_topology", False):
-                custom_topology = True
-                colors, formula = general_Wang(tiles, nodes, topology, kwargs.get("inverses", []))
-            # ad hoc code for 2d Wang tiles
-            else:
-                colors, formula = basic_2d_Wang(tiles)
-                
-            circ = compiler.formula_to_circuit(Wang_nodes, 2, Wang_topology, colors, formula)
-            SFTs[name] = sft.SFT(2, Wang_nodes, alphabet, circuit=circ, formula=formula)
-
-        elif mode == "report":
-            raise Exception("Unknown command %s." % i[0])
 
 
 if __name__ == "__main__":
@@ -588,3 +509,5 @@ if __name__ == "__main__":
         code = f.read()
 
     run_diddy(code)
+
+    
