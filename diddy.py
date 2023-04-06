@@ -106,7 +106,7 @@ class Diddy:
                 vecs = i[4]
                 print("Computing lower bound for density in {} using vectors {}, neighborhood {} and additional radius {}".format(i[1], vecs, nhood, rad))
                 #patterns = list(the_sft.all_patterns(nhood))
-                dens = density_linear_program.optimal_density(the_sft, vecs, nhood, rad, verbose=False)
+                dens = density_linear_program.optimal_density(the_sft, vecs, nhood, rad, verbose=True)
                 print("Density", dens)
                 print("Calculation took", time.time() - tim, "seconds.")
 

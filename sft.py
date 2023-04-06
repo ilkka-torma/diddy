@@ -267,12 +267,13 @@ class SFT:
     def all_patterns(self, domain, existing=None, extra_rad=0):
         if len(self.alph) != 2:
             raise Exception("Only binary alphabets supported in all_patterns")
-        if existing is None:
+        if not existing:
             pat = dict()
-            vecs = list(domain)
+            vecs = list(sorted(domain))
         else:
-            pat = existing.copy()
-            vecs = [vec for vec in domain if vec not in pat]
+            pat = dict(existing)
+            vecs = [vec for vec in sorted(domain)
+                    if vec not in pat]
         
         big_vecs = set(nvadd(nvec, tr)
                        for nvec in domain
@@ -280,12 +281,14 @@ class SFT:
         inv_vecs = [var[:-1] for var in get_vars(self.circuit)]
 
         circuits = {}
+        circ_vars = {}
         for nvec in big_vecs:
             circuits[nvec] = self.circuit.copy()
             for var in self.circuit.get_variables():
                 # translate and add 0 at end so that we don't replace twice
                 rel_pos = vadd(nvec[:-1], var[:-1]) + (var[-1], 0) 
                 substitute(circuits[nvec], var, V(rel_pos))
+            circ_vars[nvec] = circuits[nvec].get_variables()
                 # print(circuits[v])
 
         #print("vecs", vecs)
@@ -300,9 +303,10 @@ class SFT:
                 subpat = dict()
                 for vec in inv_vecs:
                     try:
-                        circ = circuits[nvsub(var, vec)]
+                        tr_vec = nvsub(var, vec)
+                        circ = circuits[tr_vec]
                         circs.append(circ)
-                        for other_var in get_vars(circ):
+                        for other_var in circ_vars[tr_vec]:
                             try:
                                 subpat[other_var] = pat[other_var[:-1]]
                             except KeyError:
@@ -334,9 +338,10 @@ class SFT:
                 subpat = dict()
                 for vec in inv_vecs:
                     try:
-                        circ = circuits[nvsub(var, vec)]
+                        tr_vec = nvsub(var, vec)
+                        circ = circuits[tr_vec]
                         circs.append(circ)
-                        for other_var in get_vars(circ):
+                        for other_var in circ_vars[tr_vec]:
                             try:
                                 subpat[other_var] = pat[other_var[:-1]]
                             except KeyError:

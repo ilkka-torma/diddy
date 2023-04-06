@@ -13,25 +13,16 @@ import time
 # given sft, vectors and patterns, enumerate combined locally correct patterns that affect origin
 # yield values are dicts : nvec -> pat
 # they are shared, i.e. should not be modified by the consumer
-def surroundings(the_sft, vecs, domain, patterns, radius, bigpat=None):
-    if bigpat is None:
-        # decide on origin
-        for fr_pat in patterns:
-            for surr in surroundings(the_sft, vecs, domain, patterns, radius, bigpat=dict(fr_pat)):
-                surr[(0,)*the_sft.dim] = fr_pat
-                yield surr
-    else:
-        if vecs:
-            sft_vars = circuit.get_vars(the_sft.circuit)
-            vec = vecs[0]
-            shifted_domain = [nvadd(nvec, vec) for nvec in domain]
-            for new_bigpat in the_sft.all_patterns(shifted_domain, existing=bigpat, extra_rad=radius):
-                backshifted = fd.frozendict({nvsub(pvec, vec) : new_bigpat[pvec] for pvec in shifted_domain})
-                for surr in surroundings(the_sft, vecs[1:], domain, patterns, radius, new_bigpat):
-                    surr[vec] = backshifted
-                    yield surr
-        else:
-            yield dict()
+def surroundings(the_sft, vecs, domain, patterns, radius):
+    bigdomain = set(nvadd(nvec, vec) for nvec in domain for vec in vecs)
+    surr = dict()
+    # decide on origin
+    for fr_pat in patterns:
+        surr[(0,)*the_sft.dim] = fr_pat
+        for bigpat in the_sft.all_patterns(bigdomain, existing=fr_pat, extra_rad=radius):
+            for vec in vecs:
+                surr[vec] = fd.frozendict({nvec : bigpat[nvadd(nvec, vec)] for nvec in domain})
+            yield surr
 
 # given sft, vectors along which to share charge, and patterns that guide the sharing, find best provable lower bound
 # vectors is a list of Z^d-vectors that should not contain origin
@@ -59,7 +50,7 @@ def optimal_density(the_sft, vectors, domain, radius, weights=None, ret_shares=F
     for pat in the_sft.all_patterns(domain):
         patterns.add(fd.frozendict(pat))
         i += 1
-        if verbose and i%10 == 0:
+        if verbose and i%100 == 0:
             print("{} found so far".format(i))
     if verbose:
         print("Done with {} patterns".format(i))
@@ -103,7 +94,7 @@ def optimal_density(the_sft, vectors, domain, radius, weights=None, ret_shares=F
             
         prob += summa >= density
         i += 1
-        if verbose and i%50 == 0:
+        if verbose and i%500 == 0:
             print("{} found so far".format(i))
     if verbose:
         print("Done with {} constraints, now solving linear program".format(i))

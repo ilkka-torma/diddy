@@ -499,8 +499,7 @@ def int_nodes(c):
     #isi = Circuit.internal_sweep_int
     #Circuit.internal_sweep_int += 1
     dealts = set()
-    for node in int_nodes_(c, dealts):
-        yield node
+    return int_nodes_(c, dealts)
 
 def int_nodes_(c, dealts):
     #if c.isi == isi:
