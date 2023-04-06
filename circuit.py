@@ -20,6 +20,7 @@ from pysat.solvers import Glucose4
 import time
 #from circuitset import CircuitSet
 import circuitset
+import itertools as it
 
 def circuit(op, *inputs):
     c = Circuit(op, *inputs)
@@ -498,23 +499,21 @@ def int_nodes(c):
     #isi = Circuit.internal_sweep_int
     #Circuit.internal_sweep_int += 1
     dealts = set()
-    return int_nodes_(c, dealts)
+    for node in int_nodes_(c, dealts):
+        yield node
 
 def int_nodes_(c, dealts):
     #if c.isi == isi:
     #    return list()
-    if c in dealts:
-        return list()
-    dealts.add(c)
-    #c.isi = isi
+    if c not in dealts:
+        dealts.add(c)
+        #c.isi = isi
     
-    if c.op == "V":
-        return []
-    ret = []
-    for t in c.inputs:
-        ret.extend(int_nodes_(t, dealts))
-    ret.append(c)
-    return ret
+        if c.op != "V":
+            for t in c.inputs:
+                for node in int_nodes_(t, dealts):
+                    yield node
+            yield c
 
 def LDAC(n):
     if type(n) != int:
@@ -633,14 +632,12 @@ def models(C1, C2, return_sep = False):
     #for v in var_to_name:
     #    print(type(v))
     # these come topologically sorted
-    nodes = list(C1.internal_nodes()) + list(C2.internal_nodes())
-    newnodes = []
-    for n in nodes:
-        if n not in newnodes:
-            newnodes.append(n)
-    nodes = newnodes
     #print(nodes, list(map(str, nodes)), list(map(id, nodes)), "node")
-    for q in nodes:
+    seen = set()
+    for q in it.chain(C1.internal_nodes(), C2.internal_nodes()):
+        if q in seen:
+            continue
+        seen.add(q)
         assert q.op != "V"
         var_to_name[id(q)] = next_name
         inps = []

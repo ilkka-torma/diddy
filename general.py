@@ -10,6 +10,9 @@ def vsub(a, b):
         c.append(a[i] - b[i])
     return tuple(c)
 
+def vmod(m, vec):
+    return tuple(a%m for a in vec)
+
 def vneg(vec):
     return tuple(-a for a in vec)
 

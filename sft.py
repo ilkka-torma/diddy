@@ -1,17 +1,6 @@
 
 from circuit import *
-
-def vadd(vec1, vec2):
-    return tuple(a+b for (a,b) in zip(vec1, vec2))
-
-def vsub(vec1, vec2):
-    return tuple(a-b for (a,b) in zip(vec1, vec2))
-
-def vmod(m, v):
-    return v[0]%m, v[1]%m
-
-def nvsub(nv, v):
-    return tuple(a-b for (a,b) in zip(nv,v)) + (nv[-1],)
+from general import *
 
 def Z2square(rad):
     for x in range(-rad, rad+1):
@@ -275,23 +264,31 @@ class SFT:
                     mm[v + (n,)] = None # was not actually discussed by rules
         return mm
 
-    def all_patterns(self, domain):
+    def all_patterns(self, domain, existing=None, extra_rad=0):
         if len(self.alph) != 2:
             raise Exception("Only binary alphabets supported in all_patterns")
-
+        if existing is None:
+            pat = dict()
+            vecs = list(domain)
+        else:
+            pat = existing.copy()
+            vecs = [vec for vec in domain if vec not in pat]
+        
+        big_vecs = set(nvadd(nvec, tr)
+                       for nvec in domain
+                       for tr in centered_hypercube(self.dim, extra_rad))
         inv_vecs = [var[:-1] for var in get_vars(self.circuit)]
 
         circuits = {}
-        for v in domain:
-            circuits[v] = self.circuit.copy()
+        for nvec in big_vecs:
+            circuits[nvec] = self.circuit.copy()
             for var in self.circuit.get_variables():
                 # translate and add 0 at end so that we don't replace twice
-                rel_pos = vadd(v, var[:-1]) + (var[-1], 0) 
-                substitute(circuits[v], var, V(rel_pos))
+                rel_pos = vadd(nvec[:-1], var[:-1]) + (var[-1], 0) 
+                substitute(circuits[nvec], var, V(rel_pos))
                 # print(circuits[v])
 
-        pat = dict()
-        vecs = list(domain)
+        #print("vecs", vecs)
         pos = 0
         while True:
             #print("begin loop", pos)
@@ -300,13 +297,21 @@ class SFT:
                 var = vecs[pos]
                 pat[var] = self.alph[0]
                 circs = []
+                subpat = dict()
                 for vec in inv_vecs:
                     try:
-                        circs.append(circuits[nvsub(var, vec)])
+                        circ = circuits[nvsub(var, vec)]
+                        circs.append(circ)
+                        for other_var in get_vars(circ):
+                            try:
+                                subpat[other_var] = pat[other_var[:-1]]
+                            except KeyError:
+                                #print("other_var", other_var, "not in", pat)
+                                pass
                     except KeyError:
                         pass
-                for (var2, val) in pat.items():
-                    circs.append(V(var2 + (0,)) if val==self.alph[1] else NOT(V(var2 + (0,))))
+                for (var2, val) in subpat.items():
+                    circs.append(V(var2) if val==self.alph[1] else NOT(V(var2)))
                 #print("checking SAT", [str(c) for c in circs])
                 if SAT(AND(*circs)):
                     #print("setting 0")
@@ -326,13 +331,21 @@ class SFT:
                 #print("entering 1", pos)
                 pat[var] = self.alph[1]
                 circs = []
+                subpat = dict()
                 for vec in inv_vecs:
                     try:
-                        circs.append(circuits[nvsub(var, vec)])
+                        circ = circuits[nvsub(var, vec)]
+                        circs.append(circ)
+                        for other_var in get_vars(circ):
+                            try:
+                                subpat[other_var] = pat[other_var[:-1]]
+                            except KeyError:
+                                pass
                     except KeyError:
                         pass
-                for (var2, val) in pat.items():
-                    circs.append(V(var2 + (0,)) if val==self.alph[1] else NOT(V(var2 + (0,))))
+                for (var2, val) in subpat.items():
+                    circs.append(V(var2) if val==self.alph[1] else NOT(V(var2)))
+                #print("checking SAT", [str(c) for c in circs])
                 if SAT(AND(*circs)):
                     #print("setting 1")
                     pos += 1

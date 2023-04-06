@@ -97,16 +97,16 @@ class Diddy:
                 print("Calculation took", time.time() - tim, "seconds.")
 
             elif i[0] == "density_lower_bound":
-                if i[1] not in SFTs:
+                if i[1] not in self.SFTs:
                     raise Exception("Density can only be calculated for SFTs, not %s." % i[1])
                 tim = time.time()
-                the_sft = SFTs[i[1]]
+                the_sft = self.SFTs[i[1]]
                 rad = i[2]
                 nhood = i[3]
                 vecs = i[4]
-                print("Computing lower bound for density in {} using neighborhood {}, additional radius {} and vectors {}".format(the_sft, nhood, rad, vecs))
-                patterns = list(the_sft.all_patterns(nhood))
-                dens = density_linear_program.optimal_density(the_sft, vecs, patterns, rad, verbose=False)
+                print("Computing lower bound for density in {} using vectors {}, neighborhood {} and additional radius {}".format(i[1], vecs, nhood, rad))
+                #patterns = list(the_sft.all_patterns(nhood))
+                dens = density_linear_program.optimal_density(the_sft, vecs, nhood, rad, verbose=True)
                 print("Density", dens)
                 print("Calculation took", time.time() - tim, "seconds.")
 
@@ -522,6 +522,7 @@ if __name__ == "__main__":
     with open(args.filename, 'r') as f:
         code = f.read()
 
-    run_diddy(code)
+    runner = Diddy()
+    runner.run(code)
 
     
