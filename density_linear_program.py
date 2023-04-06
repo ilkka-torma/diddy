@@ -59,9 +59,10 @@ def optimal_density(the_sft, vectors, domain, radius, weights=None, ret_shares=F
     for pat in the_sft.all_patterns(domain):
         patterns.add(fd.frozendict(pat))
         i += 1
-        if i%10 == 0:
+        if verbose and i%10 == 0:
             print("{} found so far".format(i))
-    print("Done with {} patterns".format(i))
+    if verbose:
+        print("Done with {} patterns".format(i))
 
     # create variables for how much is discharged in each direction from each pattern
     i = 0
