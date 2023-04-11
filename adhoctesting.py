@@ -1,4 +1,4 @@
-import diddy
+import diddy, sft
 
 unit_tests = []
 

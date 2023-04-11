@@ -13,6 +13,9 @@ def vsub(a, b):
 def vmod(m, vec):
     return tuple(a%m for a in vec)
 
+def nvmod(m, nvec):
+    return tuple(a%m for a in nvec[:-1]) + nvec[-1:]
+
 def vneg(vec):
     return tuple(-a for a in vec)
 

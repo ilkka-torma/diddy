@@ -187,11 +187,8 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
                 if v not in variables:
                     raise Exception("%s is not in alphabet nor a variable" % v)
                 v = variables[v] # variables can also contain symbols
-            if len(alphabet) == 2:
-                if v == alphabet[1]:
-                    ret = V(p1)
-                else:
-                    ret = NOT(V(p1))
+            if v == alphabet[0]:
+                ret = AND(*(NOT(V(p1 + (sym,))) for sym in alphabet[1:]))
             else:
                 ret = V(p1 + (v,))
     elif op == "VALEQ":
@@ -211,11 +208,9 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         all_vars.add(var_of_pos_expr(formula[2]))
         dems = []
         #print("glak", p1, p2)
-        if ret == None and len(alphabet) == 2:
-            ret = IFF(V(p1), V(p2))
         if ret == None:
             args = []
-            for a in alphabet:
+            for a in alphabet[1:]:
                 args.append(IFF(V(p1 + (a,)), V(p2 + (a,))))
             ret = AND(*args)
     elif op == "ISNEIGHBOR" or op == "ISPROPERNEIGHBOR":

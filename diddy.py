@@ -106,8 +106,8 @@ class Diddy:
                 vecs = i[4]
                 print("Computing lower bound for density in {} using vectors {}, neighborhood {} and additional radius {}".format(i[1], vecs, nhood, rad))
                 #patterns = list(the_sft.all_patterns(nhood))
-                dens = density_linear_program.optimal_density(the_sft, vecs, nhood, rad, verbose=True)
-                print("Density", dens)
+                dens = density_linear_program.optimal_density(the_sft, vecs, nhood, rad, weights=self.weights, verbose=False)
+                print("Lower bound", dens)
                 print("Calculation took", time.time() - tim, "seconds.")
 
             elif i[0] == "show_formula" and mode == "report":
@@ -437,12 +437,15 @@ def report_SFT_contains(a, b, mode="report", truth=True):
     bname, bSFT = b
     print("Testing whether %s contains %s." % (aname, bname))
     tim = time.time()
-    res, rad = aSFT.contains(bSFT, return_radius = True)
+    res, rad, conf = aSFT.contains(bSFT, return_radius_and_sep = True)
     tim = time.time() - tim
     if res:
         print("%s CONTAINS %s (radius %s, time %s)" % (aname, bname, rad, tim))
     else:
         print("%s DOES NOT CONTAIN %s (radius %s, time %s)" % (aname, bname, rad, tim))
+        if mode == "report":
+            print("Separating periodic configuration:")
+            print(conf)
     print()
     if mode == "assert":
         print(res, truth)
