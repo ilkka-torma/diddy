@@ -475,7 +475,7 @@ code = """
 %CA rx
 0 1 Ao o!=o.rt;
 %CA ux
-0 1 Ao o!=o.lt;
+0 1 Ao o!=o.up;
 %compose_CA rux rx ux
 %compose_CA urx ux rx
 %equal rux urx

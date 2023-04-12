@@ -26,7 +26,7 @@ def onesided_hypercube(dim, rad):
     if dim == 0:
         yield ()
         return
-    for v in centered_hypercube(dim-1, rad):
+    for v in onesided_hypercube(dim-1, rad):
         for a in range(0, rad):
             yield v + (a,)
 
