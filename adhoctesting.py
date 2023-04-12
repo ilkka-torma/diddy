@@ -1,4 +1,7 @@
+
 import diddy
+
+
 
 unit_tests = []
 
@@ -448,7 +451,40 @@ code = """
 %compose_CA a_aa a aa
 %equal a_aa aa_a
 """
-unit_tests.append(("CA", code))
+#unit_tests.append(("CA", code))
+
+code = """
+%topology grid
+%alphabet 0 1
+%SFT derp Ao let kek := 0 in 0 = 0
+%minimum_density derp (0, 1)
+"""
+#unit_tests.append(("derp", code))
+
+code = """
+--%alphabet 1 2
+--%dim 2
+--%nodes 1
+--%topology
+--rt (0,0,1) (1,0,1);
+--up (0,0,1) (0,1,1);
+--lt (0,0,1) (-1,0,1);
+--dn (0,0,1) (0,-1,1);
+
+--%topology grid
+--%alphabet 0 1
+%CA rx
+0 1 Ao o!=o.rt;
+%CA ux
+0 1 Ao o!=o.lt;
+%compose_CA rux rx ux
+%compose_CA urx ux rx
+%equal rux urx
+%calculate_CA_ball 5 kekki rx ux
+"""
+unit_tests.append(("CA ball", code))
+
+
 
 if __name__ == "__main__":
     for (name, code) in unit_tests:
@@ -457,3 +493,7 @@ if __name__ == "__main__":
         diddy_inst.run(code, "report")
         #if "a" in diddy_inst.CAs:
         #    print(diddy_inst.CAs["a"])
+
+
+
+

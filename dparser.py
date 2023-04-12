@@ -7,10 +7,13 @@ name is a string
 """
 
 import fractions
+from general import *
 
 alphabet = [0, 1]
 accept_repeats_in_forbos = True
 parse_default = False
+
+keywords = ["let", "in"]
 
 def parse(s):
     commands =[]
@@ -33,10 +36,11 @@ arguments we read before going into the first list
 basic_commands = [("Wang", ["wang"], True, 1),
                   ("start_cache", [], False, 0),
                   ("end_cache", [], False, 0),
-                  ("compose_CA", [], False, 0)]
+                  ("compose_CA", [], False, 0),
+                  ("calculate_CA_ball", [], True, 2)]
 
 def parse_command(s):
-    #print("parsin", s[:20], "---")
+    #print("PRSNNN", s[:20], "---")
     _, s = ignore_space(s)
     if len(s) == 0 or s.isspace():
         return None, s
@@ -54,7 +58,7 @@ def parse_command(s):
     if op == "nodes":
         l, s = read_simple_token_list(s)
         return ("nodes", l), s
-    elif op == "dim":
+    elif op == "dim" or op == "dimension":
         l, s = read_number(s)
         return ("dim", l), s
     elif op == "topology":
@@ -327,11 +331,13 @@ def read_word(s, allow_digits = False):
             break_condition = not ss[i].isalpha() and ss[i] != "_"
         if break_condition:
             if i > 0 and not ss[:i].isdigit():
-                return ss[:i], ss[i:]
+                if ss[:i] not in keywords:
+                    return ss[:i], ss[i:]
             return None, s
         i += 1
     if len(ss) > 0:
-        return ss, ""
+        if ss not in keywords:
+            return ss, ""
     return None, s
 
 # names in the command language allow combining numbers and letters
@@ -524,7 +530,7 @@ def read_forbidden_patterns(s):
     return forbos, s
 
 def read_forbidden_pattern(s):
-    # print("asdfsa", s[:20])
+    #print("asdfsa", s[:20])
     _, s = ignore_space(s)
     pattern = {}
     while True:
@@ -685,26 +691,29 @@ def read_simple_token_list(s):
 
 # things like v.up.dn but ALSO numbers
 def read_dotted_token_list(s):
+    #print("rdtl", s[:10])
     _, s = ignore_space(s)
     word, s = read_word(s)
+    #print(word)
     if word == None:
         num, s = read_number(s)
         if num == None:
+            #print("nonni")
             return None, s
+        #print("numbro", num)
         return num, s
     words = [word]
     while True:
         #_, s = ignore_space(s)
         if s[:1] != ".":
             if len(words) == 1:
+                #print("aha wrd", words)
                 return words[0], s
+            #print("mny wrd", words)
             return words, s
         s = s[1:]
         word, s = read_simple_token(s) # these can be numbers, since nodes can be numbers
         words.append(word)
-
-#print(read_dotted_token_list("o.up"))
-#a = bb
 
 def read_simple_token(s):
     #print("sim tok", s[:20])
@@ -718,14 +727,8 @@ def read_simple_token(s):
     return word, s
 
 
-
-
-
-def vsub(a, b):
-    r = []
-    for i in range(len(a)):
-        r.append(a[i] - b[i])
-    return tuple(r)
+#print(read_dotted_token_list(" in"))
+#a = bb
 
 def read_bound(s):
     ss = s
@@ -749,9 +752,10 @@ def read_bound(s):
     return None, s
 
 def read_let(s):
+    #print("reading let", s[:15])
     ss = s
     _, ss = ignore_space(ss)
-    # circ, ss = read_name(ss)
+    # first we read the name of the call, and the parameters, like name param1 param2 ... paramn
     call = []
     while True:
         _, ss = ignore_space(ss)
@@ -761,10 +765,14 @@ def read_let(s):
         else:
             break
     _, ss = ignore_space(ss)
+    # check that the next symbol is :=
     assert ss[:2] == ":="
+    # and that we had at least a name for the call
     assert len(call) > 0
     ss = ss[2:]
+    # now read an arbitrary formula
     expr, ss = read_formula(ss)
+    #print ("ex", expr)
     _, ss = ignore_space(ss)
     if ss[:2] != "in":
         raise Exception("Excepted 'in' at " + ss[:30])
@@ -793,6 +801,7 @@ def read_formula(s):
     elif ss[:3] == "let":
         return read_let(ss[3:])
     else: #ss[:3] == "let":
+        #print("read basic")
         expr, ss = read_basic_expression(ss)
         return expr, ss
     raise Exception("Exception: Cannot parse formula at " + ss[:30])
@@ -984,7 +993,7 @@ def read_infix_expr(s):
     
 
 def read_call(s):
-    #print("reading call", s)
+    #print("reading call", s[:15])
     ss = s
     _, ss = ignore_space(ss)
     call = []
@@ -998,13 +1007,17 @@ def read_call(s):
             ss = ss[1:]
             call.append(formu)
         else:
+            #print("try infix",ss[:10])
             name, ss = read_infix_expr(ss)
             if name != None:
+                #print("suces", name)
                 call.append(name)
             else:
+                #print("ok try tods token lis", ss[:10])
                 name, ss = read_dotted_token_list(ss) #read_name(ss)
                 #print(name)
                 if name != None:
+                    #print("cusses", name)
                     call.append(name)
                 else:
                     break
@@ -1013,6 +1026,7 @@ def read_call(s):
         return None, s
     if len(call) == 1:
         return ("BOOL", call[0]), ss
+    #print("simis", call)
     return ("CIRCUIT", tuple(call)), ss
     
 def read_basic(s):
@@ -1083,7 +1097,7 @@ s = """
 
 #print(parse(s))
 
-
+#print(read_formula("0"))
 
 
 """

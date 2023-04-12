@@ -1,5 +1,6 @@
 from circuit import *
 from general import *
+import mocircuits
 import time
 
 """
@@ -32,6 +33,9 @@ class BlockMap:
                             self.circuits[(n, a)] = AND(*(map(lambda b:NOT(b), circs.values())))
                         else:
                             self.circuits[(n, a)] = F
+
+    def tomocircuit(self):
+        return mocircuits.MOCircuit(self.circuits)
 
     # compose with other; other is done after
     def then(self, other):
@@ -97,15 +101,119 @@ class BlockMap:
             if not equivalent_under(self.circuits[ns], other.circuits[ns], ldac):
                 return False
         return True
+
+    def injective_to_ball(self, r):
+        # two circuits per position per letter
+        # force images same
+        # force preimage different
+        eq_circuits = []
+        for p in centered_hypercube(self.dimension, r):
+            for n in self.to_nodes:
+                for a in self.to_alphabet:
+                    circA = self.circuits[(n, a)].copy()
+                    circB = self.circuits[(n, a)].copy()
+                    # shift the cell, i.e. not node or letter
+                    # and also add x at the end, we make two copies of each
+                    def shift(v, x): return vadd(v[:-2], p) + v[-2:] + (x,)
+                    transform(circA, lambda y:shift(y, "A"))
+                    #circuits[p + (n, a, 0)] = circA
+                    transform(circB, lambda y:shift(y, "B"))
+                    #circuits[p + (n, a, 1)] = circB
+                    eq_circuits.append(IFF(circA, circB))
+                    #print(IFF(circA, circB))
+                    
+        origin = (0,)*self.dimension
+        differents = []
+        for n in self.from_nodes:
+            for a in self.from_alphabet:
+                differents.append(XOR(V(origin + (n, a, "A")), V(origin + (n, a, "B"))))
+        # all iamges must be the same, and some central node has diff preimage
+        ret = UNSAT_under(AND(AND(*eq_circuits), OR(*differents)), LDAC(self.from_alphabet))
+
+        return ret
+        
+    def __repr__(self):
+        return repr(self.circuits)
+
+    """
+    A CA is injective on its full shift if there exists
+    a radius r such that there do not exist a pair of
+    r-sized patterns P, Q with distinct central symbols which have
+    distinct images.
+
+    On the other hand, it is not injective if we can find two periodic
+    points with the same image.
+    """
+    def injective(self):
+        r = 1
+        while True:
+            if self.injective_to_ball(r):
+                return True
+            if not self.injective_on_periodics(r):
+                return False
+            r += 1
         
 class CA(BlockMap):
     def __init__(self, alphabet, nodes, dimension, circuits):
         super().__init__(alphabet, alphabet, nodes, nodes, dimension, circuits)
+
+# given a list of cellular automata, compute relations
+# among them up to radius rad as semigroup
+def find_relations(CAs, rad):
+    i = 0
+    firstCA = CAs[0]
+    alphabet = firstCA.to_alphabet
+    nodes = firstCA.to_nodes
+    dimension = firstCA.dimension
+    indices = []
+    for n in nodes:
+        for a in alphabet:
+            indices.append((n, a))
+    mod = mocircuits.MOCircuitDict(indices)
+    identityrule = {}
+    for n in nodes:
+        for a in alphabet:
+            identityrule[(n, a)] = V((0,)*dimension + (n, a))
+    idca = CA(alphabet, nodes, dimension, identityrule)
+    mod[idca.tomocircuit()] = (idca, ())
+    frontier = [(idca, ())]
+    """
+    for i in range(len(CAs)):
+        if CAs[i].tomocircuit() not in mod:
+            mod[CAs[i].tomocircuit()] = (CAs[i], (i,))
+            frontier.append((CAs[i], (i,)))
+            yield
+    """
+
+    relations = []
+    for r in range(rad):
+        print("Frontier size %s at depth %s; total number of CA %s." % (len(frontier), r, len(mod)))
+        newfrontier = []
+        for ca, w in frontier:
+            for k in range(len(CAs)):
+                newca = ca.then(CAs[k])
+                newcamo = newca.tomocircuit()
+                if newcamo in mod:
+                    yield ("rel", mod[newcamo][1], w + (k,))
+                    relations.append((mod[newcamo][1], w + (k,)))
+                    continue
+                yield ("CA", newca, w + (k,))
+                mod[newcamo] = (newca, w + (k,))
+                newfrontier.append((newca, w + (k,)))
+        frontier = newfrontier
+
+    ret = {}
+    for k in mod:
+        img = mod[k]
+        ret[img[1]] = img[0]
+
+    return ret, relations
+        
         
 
 
 
-        
+
 
 #def that_action(CA):
     
@@ -150,9 +258,10 @@ print(x.then(x.then(x2).then(a)) == x2.then(x).then(x), True)
 print(x.then(x.then(x2)) == x2.then(a).then(x).then(x2), False)
 """
 
+
+
 """
 # more interesting testing: lamplighter group; 
-
 alphabet = [0,1]
 nodes = ["up", "dn"]
 dimension = 1
@@ -180,14 +289,29 @@ def evalstr(s):
     #print(ret, "RETURN")
     return ret
 
-"""
-"""
+""
 print(evalstr("ss") == evalstr("e"), True)
 print(evalstr("LR") == evalstr("RL"), True)
 print(evalstr("LR") == evalstr("R"), False)
 print(evalstr("RRRsLLLsRRRsLLLs") == evalstr("e"), True)
 print(evalstr("RRRsLLLsRRRLLLs") == evalstr("e"), False)
+""
+
+#CAs, rels = find_relations([can["L"], can["R"], can["s"]], 10)
+
 """
+
+
+"""
+SO_XOR_circuits = {("up",1) : V((0,"dn",1)),
+                   ("dn",1) : XOR(V((0,"dn",1)), V((0,"up",1)), V((1,"up",1)))}
+SO_XOR = CA(alphabet, nodes, dimension, SO_XOR_circuits)
+#xor_CA_circuits = {(0,"up") : XOR(V((0,0,0,1)), V((1,0,0,1)))}
+#x = CA(alphabet, nodes, dimension, xor_CA_circuits)
+
+print(evalstr("RRRsLLLsRRRsLLLs").then(SO_XOR).injective_to_ball(0))
+"""
+
 """
 
 def addat(n):
@@ -215,6 +339,39 @@ print(C == D)
 print(time.time() - t)                        
 """
                         
+
+
+
+"""
+alphabet = [0,1]
+nodes = [0,1]
+dimension = 1
+
+#shift_CA_circuits = {(0,1) : XOR(V((0,0,0)), V((1,0,0)))}
+
+# second order xor
+#SO_XOR_circuits = {(0,1) : V((0,1,1)),
+#                   (1,1) : XOR(V((0,1,1)), V((0,0,1)), V((1,0,1)))}
+#a = CA(alphabet, nodes, dimension, SO_XOR_circuits)
+#print(a.injective_to_ball(0))
+#print(a.injective_to_ball(1))
+"""
+
+
+
+"""
+alphabet = [0,1]
+nodes = [0]
+dimension = 1
+
+c = {(0,1) : XOR(V((0,0,1)), V((1,0,1)))}
+x1 = CA(alphabet, nodes, dimension, c)
+c = {(0,1) : XOR(V((0,0,1)), V((1,0,1)), V((2,0,1)))}
+x2 = CA(alphabet, nodes, dimension, c)
+CAs, rels = find_relations([x1, x2], 7)
+"""
+
+
 
 
 

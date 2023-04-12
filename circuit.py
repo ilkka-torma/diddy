@@ -715,6 +715,16 @@ def tech_simp(c, dones = None):
     dones.add(c)
     return c
 
+def UNSAT_under(C, under, return_sep = False):
+    m = models_under(C, F, under, return_sep)
+    if not return_sep:
+        return m
+    else:
+        if m == True:
+            return True
+        else:
+            return m
+
 def UNSAT(C, return_sep = False):
     m = models(C, F, return_sep)
     if not return_sep:
@@ -724,6 +734,7 @@ def UNSAT(C, return_sep = False):
             return True
         else:
             return m
+        
 def SAT(C, return_model = False):
     if not return_model:
         return not UNSAT(C)
@@ -801,7 +812,11 @@ def XOR(*inputs):
         return inputs[0]
     if len(inputs) == 0:
         return F
-    assert len(inputs) == 2 # I just didn't bother to implement in general
+    #assert len(inputs) == 2 # I just didn't bother to implement in general
+    if len(inputs) > 2:
+        left = inputs[:len(inputs)//2]
+        right = inputs[len(inputs)//2:]
+        return XOR(XOR(*left), XOR(*right))
     return AND(OR(*inputs), NOT(AND(*inputs)))
     #return Circuit("<->", *inputs)
 # this is just used for small sets when we have larger than binary alphabets;

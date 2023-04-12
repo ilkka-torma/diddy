@@ -1,12 +1,18 @@
 import dparser
+
 import compiler
 import sft
+
 import period_automaton
 import time
+
 import argparse
 import fractions
 import math
+
+
 import blockmap
+
 
 class Diddy:
     def __init__(self):
@@ -21,7 +27,9 @@ class Diddy:
         self.weights = None
 
     def run(self, code, mode="report"):
-        print(code)
+        #print(code)
+        #import sys
+        #sys.stdout = "messias"
         parsed = dparser.parse(code)
         for i in parsed:
             if i[0] == "nodes":
@@ -224,7 +232,7 @@ class Diddy:
                 for r in rules:
                     circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, r[2])
                     circuits[(r[0], r[1])] = circ
-                print(circuits)
+                #print(circuits)
                 self.CAs[name] = blockmap.CA(self.alphabet, self.nodes, self.dim, circuits)
 
             elif i[0] == "compose_CA":
@@ -235,7 +243,27 @@ class Diddy:
                 for name in composands[2:]:
                     result_CA = result_CA.then(self.CAs[name])
                 self.CAs[result_name] = result_CA
-                
+
+            elif i[0] == "calculate_CA_ball":
+                radius = i[1]
+                filename = i[2]
+                generators = i[3][0]
+                print("Computing relationss for CA %s into file %s." % (str(generators), filename))
+                generators = [self.CAs[j] for j in generators]
+                with open(filename, "w") as outfile:
+                    for output in blockmap.find_relations(generators, radius):
+                        if output[0] == "rel":
+                            outfile.write("New relation: %s = %s" % output[1:] + "\n")
+                        else:
+                            rr = repr(output[1])
+                            #print(len(rr), rr)
+                            #if len(rr) > 50:
+                            #    rr = rr[:47] + "..."
+                            #outfile.write("New CA: %s = %s" % (rr, output[2]) + "\n")
+        
+                            outfile.write("New CA of complexity %s at %s." % (len(rr), output[2]) + "\n")
+                #blockmap.find_relations(generatrs
+                #                        )
                                         
             elif mode == "report":
                 raise Exception("Unknown command %s." % i[0])
