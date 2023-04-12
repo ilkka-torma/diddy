@@ -20,6 +20,7 @@ from pysat.solvers import Glucose4
 import time
 #from circuitset import CircuitSet
 import circuitset
+import itertools as it
 
 def circuit(op, *inputs):
     c = Circuit(op, *inputs)
@@ -503,18 +504,15 @@ def int_nodes(c):
 def int_nodes_(c, dealts):
     #if c.isi == isi:
     #    return list()
-    if c in dealts:
-        return list()
-    dealts.add(c)
-    #c.isi = isi
+    if c not in dealts:
+        dealts.add(c)
+        #c.isi = isi
     
-    if c.op == "V":
-        return []
-    ret = []
-    for t in c.inputs:
-        ret.extend(int_nodes_(t, dealts))
-    ret.append(c)
-    return ret
+        if c.op != "V":
+            for t in c.inputs:
+                for node in int_nodes_(t, dealts):
+                    yield node
+            yield c
 
 def LDAC(n):
     if type(n) != int:
@@ -551,8 +549,76 @@ def last_diff_and_count(circs, count):
     #for a in andeds:
     #    print(str(a))
     return AND(*andeds)
+
+
+# copied from models
+# TODO: rewrite
+def circuit_to_sat_instance(circ, var_to_name, next_name=None):
+    sm = Circuit.smart_simplify
+    Circuit.smart_simplify = False
+    if next_name is None:
+        next_name = 1
+
+    variables = circ.get_variables()
     
+    for v in variables:
+        var_to_name[v] = next_name
+        # if v in variables1:
+        #    clauses.append([next_name])
+        next_name += 1
+    if circ.op == "V":
+        var_to_name[id(circ)] = var_to_name[circ.inputs[0]]
+
+    clauses = []
+    for q in circ.internal_nodes():
+        assert q.op != "V"
+        var_to_name[id(q)] = next_name
+        inps = []
+        for i in q.inputs:
+            if i.op == "V":
+                inps.append(var_to_name[i.inputs[0]])
+            else:
+                inps.append(var_to_name[id(i)])
+        #print(q.op, len(inps))
+        if q.op == "!":
+            nam = inps[0]
+            clauses.append([nam, next_name])
+            clauses.append([-nam, -next_name])
+        elif q.op == "&":
+            for inp in inps:
+                clauses.append([inp, -next_name])
+            clauses.append(list([-inp for inp in inps]) + [next_name])
+        elif q.op == "|":
+            for inp in inps:
+                clauses.append([-inp, next_name])
+            clauses.append(inps + [-next_name])
+        elif q.op == "T":
+            clauses.append([var_to_name[id(q)]])
+        elif q.op == "F":
+            clauses.append([-var_to_name[id(q)]])
+        else:
+            raise Exception("nope")
+        next_name += 1
     
+    Circuit.smart_simplify = sm
+    return clauses, next_name-1
+
+def projections(circ, the_vars):
+    "All possible satisfiable values of the given variables"
+    #print(circ)
+    var_to_name = dict()
+    clauses, next_name = circuit_to_sat_instance(circ, var_to_name)
+    clauses.append([next_name])
+    #print("names", var_to_name)
+    #print("names", [(x,y) for (x,y) in var_to_name.items() if type(x) == tuple])
+    #print("clauses", clauses)
+    with Glucose4(bootstrap_with=clauses) as s:
+        while s.solve():
+            m = s.get_model()
+            #print(m)
+            yield {var : (m[abs(var_to_name[var])-1] > 0) for var in the_vars}
+            #print("adding clause", [-m[abs(var_to_name[var])-1] for var in the_vars])
+            s.add_clause([-m[abs(var_to_name[var])-1] for var in the_vars])
 
 """
 models_under tells whether C1 being true implies C2 is true,
@@ -633,14 +699,12 @@ def models(C1, C2, return_sep = False):
     #for v in var_to_name:
     #    print(type(v))
     # these come topologically sorted
-    nodes = list(C1.internal_nodes()) + list(C2.internal_nodes())
-    newnodes = []
-    for n in nodes:
-        if n not in newnodes:
-            newnodes.append(n)
-    nodes = newnodes
     #print(nodes, list(map(str, nodes)), list(map(id, nodes)), "node")
-    for q in nodes:
+    seen = set()
+    for q in it.chain(C1.internal_nodes(), C2.internal_nodes()):
+        if q in seen:
+            continue
+        seen.add(q)
         assert q.op != "V"
         var_to_name[id(q)] = next_name
         inps = []

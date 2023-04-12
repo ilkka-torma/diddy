@@ -4,6 +4,7 @@ import compiler
 import sft
 
 import period_automaton
+import density_linear_program
 import time
 
 import argparse
@@ -101,7 +102,21 @@ class Diddy:
                 print("Density", fractions.Fraction(sum(weights[b] for fr in cyc for b in fr.values()),
                                                     len(cyc)*border_size), "~", dens/(border_size*min_aut.weight_denominator), "realized by cycle of length", len(cyc))
                 print([(period_automaton.nvadd(nvec,(tr,)+(0,)*(dim-1)),c) for (tr,pat) in enumerate(cyc) for (nvec,c) in sorted(pat.items())])
-                print("Calculation took", time.time() - tim, "seconds.") 
+                print("Calculation took", time.time() - tim, "seconds.")
+
+            elif i[0] == "density_lower_bound":
+                if i[1] not in self.SFTs:
+                    raise Exception("Density can only be calculated for SFTs, not %s." % i[1])
+                tim = time.time()
+                the_sft = self.SFTs[i[1]]
+                rad = i[2]
+                nhood = i[3]
+                vecs = i[4]
+                print("Computing lower bound for density in {} using vectors {}, neighborhood {} and additional radius {}".format(i[1], vecs, nhood, rad))
+                #patterns = list(the_sft.all_patterns(nhood))
+                dens = density_linear_program.optimal_density(the_sft, vecs, nhood, rad, weights=self.weights, verbose=False)
+                print("Lower bound", dens)
+                print("Calculation took", time.time() - tim, "seconds.")
 
             elif i[0] == "show_formula" and mode == "report":
                 if i[1] in self.SFTs:
@@ -450,12 +465,15 @@ def report_SFT_contains(a, b, mode="report", truth=True):
     bname, bSFT = b
     print("Testing whether %s contains %s." % (aname, bname))
     tim = time.time()
-    res, rad = aSFT.contains(bSFT, return_radius = True)
+    res, rad, conf = aSFT.contains(bSFT, return_radius_and_sep = True)
     tim = time.time() - tim
     if res:
         print("%s CONTAINS %s (radius %s, time %s)" % (aname, bname, rad, tim))
     else:
         print("%s DOES NOT CONTAIN %s (radius %s, time %s)" % (aname, bname, rad, tim))
+        if mode == "report":
+            print("Separating periodic configuration:")
+            print(conf)
     print()
     if mode == "assert":
         print(res, truth)
@@ -527,7 +545,6 @@ Wang_topology = [("up", (0,0,"N"), (0,1,"S")),
 
 
 
-
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("filename", metavar='f', type=str)
@@ -536,6 +553,7 @@ if __name__ == "__main__":
     with open(args.filename, 'r') as f:
         code = f.read()
 
-    run_diddy(code)
+    runner = Diddy()
+    runner.run(code)
 
     

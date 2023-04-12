@@ -136,6 +136,28 @@ def parse_command(s):
                 break
         return ("minimum_density", name, periods), s
 
+    elif op == "density_lower_bound":
+        name, s = read_name(s, True)
+        rad, s = read_number(s)
+        nhood = []
+        while True:
+            vec, s = read_vector(s)
+            if vec != None:
+                nhood.append(vec)
+            else:
+                break
+        if s[0] != ';':
+            raise Exception("Syntax error near" + s[20:] + ": ';' expected")
+        s = s[1:]
+        vecs = []
+        while True:
+            vec, s = read_vector(s)
+            if vec != None:
+                vecs.append(vec)
+            else:
+                break
+        return ("density_lower_bound", name, rad, nhood, vecs), s
+
     elif op in ["show_formula", "show_forbidden_patterns", "show_parsed"]:
         name, s = read_name(s, True)
         return (op, name), s
