@@ -11,37 +11,41 @@ from general import *
 # those positions will correspond to roughly the variables of the actual formula.
 
 # we can also produce auxiliary variables called aux_0, ..., aux_n
-# which can be used for variables ranging over symbols
+# which can be used for variables ranging over symbols <- outdated!!!!!!!!!!!!!
 
-# all_vars is all the variables that we talk about
+# all_vars is all the variables that we talk about <- IT IS NOT USED FOR ANYTHING
 
 circuit_variables are aa little tricky... they should be functions
 """
 def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_var, all_vars):
     #print ("formula", formula)
     #print("variables", variables)
-    #print ("vars", variables)
-    #print ("aux vars", aux_var)
-    #print ("alls", all_vars)
+    # print ("aux vars", aux_var)
+    # print ("alls", all_vars)
     op = formula[0]
     if op == "BOOL":
         ret = variables[formula[1]]
     elif op == "CIRCUIT":
         var = formula[1][0]
         args = formula[1][1:]
+        #print(var, "being called with", args)
         #varvar = variables[var]
         arg_names, code, closure = variables[var]
         variables_new = {}
+        if len(args) != len(arg_names):
+            raise Exception("Wrong number of parameters in call %s." % (str(var) + " " + str(args)))
         #print("rgs", args)
         #print("nems", arg_names)
         for a in closure:
-            variables_new[a] = closure[a][1]
+            variables_new[a] = closure[a]
         for i,a in enumerate(arg_names):
             if type(args[i]) != tuple:
-                if type(args[i]) != tuple:
-                    #variables_new[a] = args[i]
+                #variables_new[a] = args[i]
+                try:
                     pos = eval_to_position(dim, topology, args[i], variables, nodes)
-                    variables_new[a] = pos
+                except KeyError:
+                    pos = args[i] # it's actually a value... hopefully!
+                variables_new[a] = pos
             # if argument is a formula, we will evaluate it
             else:
                 circ = formula_to_circuit_(nodes, dim, topology, alphabet, args[i], variables, aux_var, all_vars)
@@ -191,28 +195,56 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
                 ret = AND(*(NOT(V(p1 + (sym,))) for sym in alphabet[1:]))
             else:
                 ret = V(p1 + (v,))
+    # the idea was that we would use hasval when we want to directly
     elif op == "VALEQ":
         ret = None
-        p1 = eval_to_position(dim, topology, formula[1], variables, nodes)
-        if p1 == None:
-            ret = F
-        # evaluates to cell
-        if len(p1) != dim+1:
-            raise Exception("Cannot compare value of cell, only node.")
-        all_vars.add(var_of_pos_expr(formula[1]))
-        p2 = eval_to_position(dim, topology, formula[2], variables, nodes)
-        if p2 == None:
-            ret = F
-        if len(p2) != dim+1:
-            raise Exception("Cannot compare value of cell, only node.")
-        all_vars.add(var_of_pos_expr(formula[2]))
-        dems = []
-        #print("glak", p1, p2)
-        if ret == None:
-            args = []
-            for a in alphabet[1:]:
-                args.append(IFF(V(p1 + (a,)), V(p2 + (a,))))
-            ret = AND(*args)
+
+        p1ispos = True
+        try: # horrible hack
+            p1 = eval_to_position(dim, topology, formula[1], variables, nodes)
+            if p1 == None:
+                ret = F
+            # evaluates to cell
+            if len(p1) != dim+1:
+                raise Exception("Cannot compare value of cell, only node.")
+        except KeyError:
+            p1ispos = False
+            #print(formula[1], "formula 1 fast")
+            p1val = variables[formula[1]] # we assume the keyerror is because this is symbol variable
+        #all_vars.add(var_of_pos_expr(formula[1]))
+
+        p2ispos = True
+        try: # horrible hack #2
+            p2 = eval_to_position(dim, topology, formula[2], variables, nodes)
+            if p2 == None:
+                ret = F
+            if len(p2) != dim+1:
+                raise Exception("Cannot compare value of cell, only node.")
+        except KeyError:
+            p2ispos = False
+            p2val = variables[formula[2]] # we assume the keyerror is because this is symbol variable
+        #all_vars.add(var_of_pos_expr(formula[2]))
+
+        if not p1ispos and not p2ispos:
+            if p1val == p2val:
+                return T
+            return F
+
+        elif p1ispos and p2ispos:
+            if ret == None:
+                args = []
+                for a in alphabet[1:]:
+                    args.append(IFF(V(p1 + (a,)), V(p2 + (a,))))
+                ret = AND(*args)
+
+        else:
+            if not p1ispos and p2ispos:
+                p1, p2val = p2, p1val
+            if p2val == alphabet[0]:
+                ret = AND(*(NOT(V(p1 + (sym,))) for sym in alphabet[1:]))
+            else:
+                ret = V(p1 + (p2val,))
+            
     elif op == "ISNEIGHBOR" or op == "ISPROPERNEIGHBOR":
         #print("test nbr")
         ret = None

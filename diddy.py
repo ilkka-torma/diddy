@@ -28,9 +28,6 @@ class Diddy:
         self.weights = None
 
     def run(self, code, mode="report"):
-        #print(code)
-        #import sys
-        #sys.stdout = "messias"
         parsed = dparser.parse(code)
         for i in parsed:
             if i[0] == "nodes":
@@ -152,7 +149,7 @@ class Diddy:
                     report_CA_equal((i[1], CA1), (i[2], CA2), mode=mode, truth=i[0][5:])
                 
                 else:
-                    raise Exception("%s or %s is not an SFT." % i[1:])
+                    raise Exception("%s or %s is not an SFT or CA." % i[1:])
                 
                     #if i[1] not in clopens or i[2] not in clopens:
                     #    raise Exception("%s not a clopen set"i[1] )                
@@ -252,7 +249,7 @@ class Diddy:
 
             elif i[0] == "compose_CA":
                 composands = i[1]
-                print(composands, self.CAs)
+                print("Composing CA %s." % composands)#, self.CAs)
                 result_name = composands[0]
                 result_CA = self.CAs[composands[1]]
                 for name in composands[2:]:
@@ -261,22 +258,23 @@ class Diddy:
 
             elif i[0] == "calculate_CA_ball":
                 radius = i[1]
-                filename = i[2]
+                filename = i[2] + ".output"
                 generators = i[3][0]
-                print("Computing relationss for CA %s into file %s." % (str(generators), filename))
+                print("Computing relations for CA %s into file %s." % (str(generators), filename))
                 generators = [self.CAs[j] for j in generators]
                 with open(filename, "w") as outfile:
                     for output in blockmap.find_relations(generators, radius):
                         if output[0] == "rel":
                             outfile.write("New relation: %s = %s" % output[1:] + "\n")
                         else:
-                            rr = repr(output[1])
+                            rr = "" #repr(output[1])
                             #print(len(rr), rr)
                             #if len(rr) > 50:
                             #    rr = rr[:47] + "..."
                             #outfile.write("New CA: %s = %s" % (rr, output[2]) + "\n")
         
                             outfile.write("New CA of complexity %s at %s." % (len(rr), output[2]) + "\n")
+                        outfile.flush()
                 #blockmap.find_relations(generatrs
                 #                        )
                                         

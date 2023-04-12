@@ -191,7 +191,7 @@ def find_relations(CAs, rad):
         newfrontier = []
         for ca, w in frontier:
             for k in range(len(CAs)):
-                newca = ca.then(CAs[k])
+                newca = ca.after(CAs[k])
                 newcamo = newca.tomocircuit()
                 if newcamo in mod:
                     yield ("rel", mod[newcamo][1], w + (k,))

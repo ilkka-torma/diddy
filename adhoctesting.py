@@ -461,28 +461,160 @@ code = """
 #unit_tests.append(("derp", code))
 
 code = """
---%alphabet 1 2
---%dim 2
---%nodes 1
---%topology
---rt (0,0,1) (1,0,1);
---up (0,0,1) (0,1,1);
---lt (0,0,1) (-1,0,1);
---dn (0,0,1) (0,-1,1);
-
---%topology grid
---%alphabet 0 1
+%alphabet 1 2
+%dim 3
+%nodes 1
+%topology
+rt (0,0,0,1) (1,0,0,1);
+up (0,0,0,1) (0,1,0,1);
+lt (0,0,0,1) (-1,0,0,1);
+dn (0,0,0,1) (0,-1,0,1);
+fd (0,0,0,1) (0,0,1,1);
+bk (0,0,0,1) (0,0,-1,1);
 %CA rx
-0 1 Ao o!=o.rt;
+1 1 Ao o!=o.rt;
 %CA ux
-0 1 Ao o!=o.up;
-%compose_CA rux rx ux
-%compose_CA urx ux rx
-%equal rux urx
-%calculate_CA_ball 5 kekki rx ux
+1 1 Ao o!=o.up;
+%CA fx
+1 1 Ao o!=o.fd;
+--%compose_CA rux rx ux
+--%compose_CA urx ux rx
+-- %equal rx ux
+--%calculate_CA_ball 5 kekki rx ux fx
 """
-unit_tests.append(("CA ball", code))
+#unit_tests.append(("CA ball", code))
 
+code = """
+-- K3 = {0111000, 1000100, 0111100, 1010110, 1111110, 0010001, 0101001, 1101001, 0000101, 0010101,
+--0011101, 0000011, 1110011, 0011011, 1011011, 0111011, 1111011, 1000111, 1100111, 0010111,
+--1110111, 0001111, 0111111}
+%dim 1
+%alphabet 0 1
+%nodes 0
+%topology
+rt (0,0) (1,0);
+lt (0,0) (-1,0);
+%CA K
+0 1 Ao let x a b c d e f g := o=a & o.rt=b & o.rt.rt=c & o.rt.rt.rt=d & o.rt.rt.rt.rt=e & o.rt.rt.rt.rt.rt=f & o.rt.rt.rt.rt.rt.rt=g in
+x 0 1 1 1 0 0 0 |
+x 1 0 0 0 1 0 0 |
+x 0 1 1 1 1 0 0 |
+x 1 0 1 0 1 1 0 |
+x 1 1 1 1 1 1 0 |
+x 0 0 1 0 0 0 1 |
+x 0 1 0 1 0 0 1 |
+x 1 1 0 1 0 0 1 |
+x 0 0 0 0 1 0 1 |
+x 0 0 1 0 1 0 1 |
+x 0 0 1 1 1 0 1 |
+x 0 0 0 0 0 1 1 |
+x 1 1 1 0 0 1 1 |
+x 0 0 1 1 0 1 1 |
+x 1 0 1 1 0 1 1 |
+x 0 1 1 1 0 1 1 |
+x 1 1 1 1 0 1 1 |
+x 1 0 0 0 1 1 1 |
+x 1 1 0 0 1 1 1 |
+x 0 0 1 0 1 1 1 |
+x 1 1 1 0 1 1 1 |
+x 0 0 0 1 1 1 1 |
+x 0 1 1 1 1 1 1
+%CA zero
+0 1 0=1
+%compose_CA doublezero zero zero
+%equal_CA doublezero zero
+%calculate_CA_ball 10 kekki K
+--%equal_CA K zero
+--%compose_CA K2 K K
+--%equal_CA K2 zero
+--%compose_CA K3 K K2
+--%equal_CA K3 zero
+--%compose_CA K4 K K3
+--%equal_CA K4 zero
+--%compose_CA K5 K K4
+--%equal_CA K5 zero
+--%compose_CA K6 K K5
+--%equal_CA K6 zero
+--%compose_CA K7 K K6
+--%equal_CA K7 zero
+"""
+unit_tests.append(("nilpotency", code))
+
+
+code = """
+-- K3 = {0111000, 1000100, 0111100, 1010110, 1111110, 0010001, 0101001, 1101001, 0000101, 0010101,
+--0011101, 0000011, 1110011, 0011011, 1011011, 0111011, 1111011, 1000111, 1100111, 0010111,
+--1110111, 0001111, 0111111}
+%dim 1
+%alphabet 0 1
+%nodes 0
+%topology
+rt (0,0) (1,0);
+lt (0,0) (-1,0);
+%CA K
+0 1 Ao let x a b c d e f g := o=a & o.rt=b & o.rt.rt=c & o.rt.rt.rt=d & o.rt.rt.rt.rt=e & o.rt.rt.rt.rt.rt=f & o.rt.rt.rt.rt.rt.rt=g in
+(x 0 1 1 1 0 0 0) |
+(x 1 0 0 0 1 0 0)
+%CA zero
+0 1 0=1
+%compose_CA doublezero zero zero
+--%equal_CA doublezero zero
+--%calculate_CA_ball 10 kekki K3
+%equal_CA K zero
+%compose_CA K2 K K
+%equal_CA K2 zero
+%compose_CA K3 K K2
+--%compose_CA K3b K2 K
+--%equal_CA K3 K3b
+%equal_CA K3 zero
+%compose_CA K4 K K3
+%equal_CA K4 zero
+%compose_CA K5 K K4
+%equal_CA K5 zero
+%compose_CA K6 K K5
+%equal_CA K6 zero
+%compose_CA K7 K K6
+%equal_CA K7 zero
+%compose_CA K8 K K7
+%equal_CA K8 zero
+%compose_CA K9 K K8
+%equal_CA K9 zero
+%compose_CA K10 K K9
+%equal_CA K10 zero
+%compose_CA K11 K K10
+%equal_CA K11 zero
+%compose_CA K12 K K11
+%equal_CA K12 zero
+%compose_CA K13 K K12
+%equal_CA K13 zero
+%compose_CA K14 K K13
+%equal_CA K14 zero
+%compose_CA K15 K K14
+%equal_CA K15 zero
+%equal_CA K15 K14
+%compose_CA K16 K K15
+%equal_CA K16 zero
+%equal_CA K16 K15
+%compose_CA K17 K K16
+%equal_CA K17 zero
+%equal_CA K17 K16
+%compose_CA K18 K K17
+%equal_CA K18 zero
+%equal_CA K18 K17
+%compose_CA K19 K K18
+%equal_CA K19 zero
+%equal_CA K19 K18
+"""
+#unit_tests.append(("nilpotency", code))
+
+
+code = """
+%topology grid
+%CA xx
+0 1 Ao let x a := o=a in
+x 0
+--%calculate_CA_ball 3 kekki xx
+"""
 
 
 if __name__ == "__main__":
