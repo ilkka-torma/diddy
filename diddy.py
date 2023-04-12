@@ -10,7 +10,7 @@ import time
 import argparse
 import fractions
 import math
-
+import tiler
 
 import blockmap
 
@@ -24,6 +24,8 @@ class Diddy:
         self.alphabet = [0, 1]
         self.dim = 2
         self.topology = grid
+        self.gridmoves = [(1,0), (0,1)]
+        self.nodeoffsets = {0 : (0,0)}
         self.formulae = []
         self.weights = None
 
@@ -40,15 +42,23 @@ class Diddy:
                 if i[1] in ["square", "grid", "squaregrid"]:
                     self.topology = grid
                     self.nodes = [0]
+                    self.gridmoves = [(1,0), (0,1)]
+                    self.nodeoffsets = {0 : (0,0)}
                 elif i[1] in ["hex", "hexgrid"]:
                     self.topology = hexgrid
                     self.nodes = [0, 1]
+                    self.gridmoves = [(1,0), (-0.5,1)]
+                    self.nodeoffsets = {0 : (0,0), 1 : (0.5,0)}
                 elif i[1] in ["king", "kinggrid"]:
                     self.topology = kinggrid
                     self.nodes = [0]
+                    self.gridmoves = [(1,0), (0,1)]
+                    self.nodeoffsets = {0 : (0,0)}
                 elif i[1] in ["triangle", "trianglegrid"]:
                     self.topology = trianglegrid
                     self.nodes = [0]
+                    self.gridmoves = [(1,0), (0.5,0.6)]
+                    self.nodeoffsets = {0 : (0,0)}
                 else:
                     self.topology = i[1]
                 #print(topology)
@@ -276,7 +286,11 @@ class Diddy:
                             outfile.write("New CA of complexity %s at %s." % (len(rr), output[2]) + "\n")
                         outfile.flush()
                 #blockmap.find_relations(generatrs
-                #                        )
+                #)
+            elif i[0] == "tiler":
+                print(i)
+                SFT = self.SFTs[i[1][0]]
+                tiler.run(SFT, self.topology, self.gridmoves, self.nodeoffsets)
                                         
             elif mode == "report":
                 raise Exception("Unknown command %s." % i[0])

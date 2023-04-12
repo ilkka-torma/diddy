@@ -141,8 +141,9 @@ class SFT:
         return False
 
     def deduce(self, known_values, domain):
-        if len(self.alph) != 2:
-            raise Exception("Only binary alphabets supported in deduce")
+        #print(domain, known_values)
+        #if len(self.alph) != 2:
+        #    raise Exception("Only binary alphabets supported in deduce")
         
         circuits = {}
     
@@ -150,29 +151,50 @@ class SFT:
             circuits[v] = self.circuit.copy()
             for var in self.circuit.get_variables():
                 # translate and add 0 at end so that we don't replace twice
-                rel_pos = vadd(v, var[:-1]) + (var[-1], 0) 
+                rel_pos = vadd(v, var[:-2]) + (var[-2], var[-1], 0) 
                 substitute(circuits[v], var, V(rel_pos))
-                # print(circuits[v])
+            #print(circuits[v])
 
+        #print("that was circuits")
         forceds = set()
         for v in known_values:
-            if known_values[v] == self.alph[1]:
-                forceds.add(V(v + (0,)))
+            if known_values[v] == self.alph[0]:
+                for a in self.alph[1:]:
+                    forceds.add(NOT(V(v + (a, 0))))
+                #forceds.add(V(v + (1, 0)))
             else:
-                forceds.add(NOT(V(v + (0,))))
+                forceds.add(V(v + (known_values[v], 0)))
+        #for f in forceds:
+        #    print(f)
+        #print("was forced")
 
         #print("no22")
         m = SAT(AND(*(list(circuits.values()) + list(forceds))), True)
         if m == False:
+            print("nope")
             return None
-        #print(m)
+
+        #print("limimisad", m)
+        
         mm = {}
         for v in domain:
             for n in self.nodes:
-                if v + (n, 0) in m:
-                    mm[v + (n,)] = m[v + (n, 0,)]
+                for a in self.alph[1:]:
+                    if v + (n, a, 0) in m and m[v + (n, a, 0)]:
+                        mm[v + (n,)] = a
+                        break
                 else:
-                    mm[v + (n,)] = None # was not actually discussed by rules
+                    mm[v + (n,)] = self.alph[0]
+                """    
+                    #print()
+                    if m[v + (n, 1, 0)]:
+                        mm[v + (n,)] = self.alph[1] #m[v + (n, 1, 0)]
+                    else:
+                        mm[v + (n,)] = self.alph[0]"""
+                #else:
+                #    print(v + (n, 1, 0), "not in")
+                #    mm[v + (n,)] = None # was not actually discussed by rules
+        #print("mmmm", mm)
         return mm
 
     # domain is a collection of nodevectors

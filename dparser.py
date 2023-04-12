@@ -15,17 +15,6 @@ parse_default = False
 
 keywords = ["let", "in"]
 
-def parse(s):
-    commands =[]
-    while s != "":
-        command, s = parse_command(s)
-        if command == None:
-            return commands
-        if command == True:
-            continue
-        commands.append(command)
-    return commands
-
 """
 arguments are: name, alternate names, list_command, initial_args
 list_command = True means we expect a ;-separated list of argument lists
@@ -37,7 +26,19 @@ basic_commands = [("Wang", ["wang"], True, 1),
                   ("start_cache", [], False, 0),
                   ("end_cache", [], False, 0),
                   ("compose_CA", [], False, 0),
-                  ("calculate_CA_ball", [], True, 2)]
+                  ("calculate_CA_ball", [], True, 2),
+                  ("tiler", [], False, 0)]
+
+def parse(s):
+    commands =[]
+    while s != "":
+        command, s = parse_command(s)
+        if command == None:
+            return commands
+        if command == True:
+            continue
+        commands.append(command)
+    return commands
 
 def parse_command(s):
     #print("PRSNNN", s[:20], "---")

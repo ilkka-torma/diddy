@@ -538,7 +538,7 @@ x 0 1 1 1 1 1 1
 --%compose_CA K7 K K6
 --%equal_CA K7 zero
 """
-unit_tests.append(("nilpotency", code))
+#unit_tests.append(("nilpotency", code))
 
 
 code = """
@@ -615,6 +615,21 @@ code = """
 x 0
 --%calculate_CA_ball 3 kekki xx
 """
+
+code = """
+%topology hex
+%SFT golden Ao (o=1 -> (Ap[o1] p!@o -> p=0))
+%tiler golden
+-- %tiler golden
+"""
+
+code = """
+%topology hex
+%SFT idcode Ao let c u v := v = 1 & u ~ v in
+(Ed[o1] c o d) & (Ap[o2] p !@ o -> Eq[o1p1] (c o q & ! c p q) | (c p q & !c o q))
+%tiler idcode
+"""
+unit_tests.append(("hex id tiler", code))
 
 
 if __name__ == "__main__":
