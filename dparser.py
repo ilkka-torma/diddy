@@ -27,7 +27,9 @@ basic_commands = [("Wang", ["wang"], True, 1),
                   ("end_cache", [], False, 0),
                   ("compose_CA", [], False, 0),
                   ("calculate_CA_ball", [], True, 2),
-                  ("tiler", [], False, 0)]
+                  ("tiler", [], False, 0),
+                  ("kek", [], True, 2)]
+
 
 def parse(s):
     commands =[]
@@ -459,6 +461,7 @@ def read_flag(s):
     sign = True
     while ss[:1] == "!":
         sign = not sign
+        ss = ss[1:]
     obj, ss = read_object(ss)
     if obj == None:
         return None, s

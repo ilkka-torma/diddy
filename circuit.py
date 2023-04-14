@@ -223,7 +223,7 @@ def tostr_(c, appears_multiply, alreadys = None, running = None):
         alreadys = {}
         running = [0]
     if c.op == "V":
-        return str(c.inputs[0])
+        return "V" + str(c.inputs[0])
     if id(c) in alreadys:
         return "[" + alreadys[id(c)] + "]"
     if c.op != "!":

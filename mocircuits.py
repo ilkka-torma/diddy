@@ -27,6 +27,7 @@ class MOCircuitSet:
         # running index
         self.count = 0
     def add(self, new, really_add = True):
+        #print("adding", new, really_add)
         hashy = {}
         # p is a dict : bit name -> pattern
         for (a, p) in self.patterns:
@@ -34,9 +35,11 @@ class MOCircuitSet:
         hashy = fd(hashy)
         #print(hashy, "he")
         if hashy in self.circuits:
+            #print("hash was there")
             (prev, ix) = self.circuits[hashy]
             #m = new, prev, True)
             m = new.equivalent(prev)
+            #print("oho", m)
             if m == True:
                 #self.existing = m
                 return prev #False
@@ -47,7 +50,7 @@ class MOCircuitSet:
             else:
                 return True
         else:
-            #print("adding", fd(hashy))
+            #print("adding hash", fd(hashy))
             if really_add:
                 
                 self.circuits[hashy] = (new, self.count)
