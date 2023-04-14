@@ -27,7 +27,9 @@ basic_commands = [("Wang", ["wang"], True, 1),
                   ("end_cache", [], False, 0),
                   ("compose_CA", [], False, 0),
                   ("calculate_CA_ball", [], True, 2),
-                  ("tiler", [], False, 0)]
+                  ("tiler", [], False, 0),
+                  ("entropy_upper_bound", [], True, 1),
+                  ("entropy_lower_bound", [], True, 1)]
 
 def parse(s):
     commands =[]

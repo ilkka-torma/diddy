@@ -629,7 +629,13 @@ code = """
 (Ed[o1] c o d) & (Ap[o2] p !@ o -> Eq[o1p1] (c o q & ! c p q) | (c p q & !c o q))
 %tiler idcode
 """
-unit_tests.append(("hex id tiler", code))
+
+code = """
+%SFT goldenmean Ao o=1 -> o.rt=0 & o.up=0
+%entropy_upper_bound goldenmean 6 6
+%entropy_lower_bound goldenmean 1 1; 8 7
+"""
+unit_tests.append(("entropy", code))
 
 
 if __name__ == "__main__":

@@ -223,7 +223,43 @@ class SFT:
                 circuits.append(V(nvec+(sym,)))
 
         add_uniqueness_constraints(self.nodes, self.alph, circuits, all_positions)
-        #print("circs", circuits)
+
+        for model in projections(AND(*circuits), [nvec+(sym,) for nvec in domain for sym in self.alph[1:]]):
+            pat = dict()
+            for nvec in domain:
+                for sym in self.alph[1:]:
+                    if model[nvec+(sym,)]:
+                        pat[nvec] = sym
+                        break
+                else:
+                    pat[nvec] = self.alph[0]
+            yield pat
+            
+    # domain is a collection of nodevectors
+    def all_periodic_points(self, dims, existing=None):
+    
+        if existing is None:
+            existing = dict()
+        
+        domain = set([tuple()])
+        for h in dims:
+            domain = set(vec + (i,) for vec in domain for i in range(h))
+        all_positions = domain
+        domain = set(vec + (n,) for vec in domain for n in self.nodes)
+
+        circuits = []
+        for vec in domain:
+            circ = self.circuit.copy()
+            transform(circ, lambda var: nvmods(dims, nvadd(var[:-1], vec)) + var[-1:])
+            circuits.append(circ)
+            
+        for (nvec, sym) in existing.items():
+            if sym == self.alph[0]:
+                circuits.extend(NOT(V(nvec+(a,))) for a in self.alph[1:])
+            else:
+                circuits.append(V(nvec+(sym,)))
+
+        add_uniqueness_constraints(self.nodes, self.alph, circuits, all_positions)
 
         for model in projections(AND(*circuits), [nvec+(sym,) for nvec in domain for sym in self.alph[1:]]):
             pat = dict()
@@ -375,3 +411,78 @@ class SFT:
         if c21 == None:
             return None, limit
         return c21, max(rad, rad2)
+
+    def all_patterns_splitting(self, domain, known_values=None, extra_rad=0, rec=0):
+        "Compute the number of patterns on given domain"
+        if known_values is None:
+            known_values = dict()
+
+        variables = set(self.circuit.get_variables())
+        var_dims = []
+        dom_dims = []
+        for i in range(self.dim):
+            vdmin, vdmax = min(var[i] for var in variables), max(var[i] for var in variables)
+            if vdmin == vdmax:
+                vdmax += 1
+            var_dims.append((vdmin, vdmax))
+            dom_dims.append((min(nvec[i] for nvec in domain), max(nvec[i] for nvec in domain)))
+
+        diff, splitdim = max((max_dd-min_dd-max_vd+min_vd-1, i) for (i, ((min_vd, max_vd), (min_dd, max_dd))) in enumerate(zip(var_dims, dom_dims)))
+        if diff >= 3:
+            # recurse
+            min_vd, max_vd = var_dims[splitdim]
+            min_dd, max_dd = dom_dims[splitdim]
+            mid_pos = (min_dd+max_dd+min_vd-max_vd+1)//2
+            #mid_vec = (0,)*splitdim + ((mid_pos,) + (0,)*(self.dim-splitdim-1)
+            mid_domain = set(nvec for nvec in domain if mid_pos <= nvec[splitdim] < mid_pos+max_vd-min_vd)
+            left_domain = set(nvec for nvec in domain if nvec[splitdim] < mid_pos+max_vd-min_vd)
+            right_domain = set(nvec for nvec in domain if mid_pos <= nvec[splitdim])
+            for mid_pat in self.all_patterns_splitting(mid_domain, known_values=known_values, extra_rad=extra_rad, rec=rec+1):
+                mid_pat.update(known_values)
+                rpats = list(self.all_patterns_splitting(right_domain, known_values=mid_pat, extra_rad=extra_rad, rec=rec+1))
+                for lpat in self.all_patterns_splitting(left_domain, known_values=mid_pat, extra_rad=extra_rad, rec=rec+1):
+                    for rpat in rpats:
+                        newpat = rpat.copy()
+                        rpat.update(lpat)
+                        yield newpat
+        else:
+            # compute by brute force
+            for pat in self.all_patterns(domain, existing=known_values, extra_rad=extra_rad):
+                yield pat
+                   
+    def count_patterns_splitting(self, domain, known_values=None, extra_rad=0, rec=0):
+        "Compute the number of patterns on given domain"
+        if known_values is None:
+            known_values = dict()
+
+        variables = set(self.circuit.get_variables())
+        var_dims = []
+        dom_dims = []
+        for i in range(self.dim):
+            vdmin, vdmax = min(var[i] for var in variables), max(var[i] for var in variables)
+            if vdmin == vdmax:
+                vdmax += 1
+            var_dims.append((vdmin, vdmax))
+            dom_dims.append((min(nvec[i] for nvec in domain), max(nvec[i] for nvec in domain)))
+
+        diff, splitdim = max((max_dd-min_dd-max_vd+min_vd-1, i) for (i, ((min_vd, max_vd), (min_dd, max_dd))) in enumerate(zip(var_dims, dom_dims)))
+        if diff >= 3:
+            # recurse
+            min_vd, max_vd = var_dims[splitdim]
+            min_dd, max_dd = dom_dims[splitdim]
+            mid_pos = (min_dd+max_dd+min_vd-max_vd+1)//2
+            #mid_vec = (0,)*splitdim + ((mid_pos,) + (0,)*(self.dim-splitdim-1)
+            mid_domain = set(nvec for nvec in domain if mid_pos <= nvec[splitdim] < mid_pos+max_vd-min_vd)
+            left_domain = set(nvec for nvec in domain if nvec[splitdim] < mid_pos+max_vd-min_vd)
+            right_domain = set(nvec for nvec in domain if mid_pos <= nvec[splitdim])
+            summa = 0
+            for mid_pat in self.all_patterns_splitting(mid_domain, known_values=known_values, extra_rad=extra_rad, rec=rec+1):
+                mid_pat.update(known_values)
+                lefts = self.count_patterns_splitting(left_domain, known_values=mid_pat, extra_rad=extra_rad, rec=rec+1)
+                rights = self.count_patterns_splitting(right_domain, known_values=mid_pat, extra_rad=extra_rad, rec=rec+1)
+                summa += lefts*rights
+            return summa
+        else:
+            # compute by brute force
+            return sum(1 for _ in self.all_patterns(domain, existing=known_values, extra_rad=extra_rad))
+            

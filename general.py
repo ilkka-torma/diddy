@@ -35,6 +35,9 @@ def vmod(m, vec):
 
 def nvmod(m, nvec):
     return tuple(a%m for a in nvec[:-1]) + nvec[-1:]
+    
+def nvmods(mods, nvec):
+    return tuple(a%m for (m,a) in zip(mods, nvec[:-1])) + nvec[-1:]
 
 def vneg(vec):
     return tuple(-a for a in vec)

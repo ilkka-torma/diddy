@@ -1,3 +1,4 @@
+import general
 import dparser
 
 import compiler
@@ -291,7 +292,53 @@ class Diddy:
                 print(i)
                 SFT = self.SFTs[i[1][0]]
                 tiler.run(SFT, self.topology, self.gridmoves, self.nodeoffsets)
-                                        
+            
+            elif i[0] == "entropy_upper_bound":
+                the_sft = self.SFTs[i[1]]
+                rad = i[3].get("radius", 0)
+                
+                rect = set([tuple()])
+                size = 1
+                for h in i[2][0]:
+                    rect = set(vec+(i,) for vec in rect for i in range(h))
+                    size *= h
+                rect = set(vec+(n,) for vec in rect for n in the_sft.nodes)
+                size *= len(the_sft.nodes)
+                print("Computing upper bound for topological entropy of {} using dimensions {}".format(i[1], i[2][0]))
+                tim = time.time()
+                num_pats = the_sft.count_patterns_splitting(rect, extra_rad=rad)
+                print("Entropy is at most log2({})/{} ~ {}".format(num_pats, size, math.log(num_pats, 2)/size))
+                print("Eta is at most {}^(1/{}) ~ {}".format(num_pats, size, num_pats**(1/size)))
+                print("Computation took {} seconds".format(time.time() - tim))
+                
+            elif i[0] == "entropy_lower_bound":
+                # TODO: split the periodic points as in upper bound
+                the_sft = self.SFTs[i[1]]
+                # i[2] has: periods of periodic points, dimensions of block
+                periods = i[2][0]
+                dims = i[2][1]
+                variables = set(the_sft.circuit.get_variables())
+                var_dims = []
+                for k in range(the_sft.dim):
+                    vdmin, vdmax = min(var[k] for var in variables), max(var[k] for var in variables)
+                    var_dims.append(vdmax - vdmin)
+                big_periods = [a*b for (a,b) in zip(periods, dims)]
+                big_domain = set([tuple()])
+                size = 1
+                for p in big_periods:
+                    big_domain = set(vec + (i,) for vec in big_domain for i in range(p))
+                    size *= p
+                big_domain = set(vec + (n,) for vec in big_domain for n in the_sft.nodes)
+                size *= len(the_sft.nodes)
+                print("Computing lower bound for topological entropy of {} using {}-periodic points and {}-size blocks".format(i[1], periods, big_periods))
+                the_max = 0
+                for pat in the_sft.all_periodic_points(periods):
+                    border = {nvec : pat[general.nvmods(periods, nvec)] for nvec in big_domain if any(a <= b for (a,b) in zip(nvec, var_dims))}
+                    the_max = max(the_max, sum(1 for _ in the_sft.all_periodic_points(big_periods, existing=border)))
+                print("Entropy is at least log2({})/{} ~ {}".format(the_max, size, math.log(the_max, 2)/size))
+                print("Eta is at least {}^(1/{}) ~ {}".format(the_max, size, the_max**(1/size)))
+                print("Computation took {} seconds".format(time.time() - tim))
+            
             elif mode == "report":
                 raise Exception("Unknown command %s." % i[0])
 
