@@ -172,11 +172,24 @@ def find_relations(CAs, rad):
     mod = mocircuits.MOCircuitDict(indices)
     identityrule = {}
     for n in nodes:
-        for a in alphabet:
+        for a in alphabet[1:]:
             identityrule[(n, a)] = V((0,)*dimension + (n, a))
     idca = CA(alphabet, nodes, dimension, identityrule)
+    #assert idca.then(idca) == idca
     mod[idca.tomocircuit()] = (idca, ())
+    #print(idca.circuits)
+    #print(CAs[0].circuits)
+
+
+    #print(CAs[0])
+
+    assert CAs[0].tomocircuit() in mod
+    
+    #a = bbb
     frontier = [(idca, ())]
+
+    
+    #assert idca.tomocircuit() in mod
     """
     for i in range(len(CAs)):
         if CAs[i].tomocircuit() not in mod:
@@ -188,6 +201,8 @@ def find_relations(CAs, rad):
     relations = []
     for r in range(rad):
         print("Frontier size %s at depth %s; total number of CA %s." % (len(frontier), r, len(mod)))
+        #for ca, w in frontier:
+        #    print(w)
         newfrontier = []
         for ca, w in frontier:
             for k in range(len(CAs)):

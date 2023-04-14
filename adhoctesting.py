@@ -494,7 +494,7 @@ code = """
 %topology
 rt (0,0) (1,0);
 lt (0,0) (-1,0);
-%CA K
+%CA A
 0 1 Ao let x a b c d e f g := o=a & o.rt=b & o.rt.rt=c & o.rt.rt.rt=d & o.rt.rt.rt.rt=e & o.rt.rt.rt.rt.rt=f & o.rt.rt.rt.rt.rt.rt=g in
 x 0 1 1 1 0 0 0 |
 x 1 0 0 0 1 0 0 |
@@ -521,9 +521,9 @@ x 0 0 0 1 1 1 1 |
 x 0 1 1 1 1 1 1
 %CA zero
 0 1 0=1
-%compose_CA doublezero zero zero
-%equal_CA doublezero zero
-%calculate_CA_ball 10 kekki K
+--%compose_CA doublezero zero zero
+--%equal_CA doublezero zero
+%calculate_CA_ball 10 outfile A zero
 --%equal_CA K zero
 --%compose_CA K2 K K
 --%equal_CA K2 zero
@@ -635,7 +635,75 @@ code = """
 %entropy_upper_bound goldenmean 6 6
 %entropy_lower_bound goldenmean 1 1; 8 7
 """
-unit_tests.append(("entropy", code))
+#unit_tests.append(("entropy", code))
+
+#unit_tests.append(("hex id tiler", code))
+
+code = """
+%alphabet 0 1
+%nodes top bot -- two tracks, top and bottom
+%dim 1
+%topology
+rt (0, top) (1, top)
+rt (0, bot) (1, bot)
+lt (0, top) (-1, top)
+lt (0, bot) (-1, bot)
+%CA R -- partial right shift on the top track
+top 1 ACo o.rt.top=1
+bot 1 ACo o.bot=1
+%CA L -- partial left shift on the top track
+top 1 ACo o.lt.top=1
+bot 1 ACo o.bot=1
+%CA A -- add top track to bottom track
+top 1 ACo o.top=1
+bot 1 ACo (o.bot=1 | o.top=1) & (o.bot=0 | o.top=0)
+%CA id -- identity
+top 1 ACo o.top=1
+bot 1 ACo o.bot=1
+%compose_CA ARRRALLLLLARR A R R R A L L L L L A R R
+%compose_CA LLARRRRRALLLA L L A R R R R R A L L L A
+%equal_CA ARRRALLLLLARR LLARRRRRALLLA
+%compose_CA ARRRALLLLARR A R R R A L L L L A R R
+%compose_CA LLARRRRRALLLA L L A R R R R A L L L L A
+%equal_CA ARRRALLLLLARR LLARRRRRALLLA
+"""
+#unit_tests.append(("lamp", code))
+
+code = """
+%alphabet 0 1
+%nodes top bot -- two tracks, top and bottom
+%dim 1
+%topology
+rt (0, top) (1, top)
+rt (0, bot) (1, bot)
+lt (0, top) (-1, top)
+lt (0, bot) (-1, bot)
+%CA R -- partial right shift on the top track
+top 1 ACo o.rt.top=1
+bot 1 ACo o.bot=1
+%CA L -- partial left shift on the top track
+top 1 ACo o.lt.top=1
+bot 1 ACo o.bot=1
+%CA A -- add top track to bottom track
+top 1 ACo o.top=1
+bot 1 ACo (o.bot=1 | o.top=1) & (o.bot=0 | o.top=0)
+%CA id -- identity
+top 0 ACo o.top=0
+bot 1 ACo o.bot=1
+%calculate_CA_ball 10 lampout id A L R
+"""
+unit_tests.append(("lamp ball", code))
+
+"""
+%compose_CA AA A A
+%equal_CA id AA
+%compose_CA AAA A AA
+%equal_CA id AAA
+%compose_CA RALA R A L A
+%equal_CA id RALA
+%compose_CA ARAL A R A L
+%equal_CA RALA ARAL
+"""
 
 
 if __name__ == "__main__":

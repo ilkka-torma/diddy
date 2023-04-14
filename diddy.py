@@ -11,7 +11,7 @@ import time
 import argparse
 import fractions
 import math
-import tiler
+
 
 import blockmap
 
@@ -262,33 +262,46 @@ class Diddy:
                 composands = i[1]
                 print("Composing CA %s." % composands)#, self.CAs)
                 result_name = composands[0]
+                """
                 result_CA = self.CAs[composands[1]]
                 for name in composands[2:]:
                     result_CA = result_CA.then(self.CAs[name])
+                """
+                composands = composands[1:]
+                result_CA = self.CAs[composands[-1]]
+                for name in reversed(composands[:-1]):
+                    result_CA = self.CAs[name].then(result_CA)
                 self.CAs[result_name] = result_CA
 
             elif i[0] == "calculate_CA_ball":
+                t = time.time()
                 radius = i[1]
                 filename = i[2] + ".output"
-                generators = i[3][0]
-                print("Computing relations for CA %s into file %s." % (str(generators), filename))
-                generators = [self.CAs[j] for j in generators]
+                gen_names = i[3][0]
+                print("Computing relations for CA %s into file %s." % (str(gen_names), filename))
+                generators = [self.CAs[j] for j in gen_names]
                 with open(filename, "w") as outfile:
                     for output in blockmap.find_relations(generators, radius):
+                        #print(output)
+                        def zz(l):
+                            #print("moi")
+                            return " ".join(map(lambda a:gen_names[a], l))
                         if output[0] == "rel":
-                            outfile.write("New relation: %s = %s" % output[1:] + "\n")
+                            outfile.write("New relation: %s = %s" % (zz(output[1]), zz(output[2])) + "\n")
                         else:
-                            rr = "" #repr(output[1])
+                            #rr = repr(output[1])
                             #print(len(rr), rr)
                             #if len(rr) > 50:
                             #    rr = rr[:47] + "..."
                             #outfile.write("New CA: %s = %s" % (rr, output[2]) + "\n")
         
-                            outfile.write("New CA of complexity %s at %s." % (len(rr), output[2]) + "\n")
+                            outfile.write("New CA at %s." % (zz(output[2]),) + "\n")
                         outfile.flush()
                 #blockmap.find_relations(generatrs
                 #)
+                print("Time to calculate ball: %s seconds." % (time.time() - t))
             elif i[0] == "tiler":
+                import tiler
                 print(i)
                 SFT = self.SFTs[i[1][0]]
                 tiler.run(SFT, self.topology, self.gridmoves, self.nodeoffsets)
@@ -339,6 +352,10 @@ class Diddy:
                 print("Eta is at least {}^(1/{}) ~ {}".format(the_max, size, the_max**(1/size)))
                 print("Computation took {} seconds".format(time.time() - tim))
             
+
+            elif i[0] == "kek":
+                print(i)
+                                        
             elif mode == "report":
                 raise Exception("Unknown command %s." % i[0])
 

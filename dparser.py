@@ -29,7 +29,9 @@ basic_commands = [("Wang", ["wang"], True, 1),
                   ("calculate_CA_ball", [], True, 2),
                   ("tiler", [], False, 0),
                   ("entropy_upper_bound", [], True, 1),
-                  ("entropy_lower_bound", [], True, 1)]
+                  ("entropy_lower_bound", [], True, 1),
+                  ("kek", [], True, 2)]
+
 
 def parse(s):
     commands =[]
@@ -461,6 +463,7 @@ def read_flag(s):
     sign = True
     while ss[:1] == "!":
         sign = not sign
+        ss = ss[1:]
     obj, ss = read_object(ss)
     if obj == None:
         return None, s
