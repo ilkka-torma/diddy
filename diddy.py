@@ -88,7 +88,7 @@ class Diddy:
                 tim = time.time()
                 the_sft = self.SFTs[i[1]]
                 periods = i[2]
-                print("Computing minimum density for %s restricted to period(s) %s"%(i[1], periods) + " using weights {}".format(self.weights) if self.weights is not None else "")
+                print("Computing minimum density for %s restricted to period(s) %s"%(i[1], periods) + (" using weights {}".format(self.weights) if self.weights is not None else ""))
                 nfa = period_automaton.PeriodAutomaton(the_sft, periods, weights=self.weights)
                 if verbose_here: print("const")
                 nfa.populate()
