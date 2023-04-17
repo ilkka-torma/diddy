@@ -484,5 +484,33 @@ class SFT:
             return summa
         else:
             # compute by brute force
-            return sum(1 for _ in self.all_patterns(domain, existing=known_values, extra_rad=extra_rad))
+            return sum(1 for _ in sealf.all_patterns(domain, existing=known_values, extra_rad=extra_rad))
+
+    def keep_tiling(self):
+        r = 1
+        while True:
+            print(r)
+
+            m = self.tile_box(r)
+            assert m
+            
+            r += 1
+        return None
+
+    def tile_box(self, r):
+        all_positions = set()
+        circuits = []
+        
+        for vec in centered_hypercube(self.dim, r):
+            circ = self.circuit.copy()
+            transform(circ, lambda var: nvadd(var[:-1], vec) + var[-1:])
+            for var in circ.get_variables():
+                all_positions.add(var[:-2]) # drop node and letter
+            circuits.append(circ)
+
+        add_uniqueness_constraints(self.nodes, self.alph, circuits, all_positions)
+
+        m = SAT(AND(*circuits))
+        return not (m == False)
+
             

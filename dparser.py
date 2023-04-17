@@ -30,7 +30,7 @@ basic_commands = [("Wang", ["wang"], True, 1),
                   ("tiler", [], False, 0),
                   ("entropy_upper_bound", [], True, 1),
                   ("entropy_lower_bound", [], True, 1),
-                  ("kek", [], True, 2)]
+                  ("tile_box", [], False, 0)]
 
 
 def parse(s):

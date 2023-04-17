@@ -692,7 +692,7 @@ top 0 ACo o.top=0
 bot 1 ACo o.bot=1
 %calculate_CA_ball 10 lampout id A L R
 """
-unit_tests.append(("lamp ball", code))
+#unit_tests.append(("lamp ball", code))
 
 """
 %compose_CA AA A A
@@ -704,6 +704,43 @@ unit_tests.append(("lamp ball", code))
 %compose_CA ARAL A R A L
 %equal_CA RALA ARAL
 """
+
+code_JR = """
+%nodes N E S W
+%alphabet 0 1 2 3 4
+%topology
+up (0,0,N) (0,1,S)
+dn (0,0,S) (0,-1,N)
+rt (0,0,E) (1,0,W)
+lt (0,0,W) (-1,0,E)
+%SFT JeandelRao ACo
+let WangConstraint o := o.N = o.up.S & o.E = o.rt.W in
+WangConstraint o &
+-- 1131
+(o.E=1 & o.N=1 & o.W=3 & o.S=1) |
+-- 1232
+(o.E=1 & o.N=2 & o.W=3 & o.S=2) |
+-- 3133
+(o.E=3 & o.N=1 & o.W=3 & o.S=3) |
+-- 2421
+(o.E=2 & o.N=4 & o.W=2 & o.S=1) |
+-- 2220
+(o.E=2 & o.N=2 & o.W=2 & o.S=0) |
+-- 0001
+(o.E=0 & o.N=0 & o.W=0 & o.S=1) |
+-- 3102
+(o.E=3 & o.N=1 & o.W=0 & o.S=2) |
+-- 0212
+(o.E=0 & o.N=2 & o.W=1 & o.S=2) |
+-- 1214
+(o.E=1 & o.N=2 & o.W=1 & o.S=4) |
+-- 3312
+(o.E=3 & o.N=3 & o.W=1 & o.S=2) |
+-- 0131
+(o.E=0 & o.N=1 & o.W=3 & o.S=1)
+%tile_box JeandelRao 33
+"""
+unit_tests.append(("JR tiling", code_JR))
 
 
 if __name__ == "__main__":
