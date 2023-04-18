@@ -397,8 +397,19 @@ class Diddy:
                 print("Computation took {} seconds".format(time.time() - tim))
             
 
-            elif i[0] == "kek":
-                print(i)
+            elif i[0] == "tile_box":
+                name = i[1][0]
+                rad = i[1][1]
+                print("Tiling %s-hypercube with SFT %s." % (rad, name))
+                succ = self.SFTs[name].tile_box(rad)
+                assert succ
+
+            elif i[0] == "keep_tiling":
+                name = i[1][0]
+                for i in range(1, 100):
+                    print("Tiling %s-hypercube of SFT %s." % (rad, name))
+                    self.SFTs[name].tile_box(rad)
+                    
                                         
             elif mode == "report":
                 raise Exception("Unknown command %s." % i[0])
