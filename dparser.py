@@ -30,6 +30,8 @@ basic_commands = [("Wang", ["wang"], True, 1),
                   ("tiler", [], False, 0),
                   ("entropy_upper_bound", [], True, 1),
                   ("entropy_lower_bound", [], True, 1),
+                  ("minimum_density", [], True, 1),
+                  ("density_lower_bound", [], True, 2),
                   ("kek", [], True, 2)]
 
 
@@ -130,38 +132,38 @@ def parse_command(s):
             weights[symbol] = weight
         return (op, weights), s
             
-    elif op == "minimum_density":
-        name, s = read_name(s, True)
-        periods = []
-        while True:
-            period, s = read_vector(s)
-            if period != None:
-                periods.append(period)
-            else:
-                break
-        return ("minimum_density", name, periods), s
+    #elif op == "minimum_density":
+    #    name, s = read_name(s, True)
+    #    periods = []
+    #    while True:
+    #        period, s = read_vector(s)
+    #        if period != None:
+    #            periods.append(period)
+    #        else:
+    #            break
+    #    return ("minimum_density", name, periods), s
 
-    elif op == "density_lower_bound":
-        name, s = read_name(s, True)
-        rad, s = read_number(s)
-        nhood = []
-        while True:
-            vec, s = read_vector(s)
-            if vec != None:
-                nhood.append(vec)
-            else:
-                break
-        if s[0] != ';':
-            raise Exception("Syntax error near" + s[20:] + ": ';' expected")
-        s = s[1:]
-        vecs = []
-        while True:
-            vec, s = read_vector(s)
-            if vec != None:
-                vecs.append(vec)
-            else:
-                break
-        return ("density_lower_bound", name, rad, nhood, vecs), s
+    #elif op == "density_lower_bound":
+    #    name, s = read_name(s, True)
+    #    rad, s = read_number(s)
+    #    nhood = []
+    #    while True:
+    #        vec, s = read_vector(s)
+    #        if vec != None:
+    #            nhood.append(vec)
+    #        else:
+    #            break
+    #    if s[0] != ';':
+    #        raise Exception("Syntax error near" + s[20:] + ": ';' expected")
+    #    s = s[1:]
+    #    vecs = []
+    #    while True:
+    #        vec, s = read_vector(s)
+    #        if vec != None:
+    #            vecs.append(vec)
+    #        else:
+    #            break
+    #    return ("density_lower_bound", name, rad, nhood, vecs), s
 
     elif op in ["show_formula", "show_forbidden_patterns", "show_parsed"]:
         name, s = read_name(s, True)

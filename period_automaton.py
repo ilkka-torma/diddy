@@ -10,9 +10,6 @@ import fractions
 #import frozendict as fd
 from sft import *
 
-NUM_THREADS = 2
-CHUNK_SIZE = 200
-
 class CompMode(Enum):
     SQUARE_CYCLE = 0 # don't recompute, use O(n^2) space, return cycle
     LINSQRT_CYCLE = 1 # recompute twice, use O(n^{3/2}) space, return cycle
@@ -186,7 +183,7 @@ class PeriodAutomaton:
                 self.weight_numerators[a] = numerator * self.weight_denominator // denominator
             #print (self.weight_denominator, self.weight_numerators)
 
-    def populate(self, verbose=False, report=5000):
+    def populate(self, num_threads=1, chunk_size=200, verbose=False, report=5000):
         debug_verbose = False
         if debug_verbose: print("asdf")
         self.s2idict = {}
@@ -210,8 +207,8 @@ class PeriodAutomaton:
         res_q = mp.Queue()
         processes = [mp.Process(target=populate_worker,
                                 args=(self.pmat, self.sft.alph, self.border_forbs, self.node_frontier, self.sym_bound, self.rotate,
-                                      task_q, res_q, self.weight_numerators))
-                     for _ in range(NUM_THREADS)]
+                                      task_q, res_q, self.weight_numerators, chunk_size))
+                     for _ in range(num_threads)]
         if debug_verbose: print("processes built")
         for pr in processes:
             pr.start()
@@ -236,7 +233,7 @@ class PeriodAutomaton:
                     if verbose and len(self.states)%report == 0:
                         print("states", len(self.states), "to process", undone)
                     qq.append(new_state)
-                    if len(qq) >= CHUNK_SIZE:
+                    if len(qq) >= chunk_size:
                         task_q.put(qq)
                         undone += len(qq)
                         qq = []
@@ -369,7 +366,7 @@ class PeriodAutomaton:
             self.trans = {ts[p] : {ts[q] : w for (q,w) in qs.items()}
                           for (p,qs) in self.trans.items()}
 
-    def square_min_density_cycle(self, bound_len=None, verbose=False, report=50):
+    def square_min_density_cycle(self, bound_len=None, verbose=False, report=50, num_threads=1):
         "Assume states are relabeled to range(len(states))"
         if verbose:
             print("finding min density cycle in O(n^2) space")
@@ -392,8 +389,8 @@ class PeriodAutomaton:
                                    for k in range(m+1)
                                    for q in range(n)],
                              lock=False)
-        task_qs = [((i*n)//NUM_THREADS, ((i+1)*n)//NUM_THREADS,  mp.Queue())
-                   for i in range(NUM_THREADS)]
+        task_qs = [((i*n)//num_threads, ((i+1)*n)//num_threads,  mp.Queue())
+                   for i in range(num_threads)]
         res_q = mp.Queue()
         procs = [mp.Process(target=square_min_worker,
                             args=(mins, opt_prevs, n, m, max_w,
@@ -407,7 +404,7 @@ class PeriodAutomaton:
                 print("round", k, "/", m)
             for (_, _, task_q) in task_qs:
                 task_q.put(k)
-            for _ in range(NUM_THREADS):
+            for _ in range(num_threads):
                 res = res_q.get()
                 assert res is None
         for (_, _, task_q) in task_qs:
@@ -416,7 +413,7 @@ class PeriodAutomaton:
         min_num = math.inf
         min_val = None
         reachermost = None
-        for _ in range(NUM_THREADS):
+        for _ in range(num_threads):
             num, val, reacher = res_q.get()
             if num < min_num or (num == min_num and (min_val == None or min_val < val)):
                 min_num = num
@@ -459,7 +456,7 @@ class PeriodAutomaton:
             
         return min_num, len(cyc_labels), min_cycle, cyc_labels
 
-    def linsqrt_min_density_cycle(self, bound_len=None, verbose=False, report=50):
+    def linsqrt_min_density_cycle(self, bound_len=None, verbose=False, report=50, num_threads=1):
         "Assume states are relabeled to range(len(self.trans))"
         if verbose:
             print("finding min density cycle in O(n^(2/3)) space")
@@ -500,8 +497,8 @@ class PeriodAutomaton:
                                    for k in range(sqrtm)
                                    for q in range(n)],
                              lock=False)
-        task_qs = [((i*n)//NUM_THREADS, ((i+1)*n)//NUM_THREADS,  mp.Queue())
-                   for i in range(NUM_THREADS)]
+        task_qs = [((i*n)//num_threads, ((i+1)*n)//num_threads,  mp.Queue())
+                   for i in range(num_threads)]
         res_q = mp.Queue()
         procs = [mp.Process(target=linsqrt_min_worker,
                             args=(dense_mins, sparse_mins, opt_prevs, n, m, max_w, sparse_rows,
@@ -517,7 +514,7 @@ class PeriodAutomaton:
                 print("phase 1 round", k, "/", m)
             for (_, _, task_q) in task_qs:
                 task_q.put(k)
-            for _ in range(NUM_THREADS):
+            for _ in range(num_threads):
                 res = res_q.get()
                 assert res is None
 
@@ -531,7 +528,7 @@ class PeriodAutomaton:
                 print("phase 2 round", k, "/", m)
             for (_, _, task_q) in task_qs:
                 task_q.put(k)
-            for _ in range(NUM_THREADS):
+            for _ in range(num_threads):
                 res = res_q.get()
                 assert res is None
         for (_, _, task_q) in task_qs:
@@ -553,7 +550,7 @@ class PeriodAutomaton:
                 rnd += 1
                 for (_, _, task_q) in task_qs:
                     task_q.put((lo,k))
-                for _ in range(NUM_THREADS):
+                for _ in range(num_threads):
                     res = res_q.get()
                     assert res is None
             for i in reversed(range(lo+1, hi+1)):
@@ -588,7 +585,7 @@ class PeriodAutomaton:
             
         return min_d, len(cyc_labels), min_cycle, cyc_labels
 
-    def linear_min_density_cycle(self, bound_len=None, verbose=False, report=50):
+    def linear_min_density_cycle(self, bound_len=None, verbose=False, report=50, num_threads=1):
         "Assume states are relabeled to range(len(states))"
         if verbose:
             print("finding min density of cycle in O(n) space")
@@ -608,8 +605,8 @@ class PeriodAutomaton:
                               for k in range(3)
                               for q in range(n)],
                         lock=False)
-        task_qs = [((i*n)//NUM_THREADS, ((i+1)*n)//NUM_THREADS,  mp.Queue())
-                   for i in range(NUM_THREADS)]
+        task_qs = [((i*n)//num_threads, ((i+1)*n)//num_threads,  mp.Queue())
+                   for i in range(num_threads)]
         res_q = mp.Queue()
         procs = [mp.Process(target=linear_min_worker,
                             args=(mins, n, m, max_w,
@@ -624,7 +621,7 @@ class PeriodAutomaton:
                     print("phase", p, "round", k, "/", m if p == 1 else (m-1))
                 for (_, _, task_q) in task_qs:
                     task_q.put(k)
-                for _ in range(NUM_THREADS):
+                for _ in range(num_threads):
                     res = res_q.get()
                     assert res is None
             if p == 1:
@@ -635,7 +632,7 @@ class PeriodAutomaton:
         min_num = math.inf
         min_val = None
         min_state = 0
-        for _ in range(NUM_THREADS):
+        for _ in range(num_threads):
             num, val, state, maxes = res_q.get()
             if num < min_num or (num == min_num and (min_val == None or min_val < val)):
                 min_num = num
@@ -812,7 +809,7 @@ def border_at(pmat, vec):
         return (vec[0]*i)//j
     return 0 # TODO: change
 
-def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_queue, res_queue, weights):
+def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_queue, res_queue, weights, chunk_size):
     numf = len(border_forbs)
     #border_sets = [set(forb) for forb in border_forbs]
     if rotate:
@@ -885,7 +882,7 @@ def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_
                             new_state += 2**(numf*tr + ix)
                     if sym_bound is None or sum(sym_pairs.values()) <= sym_bound:
                         ret.append((state, weighted_sum(weights, new_front.values()), new_state))
-                        if len(ret) >= CHUNK_SIZE:
+                        if len(ret) >= chunk_size:
                             res_queue.put(ret)
                             ret = []
                     
@@ -1118,9 +1115,7 @@ if __name__ == "__main__":
         COMP_MODE = CompMode.SQUARE_CYCLE
     if rotate and COMP_MODE != CompMode.LINEAR_NOCYCLE:
         print("warning: rotation produces a cycle with each label independently rotated/reflected")
-    NUM_THREADS = args.threads
-    CHUNK_SIZE = args.chunksize
-    print("threads", NUM_THREADS, "chunk size", CHUNK_SIZE)
+    print("threads", args.threads, "chunk size", args.chunksize)
     print("using height %s shear %s mode %s symmetry-breaking %s Karp bound %s rotation symmetry %s" % (h, s, COMP_MODE, sym_b, bound_len, rotate))
     
     if infile is None:
@@ -1172,7 +1167,7 @@ if __name__ == "__main__":
         print("using", hex_iden_sft)
                      
         nfa = PeriodAutomaton(hex_iden_sft,[(s,h)],sym_bound=sym_b,verbose=True,immediately_relabel=True,rotate=rotate, all_labels=True)
-        nfa.populate(verbose=True, report=reportpop)
+        nfa.populate(verbose=True, report=reportpop, num_threads=args.threads, chunk_size=args.chunksize)
         print("time taken after pop:", time.time()-starttime, "seconds")
         nfa.relabel()
         nfa.minimize(verbose=True)
@@ -1202,11 +1197,11 @@ if __name__ == "__main__":
         # TODO: special case components that are cycles
         print("analyzing connected component", ic+1, "/", len(comps), "with", len(comp.trans), "states")
         if COMP_MODE == CompMode.SQUARE_CYCLE:
-            data = comp.square_min_density_cycle(bound_len=bound_len, verbose=True, report=reportcyc)
+            data = comp.square_min_density_cycle(bound_len=bound_len, verbose=True, report=reportcyc, num_threads=args.threads)
         elif COMP_MODE == CompMode.LINSQRT_CYCLE:        
-            data = comp.linsqrt_min_density_cycle(bound_len=bound_len, verbose=True, report=reportcyc)
+            data = comp.linsqrt_min_density_cycle(bound_len=bound_len, verbose=True, report=reportcyc, num_threads=args.threads)
         elif COMP_MODE == CompMode.LINEAR_NOCYCLE:
-            data = comp.linear_min_density_cycle(bound_len=bound_len, verbose=True, report=reportcyc)   
+            data = comp.linear_min_density_cycle(bound_len=bound_len, verbose=True, report=reportcyc, num_threads=args.threads)
         if data[:1] < min_data[:1]:
             min_data = data
             min_aut = comp

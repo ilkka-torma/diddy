@@ -87,29 +87,59 @@ class Diddy:
                     raise Exception("Density can only be calculated for SFTs, not %s." % i[1])
                 tim = time.time()
                 the_sft = self.SFTs[i[1]]
-                periods = i[2]
+                periods = i[2][0]
+                keywords = i[3]
+                threads = keywords.get("threads", 1)
+                mode = keywords.get("mode", 'S')
+                if mode not in 'QSL':
+                    print("Unknown mode:", mode)
+                    break
+                chunk_size = keywords.get("chunk_size", 200)
+                sym_bound = keywords.get("symmetry", None)
+                if sym_bound is not None and any(n%2 for n in periods[0]):
+                    print("First period vector must be even for symmetry breaking")
+                    break
+                print_freq_pop = keywords.get("print_freq_pop", 5000)
+                print_freq_cyc = keywords.get("print_freq_cyc", 50)
+                flags = i[4]
+                verb = flags.get("verbose", False)
+                rot = flags.get("rotate", False)
+                if rot and (the_sft.dim != 2 or periods[0][0] != 0):
+                    print("Rotation only available in 2D and with periods (N,0)")
+                    break
                 print("Computing minimum density for %s restricted to period(s) %s"%(i[1], periods) + (" using weights {}".format(self.weights) if self.weights is not None else ""))
-                nfa = period_automaton.PeriodAutomaton(the_sft, periods, weights=self.weights)
+                nfa = period_automaton.PeriodAutomaton(the_sft, periods, weights=self.weights, verbose=verb, rotate=rot, sym_bound=sym_bound)
                 if verbose_here: print("const")
-                nfa.populate()
+                nfa.populate(verbose=verb, num_threads=threads, chunk_size=chunk_size, report=print_freq_pop)
                 if verbose_here: print("popula")
-                nfa.minimize()
+                nfa.minimize(verbose=verb)
                 comps = list(nfa.strong_components())
                 if verbose_here: print("strng com")
                 del nfa
                 min_data = (math.inf,)
                 min_aut = None
                 for (ic, comp) in enumerate(comps):
-                    data = comp.linsqrt_min_density_cycle()
+                    if verb:
+                        print("Component {}/{}".format(ic+1, len(comps)))
+                    if mode == 'Q':
+                        data = comp.square_min_density_cycle(verbose=verb, num_threads=threads, report=print_freq_cyc)
+                    elif mode == 'S':
+                        data = comp.linsqrt_min_density_cycle(verbose=verb, num_threads=threads, report=print_freq_cyc)
+                    elif mode == 'L':
+                        data = comp.linear_min_density_cycle(verbose=verb, num_threads=threads, report=print_freq_cyc)
                     if data[:1] < min_data[:1]:
                         min_data = data
                         min_aut = comp
                 if verbose_here: print("kikek")
-                dens, minlen, stcyc, cyc = min_data
                 border_size = len(the_sft.nodes)*len(min_aut.frontier)
-                print("Density", fractions.Fraction(sum(weights[b] for fr in cyc for b in fr.values()),
-                                                    len(cyc)*border_size), "~", dens/(border_size*min_aut.weight_denominator), "realized by cycle of length", len(cyc))
-                print([(period_automaton.nvadd(nvec,(tr,)+(0,)*(dim-1)),c) for (tr,pat) in enumerate(cyc) for (nvec,c) in sorted(pat.items())])
+                if mode in 'QS':
+                    dens, minlen, stcyc, cyc = min_data
+                    print("Density", fractions.Fraction(sum(self.weights[b] if self.weights is not None else b for fr in cyc for b in fr.values()),
+                                                        len(cyc)*border_size), "~", dens/(border_size*min_aut.weight_denominator), "realized by cycle of length", len(cyc))
+                    print([(period_automaton.nvadd(nvec,(tr,)+(0,)*(the_sft.dim-1)),c) for (tr,pat) in enumerate(cyc) for (nvec,c) in sorted(pat.items())])
+                else:
+                    dens, minlen, _ = min_data
+                    print("Density", dens/(border_size*min_aut.weight_denominator), "realized by cycle of length", minlen, "in minimized automaton")
                 print("Calculation took", time.time() - tim, "seconds.")
 
             elif i[0] == "density_lower_bound":
@@ -118,12 +148,26 @@ class Diddy:
                 tim = time.time()
                 the_sft = self.SFTs[i[1]]
                 rad = i[2]
-                nhood = i[3]
-                vecs = i[4]
-                print("Computing lower bound for density in {} using vectors {}, neighborhood {} and additional radius {}".format(i[1], vecs, nhood, rad))
+                specs = [(i[3][2*j], i[3][2*j+1]) for j in range(len(i[3])//2)]
+                keywords = i[4]
+                print_freq = keywords.get("print_freq", 5000)
+                flags = i[5]
+                verb = flags.get("verbose", False)
+                show_rules = flags.get("show_rules", False)
+                print("Computing lower bound for density in {} using specs {} and additional radius {}".format(i[1], specs, rad))
                 #patterns = list(the_sft.all_patterns(nhood))
-                dens = density_linear_program.optimal_density(the_sft, vecs, nhood, rad, weights=self.weights, verbose=False)
-                print("Lower bound", dens)
+                data = density_linear_program.optimal_density(the_sft, specs, rad, weights=self.weights, verbose=verb, print_freq=print_freq, ret_shares=show_rules)
+                if show_rules:
+                    dens, rules = data
+                    print("Discharging rules")
+                    for (fr_pat, amounts) in sorted(rules.items(), key=lambda p: tuple(sorted(p[0].items()))):
+                        if amounts:
+                            print("on {}:".format(dict(fr_pat)))
+                            for (vec, amount) in sorted(amounts.items()):
+                                print("send {} to {}".format(amount, vec))
+                    print("Lower bound", dens)
+                else:
+                    print("Lower bound", data)
                 print("Calculation took", time.time() - tim, "seconds.")
 
             elif i[0] == "show_formula" and mode == "report":
