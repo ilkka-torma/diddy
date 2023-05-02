@@ -62,6 +62,8 @@ class Diddy:
                     self.nodeoffsets = {0 : (0,0)}
                 else:
                     self.topology = i[1]
+                    self.gridmoves = [(1,0), (0,1)]
+                    self.nodeoffsets = {node : (2*j/(3*len(self.nodes)), 2*j/(3*len(self.nodes))) for (j,node) in enumerate(self.nodes)}
                 #print(topology)
                     
             elif i[0] == "SFT":
