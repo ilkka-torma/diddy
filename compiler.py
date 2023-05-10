@@ -17,18 +17,20 @@ from general import *
 
 circuit_variables are aa little tricky... they should be functions
 """
+
 def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_var, all_vars):
-    #print ("formula", formula)
+    #print("formula", formula)
     #print("variables", variables)
     # print ("aux vars", aux_var)
     # print ("alls", all_vars)
     op = formula[0]
+    #print("op", op)
     if op == "BOOL":
         ret = variables[formula[1]]
-    elif op == "CIRCUIT":
-        var = formula[1][0]
-        args = formula[1][1:]
-        #print(var, "being called with", args)
+    elif op == "CALL":
+        var = formula[1]
+        args = formula[2:]
+        #print(var, "being called with", args, "in", formula)
         #varvar = variables[var]
         arg_names, code, closure = variables[var]
         variables_new = {}
@@ -45,6 +47,9 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
                     pos = eval_to_position(dim, topology, args[i], variables, nodes)
                 except KeyError:
                     pos = args[i] # it's actually a value... hopefully!
+                variables_new[a] = pos
+            elif args[i][0] == "ADDR":
+                pos = eval_to_position(dim, topology, args[i], variables, nodes)
                 variables_new[a] = pos
             # if argument is a formula, we will evaluate it
             else:
@@ -64,7 +69,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
                     variables_new[j] = variables[j]
         """
         ret = formula_to_circuit_(nodes, dim, topology, alphabet, code, variables_new, aux_var, all_vars)
-    elif op in ["CELLFORALL", "CELLEXISTSCELL", "NODEFORALL", "NODEEXISTS"]:
+    elif op in ["CELLFORALL", "CELLEXISTS", "NODEFORALL", "NODEEXISTS"]:
         var = formula[1]
         bound = formula[2]
         if bound == None:
@@ -133,8 +138,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         variables_new[var] = form
         ret = formula_to_circuit_(nodes, dim, topology, alphabet, formula[3], variables_new, aux_var, all_vars)
     # cvn[var] should be just the code, and a closure
-    elif op == "SETCIRCUIT":
-        #print("here")
+    elif op == "LET":
         var = formula[1][0]
         #print(var)
         arg_names = formula[1][1:]
@@ -142,11 +146,10 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         circuit_code = formula[2]
         #print("ccode, ", circuit_code)
         unbound_vars = collect_unbound_vars(circuit_code, set(arg_names))
-        #print("unbound", unbound_vars)
         ret_code = formula[3]
         closure = {}
         for v in unbound_vars:
-            if v in arg_names:
+            if v in arg_names or v in alphabet:
                 continue
             closure[v] = variables[v]
         #print(closure)
@@ -197,6 +200,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
                 ret = V(p1 + (v,))
     # the idea was that we would use hasval when we want to directly
     elif op == "VALEQ":
+        
         ret = None
 
         p1ispos = True
@@ -208,9 +212,13 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
             if len(p1) != dim+1:
                 raise Exception("Cannot compare value of cell, only node.")
         except KeyError:
+            #print("eval to pos failed")
             p1ispos = False
             #print(formula[1], "formula 1 fast")
-            p1val = variables[formula[1]] # we assume the keyerror is because this is symbol variable
+            if formula[1] in alphabet:
+                p1val = formula[1]
+            else:
+                p1val = variables[formula[1]] # we assume the keyerror is because this is symbol variable
         #all_vars.add(var_of_pos_expr(formula[1]))
 
         p2ispos = True
@@ -221,8 +229,12 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
             if len(p2) != dim+1:
                 raise Exception("Cannot compare value of cell, only node.")
         except KeyError:
+            #print("eval to pos failed")
             p2ispos = False
-            p2val = variables[formula[2]] # we assume the keyerror is because this is symbol variable
+            if formula[2] in alphabet:
+                p2val = formula[2]
+            else:
+                p2val = variables[formula[2]] # we assume the keyerror is because this is symbol variable
         #all_vars.add(var_of_pos_expr(formula[2]))
 
         if not p1ispos and not p2ispos:
@@ -295,7 +307,7 @@ def collect_unbound_vars(formula, bound = None):
     possibles = set()
     if op == "BOOL":
         possibles.add(formula[1]) # a boolean variable's value is copied from enclosing
-    elif op == "CIRCUIT":
+    elif op == "CALL":
         possibles.add(formula[1][0]) # same for circuit
         # but also collect in args
         args = formula[1][1:]
@@ -327,7 +339,7 @@ def collect_unbound_vars(formula, bound = None):
         bound.add(var)
         possibles.update(collect_unbound_vars(formula[3], bound)) # but is in evaluation of actual 
     # cvn[var] should be just the code, and a closure
-    elif op == "SETCIRCUIT":
+    elif op == "LET":
         var = formula[1][0]
         arg_names = formula[1][1:]
         circuit_code = formula[2]
@@ -354,8 +366,8 @@ def collect_unbound_vars(formula, bound = None):
     return ret
 
 def var_of_pos_expr(f):
-    while type(f) == list:
-        f = f[0]
+    if type(f) == tuple:
+        f = f[1]
     return f
 
 # a position expression is a list where
@@ -364,32 +376,37 @@ def var_of_pos_expr(f):
 # those edges
 def eval_to_position(dim, topology, expr, pos_variables, nodes):
     #print("EVALTOPOS", expr, pos_variables)
-    if type(expr) != list:
-        #print("note list")
+    if type(expr) != tuple:
+        #print("not tup")
         #print("tking", pos_variables[expr])
         pos = pos_variables[expr]
         if type(pos) != tuple:
-            #print("recu")
+            #print("recurse")
             return eval_to_position(dim, topology, pos, pos_variables, nodes)
+        #print("got 1 pos", pos)
         return pos
-    pos = pos_variables[expr[0]]
+    assert expr[0] == "ADDR"
+    pos = pos_variables[expr[1]]
     #print(pos, "ke")
     if type(pos) != tuple:
+        #print("temp recurse")
         pos = eval_to_position(dim, topology, pos, pos_variables, nodes)
     #print("ini", pos)
-    for i in expr[1:]:
-        #print(i)
+    #print(topology)
+    for i in expr[2:]:
+        #print("move", i)
         for t in topology:
             if len(t) == 3:
                 a, b = t[1], t[2]
                 if t[0] == i and (pos[dim] == None or pos[dim] == a[dim]):
-                    #print("lauk")
+                    #print("found top move")
                     if pos[dim] == None:
                         pos = vadd(vsub(pos[:-1], a[:-1]), b[:-1]) + (None,)
                     else:
                         pos = vadd(vsub(pos[:-1], a[:-1]), b[:-1]) + (a[dim],)
                     break
         else:
+            #print("not top move")
             if i in nodes: # single thing => change node
                 pos = pos[:-1] + (i,)
             elif len(i) == dim and type(i) == tuple: # tuple of len dim => move
@@ -397,7 +414,7 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes):
             elif len(i) == dim+1 and type(i) == tuple: # tuple of len dim+1 => both
                 pos = vadd(pos[:-1], i[:-1]) + (i[-1],)
         #print(pos)
-    #print ("reton", pos)
+    #print ("got 2 pos", pos)
     return pos
 
 # given topology, positions of variables and bound dict
