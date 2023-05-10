@@ -19,13 +19,13 @@ code_basic_comparisons = """
 %SFT golden_mean_shift      Ao o = 1 -> o.up = 0 & o.rt = 0
 %SFT hor_golden_mean_shift2
 (0,0,0):1 (1,0,0):1
-%containsF ver_golden_mean_shift hor_golden_mean_shift
-%containsF golden_mean_shift hor_golden_mean_shift
-%containsT ver_golden_mean_shift golden_mean_shift
-%containsF ver_golden_mean_shift full_shift
-%containsT full_shift hor_golden_mean_shift
-%equalT hor_golden_mean_shift2 hor_golden_mean_shift
-%equalT ver_golden_mean_shift ver_golden_mean_shift2
+%contains expect=F ver_golden_mean_shift hor_golden_mean_shift
+%contains expect=F golden_mean_shift hor_golden_mean_shift
+%contains expect=T ver_golden_mean_shift golden_mean_shift
+%contains expect=F ver_golden_mean_shift full_shift
+%contains expect=T full_shift hor_golden_mean_shift
+%equal expect=T hor_golden_mean_shift2 hor_golden_mean_shift
+%equal expect=T ver_golden_mean_shift ver_golden_mean_shift2
 """
 unit_tests.append(("basic comparisons", code_basic_comparisons))
 
@@ -39,29 +39,29 @@ code_crazy_gms = """
 (0,0,0):1 (1,0,0):1 (2,2,0):1
 %show_formula hor_golden_mean_shift
 %show_formula hor_golden_mean_shift2
-%equalT hor_golden_mean_shift2 hor_golden_mean_shift
+%equal expect=T hor_golden_mean_shift2 hor_golden_mean_shift
 """
 unit_tests.append(("crazy gms", code_crazy_gms))
 
 # golden mean shift on hexagon grid
 code_hex_gms = """
 %topology hex
-%set gms Ao Ae[o1] o=0|e=0|o@e
-%set gms2 Ao Ae[o5] o~~e -> (o=0| e = 0)
-%set broken_gms Ao Ae[o1] o=0|e=0
-%set broken_gms2 Ao Ae[o5] o~e -> (o=0| e = 0)
-%set empty Ao 0=1
-%set all_zero Ao o=0
-%set fullshift Ao 0=0
+%SFT gms Ao Ae[o1] o=0|e=0|o@e
+%SFT gms2 Ao Ae[o5] o~~e -> (o=0| e = 0)
+%SFT broken_gms Ao Ae[o1] o=0|e=0
+%SFT broken_gms2 Ao Ae[o5] o~e -> (o=0| e = 0)
+%SFT empty Ao 0=1
+%SFT all_zero Ao o=0
+%SFT fullshift Ao 0=0
 %SFT byforbs
 (0,0,0):1 (0,0,1):1;
 (0,0,0):1 (-1,0,1):1;
 (0,0,0):1 (0,1,1):1
 -- %compare_SFT_pairs_equality
-%equalT gms gms2
-%equalF gms broken_gms2
-%equalT all_zero broken_gms2
-%equalT byforbs gms
+%equal expect=T gms gms2
+%equal expect=F gms broken_gms2
+%equal expect=T all_zero broken_gms2
+%equal expect=T byforbs gms
 """
 unit_tests.append(("hex gms", code_hex_gms))
 
@@ -86,7 +86,7 @@ code_hex_idcodes = """
 --%calculate_forbidden_patterns idcode idcode3 3
 --%show_formula idcode2
 --%show_formula idcode3
-%equalT idcode idcode2
+%equal expect=T idcode idcode2
 """
 unit_tests.append(("hex idcodes", code_hex_idcodes))
 
@@ -104,15 +104,15 @@ code_basic = """
 code_basic_xors = """
 %topology grid
 %SFT test Ao Ap let xor a b := (a & !b) | (!a & b) in
-xor (xor o=1 o.up=1) (xor o.dn=1 o.up.up=1)
+xor (xor (o=1) (o.up=1)) (xor (o.dn=1) (o.up.up=1))
 %SFT test2 Ao Ap let xor a b := (a & !b) | (!a & b) in
-xor (xor (xor o=1 o.dn=1) o.up.up!=0) o.up=1
+xor (xor (xor (o=1) (o.dn=1)) (o.up.up!=0)) (o.up=1)
 %SFT test3 Ao Ap let xor a b := (a & !b) | (!a & b) in
-xor (xor (xor o=1 o.dn.up=1) o.up.up!=0) o.up=1
+xor (xor (xor (o=1) (o.dn.up=1)) (o.up.up!=0)) (o.up=1)
 %show_formula test2
 -- %compare_SFT_pairs_equality
-%equalT test test2
-%equalF test test3
+%equal expect=T test test2
+%equal expect=F test test3
 """
 unit_tests.append(("basic xors", code_basic_xors))
 
@@ -120,12 +120,12 @@ unit_tests.append(("basic xors", code_basic_xors))
 code_ledra = """
 %topology grid
 %SFT Ledrappier Ao let xor a b := (a & !b) | (!a & b) in
-xor (xor o=1 o.up=1) o.rt=1
+xor (xor (o=1) (o.up=1)) (o.rt=1)
 %SFT LedrappierSquare Ao let xor a b := (a & !b) | (!a & b) in
-xor (xor o=1 o.up.up=1) o.rt.rt=1
+xor (xor (o=1) (o.up.up=1)) (o.rt.rt=1)
 --%compare_SFT_pairs
-%containsF Ledrappier LedrappierSquare
-%containsT LedrappierSquare Ledrappier
+%contains expect=F Ledrappier LedrappierSquare
+%contains expect=T LedrappierSquare Ledrappier
 """
 unit_tests.append(("ledrappier", code_ledra))
 
@@ -133,21 +133,21 @@ code_trivial_WangTest = """
 %nodes N E S W
 %alphabet 0 1 2 3
 %topology
-up (0,0,N) (0,1,S)
-dn (0,0,S) (0,-1,N)
-rt (0,0,E) (1,0,W)
-lt (0,0,W) (-1,0,E)
+up (0,0,N) (0,1,S);
+dn (0,0,S) (0,-1,N);
+rt (0,0,E) (1,0,W);
+lt (0,0,W) (-1,0,E);
 %SFT WangTest ACo
 let WangConstraint o := o.N = o.up.S & o.E = o.rt.W in
 WangConstraint o.rt.up &
 o.N = o.up.S & o.E = o.rt.W &
-o.N=0|o.N=1 &
+(o.N=0|o.N=1) &
 o.S=0 &
-o.W=0|o.W=1 &
+(o.W=0|o.W=1) &
 o.E=0
 %SFT WangTest2 Ao o=0
 %show_formula WangTest2
-%equalT WangTest WangTest2
+%equal expect=T WangTest WangTest2
 """
 unit_tests.append(("trivial Wang test", code_trivial_WangTest))
 
@@ -221,24 +221,32 @@ if long_ones_too:
 code = """
 %CA a
 0 1 Ao o!=o.rt;
-%equalT a a
+%equal expect=T a a
 %compose_CA aa a a
 %compose_CA aa_a aa a
 %compose_CA a_aa a aa
-%equalT a_aa aa_a
+%equal expect=T a_aa aa_a
 """
 unit_tests.append(("trivial CA associativity", code))
 
 code = """
-%CA a
-0 1 Ao o!=o.rt;
-%equalT a a
-%compose_CA aa a a
-%compose_CA aa_a aa a
-%compose_CA a_aa a aa
-%equalT a_aa aa_a
+%alphabet a b
+%SFT goldenmean Ao o=a -> o.rt=b & o.up=b
+%compute_forbidden_patterns goldenmean
+%set_weights a:0 b:2
+%minimum_density expect=2 goldenmean (0,1)
+%minimum_density expect=1 goldenmean (0,2)
+%minimum_density expect=6/5 goldenmean (2,3)
 """
-unit_tests.append(("trivial CA associativity", code))
+unit_tests.append(("golden mean upper density", code))
+
+code = """
+%alphabet a b
+%SFT goldenmean Ao o=a -> o.rt=b & o.up=b
+%set_weights a:0 b:2
+%density_lower_bound expect=1 goldenmean (0,0,0) (1,0,0) (-1,0,0) (0,1,0) (0,-1,0); (0,1) (1,0)
+"""
+unit_tests.append(("golden mean lower density", code))
 
 
 

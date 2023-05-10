@@ -6,1126 +6,618 @@ token means string or integers or whatever
 name is a string
 """
 
-import fractions
+from fractions import Fraction
+import parsy as p
 from general import *
+from enum import Enum, Flag, auto
+from functools import reduce, wraps
 
-alphabet = [0, 1]
-accept_repeats_in_forbos = True
-parse_default = False
+### Top-level parsing functions
 
-keywords = ["let", "in"]
-
-"""
-arguments are: name, alternate names, list_command, initial_args
-list_command = True means we expect a ;-separated list of argument lists
-list_command = False means we read a list of arguments
-if list_command = True, then initial_args is how many
-arguments we read before going into the first list
-"""
-basic_commands = [("Wang", ["wang"], True, 1),
-                  ("start_cache", [], False, 0),
-                  ("end_cache", [], False, 0),
-                  ("compose_CA", [], False, 0),
-                  ("calculate_CA_ball", [], True, 2),
-                  ("tiler", [], False, 0),
-                  ("entropy_upper_bound", [], True, 1),
-                  ("entropy_lower_bound", [], True, 1),
-                  ("minimum_density", [], True, 1),
-                  ("density_lower_bound", [], True, 2),
-                  ("tile_box", [], False, 0)]
-
-
-def parse(s):
-    commands =[]
-    while s != "":
-        command, s = parse_command(s)
-        if command == None:
-            return commands
-        if command == True:
-            continue
-        commands.append(command)
-    return commands
-
-def parse_command(s):
-    #print("PRSNNN", s[:20], "---")
-    _, s = ignore_space(s)
-    if len(s) == 0 or s.isspace():
-        return None, s
-    """
-    if s[:2] == "--":
-        _, s = parse_comment(s)
-        return True, s
-    """
+def parse_diddy(code):
+    "Parse a Diddy file. Return a list of commands or raise a ParseError."
+    return (whitespace >> diddy_file).parse(code)
     
-    #assert len(s) > 0 and s[0] == "%"
-    if len(s) == 0 or s[0] != "%":
-        raise Exception("Parsing failed near %s." % s[:20])
+def parse_formula(code):
+    "Parse a FO formula."
+    return (quantified | formula).parse(code)
+
+### Common utilities
+
+def many_strict(parser):
+    """Parse zero or more times, return results in a list.
+       Fail if the parser fails and consumes input.
+       The purpose is to give better error messages than parser.many()."""
+
+    @p.Parser
+    def many_strict_parser(stream, index):
+        values = []
+        result = None
+        while True:
+            result = parser(stream, index).aggregate(result)
+            if result.status:
+                values.append(result.value)
+                index = result.index
+            elif result.furthest > index:
+                return result
+            else:
+                return p.Result.success(index, values).aggregate(result)
+
+    return many_strict_parser
+
+# Whitespace and comments
+whitespace = p.regex(r'(\s|--.*(\r|\n)+)*')
+
+def lexeme(p):
+    "p followed by whitespace."
+    return p << whitespace
+
+# Parentheses    
+lparen = lexeme(p.string('('))
+rparen = lexeme(p.string(')'))
+lbracket = lexeme(p.string('['))
+rbracket = lexeme(p.string(']'))
+lbrace = lexeme(p.string('{'))
+rbrace = lexeme(p.string('}'))
+# Separators
+comma = lexeme(p.string(','))
+colon = lexeme(p.string(':'))
+semicolon = lexeme(p.string(';'))
+
+# Protected keywords
+keyword = p.regex(r'(let|in)(\W|$)')
+
+### Command parser
+
+class ArgType(Flag):
+    LABEL = auto()
+    NUMBER = auto()
+    SIMPLE_LIST = auto()
+    PATTERN_LIST = auto()
+    NESTED_LIST = auto()
+    PATTERN = auto()
+    MAPPING = auto() # mainly for weights
+    FORMULA = auto()
+    TOPOLOGY_KEYWORD = auto()
+                  
+class Command:
+    "A container for a Diddy command definition."
     
-    op, s = read_word(s[1:])
-    if op == "nodes":
-        l, s = read_simple_token_list(s)
-        return ("nodes", l), s
-    elif op == "dim" or op == "dimension":
-        l, s = read_number(s)
-        return ("dim", l), s
-    elif op == "topology":
-        l, s = read_any_symbol(s, ["squaregrid", "square", "grid", "hexgrid", "hex", "king", "kinggrid", "triangle", "trianglegrid"])
-        if l != None:
-            return ("topology", l), s
-        simplices = []
-        while True:
-            #print("kime")
-            simplex, s = read_simplex(s)
-            if simplex != None:
-                simplices.append(simplex)
-                _, s = ignore_space(s)
-                _, s = ignore_symbol(s, ";")
-                _, s = ignore_space(s)
-            else:
-                break
-        return ("topology", simplices), s
-    elif op == "alphabet":
-        l, s = read_simple_token_list(s)
-        global alphabet
-        alphabet = l
-        return ("alphabet", l), s
-    # clopens and SFTs are internally represented the same way (first variable is be forall-quantified)
-    # except we tag with the type
-    elif op in ["set", "SFT", "clopen"]:
-        name, s = read_name(s, True)
-        #print(name, "kim")
-        _, s = ignore_space(s)
-        
-        # set is defined by a formula
-        if s[0] in "AEO":            
-            formula, s = read_formula(s)
-            if op == "SFT":
-                if formula[0] not in ["NODEFORALL", "CELLFORALL"]:
-                    raise Exception("When defining SFT, first quantifier must be A.")
-            elif op == "clopen":
-                if formula[0] not in ["NODEORIGIN", "CELLORIGIN"]:
-                    raise Exception("When defining SFT, first quantifier must be O.")
-            else:
-                if formula[0] in ["NODEFORALL", "CELLFORALL"]:
-                    op = "SFT"
-                else:
-                    op = "clopen"
-            formula = (formula[0][:4] + "FORALL",) + formula[1:]
-            return (op, name, "formula", formula), s
-        
-        # set is defined by forbidden patterns
-        if s[0] == "(":
-            if op not in ["SFT", "clopen"]:
-                raise Exception("When giving explicit forbidden patterns, use SFT or clopen command.")
-            forbos, s = read_forbidden_patterns(s)
-            return (op, name, "forbos", forbos), s
+    def __init__(self, name, pos_args, opts=None, flags=None, aliases=None):
+        self.name = name
+        self.pos_args = pos_args
+        if opts is None:
+            opts = []
+        self.opts = opts
+        if flags is None:
+            flags = []
+        self.flags = flags
+        if aliases is None:
+            aliases = []
+        self.aliases = aliases
 
-    elif op == "set_weights":
-        weights = {}
-        while True:
-            symbol, s = read_simple_token(s)
-            if symbol == None:
-                break
-            weight, s = read_fraction(s)
-            if weight == None:
-                weight, s = read_signed_number(s)
-            weights[symbol] = weight
-        return (op, weights), s
-            
-    #elif op == "minimum_density":
-    #    name, s = read_name(s, True)
-    #    periods = []
-    #    while True:
-    #        period, s = read_vector(s)
-    #        if period != None:
-    #            periods.append(period)
-    #        else:
-    #            break
-    #    return ("minimum_density", name, periods), s
+# List of commands
+# Each entry has command names, positional arguments and types, optional arguments (whose values are flat), and flags
+commands = [
+    # Setting up the environment
+    Command("alphabet",
+            [ArgType.SIMPLE_LIST],
+            aliases = ["alph"]),
+    Command("topology",
+            [ArgType.TOPOLOGY_KEYWORD | ArgType.NESTED_LIST]),
+    Command("dim",
+            [ArgType.NUMBER],
+            aliases = ["dimension"]),
+    Command("nodes",
+            [ArgType.SIMPLE_LIST],
+            aliases = ["vertices"]),
+    Command("set_weights",
+            [ArgType.MAPPING]),
 
-    #elif op == "density_lower_bound":
-    #    name, s = read_name(s, True)
-    #    rad, s = read_number(s)
-    #    nhood = []
-    #    while True:
-    #        vec, s = read_vector(s)
-    #        if vec != None:
-    #            nhood.append(vec)
-    #        else:
-    #            break
-    #    if s[0] != ';':
-    #        raise Exception("Syntax error near" + s[20:] + ": ';' expected")
-    #    s = s[1:]
-    #    vecs = []
-    #    while True:
-    #        vec, s = read_vector(s)
-    #        if vec != None:
-    #            vecs.append(vec)
-    #        else:
-    #            break
-    #    return ("density_lower_bound", name, rad, nhood, vecs), s
+    # Defining objects
+    Command("sft",
+            [ArgType.LABEL, ArgType.FORMULA | ArgType.PATTERN_LIST],
+            aliases = ["SFT"]),
+    Command("compute_forbidden_patterns",
+            [ArgType.LABEL],
+            opts = ["radius"],
+            aliases = ["calculate_forbidden_patterns"]),
+    Command("wang",
+            [ArgType.LABEL, "tiles", ArgType.NESTED_LIST],
+            opts = ["inverses"],
+            flags = ["topology", "use_topology", "custom_topology"],
+            aliases = ["Wang"]),
+    Command("CA",
+            [ArgType.LABEL, ArgType.NESTED_LIST],
+            aliases = ["cellular_automaton"]),
+    Command("compose_CA",
+            [ArgType.LABEL, ArgType.SIMPLE_LIST]),
 
-    elif op in ["show_formula", "show_forbidden_patterns", "show_parsed"]:
-        name, s = read_name(s, True)
-        return (op, name), s
+    # Printing objects' basic properties
+    Command("show_formula",
+            [ArgType.LABEL],
+            aliases = ["print_formula"]),
+    Command("show_parsed",
+            [ArgType.LABEL],
+            aliases = ["print_parsed"]),
+    Command("show_forbidden_patterns",
+            [ArgType.LABEL],
+            aliases = ["print_forbidden_patterns"]),
 
-    elif op == "compute_forbidden_patterns":
-        name, s = read_name(s, True)
-        rad, s = read_number(s)
-        return (op, name, rad), s
+    # Comparing objects
+    Command("equal",
+            [ArgType.LABEL, ArgType.LABEL],
+            opts = ["expect"]),
+    Command("contains",
+            [ArgType.LABEL, ArgType.LABEL],
+            opts = ["expect"]),
+    Command("compare_sft_pairs", [],
+            aliases = ["compare_SFT_pairs"]),
+    Command("compare_sft_pairs_equality", [],
+            aliases = ["compare_SFT_pairs_equality"]),
+    Command("compute_CA_ball",
+            [ArgType.NUMBER, ArgType.SIMPLE_LIST],
+            opts = ["filename"],
+            aliases = ["calculate_CA_ball"]),
 
-    elif op[:5] == "equal" or op[:8] == "contains":
-        name, s = read_name(s, True)
-        name2, s = read_name(s, True)
-        return (op, name, name2), s
+    # Analyzing dynamical properties
+    Command("minimum_density",
+            [ArgType.LABEL, ArgType.SIMPLE_LIST],
+            opts = ["threads", "mode", "chunk_size", "symmetry", "print_freq_pop", "print_freq_cyc", "expect"],
+            flags = ["verbose", "rotate"]),
+    Command("density_lower_bound",
+            [ArgType.LABEL, ArgType.SIMPLE_LIST, ArgType.SIMPLE_LIST],
+            opts = ["radius", "print_freq", "expect"],
+            flags = ["verbose", "show_rules"]),
+    Command("entropy_upper_bound",
+            [ArgType.LABEL, ArgType.SIMPLE_LIST],
+            opts = ["radius"]),
+    Command("entropy_lower_bound",
+            [ArgType.LABEL, ArgType.SIMPLE_LIST, ArgType.SIMPLE_LIST]),
 
-    elif op == "compare_SFT_pairs" or op == "compare_SFT_pairs_equality":
-        return (op,), s
+    # Visualization
+    Command("tiler",
+            [ArgType.LABEL]),
+    Command("tile_box",
+            [ArgType.LABEL, ArgType.NUMBER]),
+    Command("keep_tiling",
+            [ArgType.LABEL],
+            opts = ["min", "max"]),
 
-    elif op == "CA":
-        name, s = read_high_level_name(s)
-        #print(name)
-        rules = []
-        while True:
-            node, s = read_simple_token(s)
-            if node == None:
-                #print("nonw")
-                break
-            #print(node)
-            sym, s = read_simple_token(s)
-            #print(sym)
-            formula, s = read_formula(s)
-            #print(formula)
-            _, s = ignore_symbol(s, ";")
-            rules.append((node, sym, formula))
-        return (op, name, rules), s
+    # Technical commands
+    Command("start_cache",
+            [ArgType.NUMBER, ArgType.NUMBER]),
+    Command("end_cache", [])
+]
 
-    #This is the default parser. It's complicated partly because of
-    #list commands, which have rather complicated syntax and since
-    #I tried to make this robust in some ways.
+command_dict = {alias : cmd for cmd in commands for alias in [cmd.name] + cmd.aliases}
+
+# Unsigned integer (can be used as label)
+natural = lexeme(p.regex(r'0|[1-9]\d*').map(int))
+# Negative integer
+neg_nat = (p.string('-') >> natural).map(lambda n: -n)
+# Signed integer
+integer = natural | neg_nat
+# Fraction
+@p.generate("fraction")
+def fraction():
+    numerator = yield integer
+    maybe_denominator = yield (lexeme(p.string('/')) >> natural).optional()
+    if maybe_denominator is None:
+        return numerator
     else:
+        return Fraction(numerator, maybe_denominator)
+
+# Labels (of commands, alphabets, nodes etc.)
+label = lexeme(keyword.should_fail("keyword") >> p.regex(r'[a-zA-Z]\w*')).desc("label")
+topology_keyword = lexeme(p.regex(r'grid|square|squaregrid|king|kinggrid|triangle|trianglegrid|hex|hexgrid')).desc("topology name")
+
+# Optional argument / setter; value is a signed number or label
+# Type checking is not done at parse time
+@p.generate("optional argument / setter")
+def set_arg_value():
+    arg_name = yield label
+    yield p.string('=')
+    arg_value = yield fraction | label | nested_list
+    return (arg_name, arg_value)
+
+# Vector or node vector
+@p.generate("vector")
+def vector():
+    yield lparen
+    nums = yield integer.sep_by(comma << p.peek(integer))
+    maybe_node = yield (comma >> label).optional()
+    yield rparen
+    if maybe_node is None:
+        return tuple(nums)
+    else:
+        return tuple(nums + [maybe_node])
+    
+# Pattern/mapping pair
+def mapping_pair(key, value):
+    @p.generate("mapping pair")
+    def part():
+        the_key = yield key
+        yield colon
+        val = yield value
+        return (the_key, val)
+    return part
+
+# Mapping: list of key:value pairs, parsed into a dict
+def mapping(key, value):
+    return (lbrace >> mapping_pair(key, value).many().map(dict) << rbrace).desc("mapping")
+# Mapping without braces
+def open_mapping(key, value):
+    return mapping_pair(key, value).many().map(dict).desc("mapping")
+
+# Pattern: vector:label/number mapping
+pattern = mapping(vector, label|fraction)
+open_pattern = open_mapping(vector, label|fraction)
+
+# Flat value
+flat_value = fraction | vector | set_arg_value.desc("setter") | label | pattern
+
+# List (possibly nested) of numbers, vectors, labels, setters and patterns
+@p.generate("list")
+def nested_list():
+    yield lbracket
+    vals = yield (flat_value | nested_list).many()
+    yield rbracket
+    return vals
+    
+# List without braces
+open_nested_list = nested_list.many().desc("list")
+
+# Parse a specific command based on its definition (do not parse the label)
+# TODO: finish
+# Once there are only list arguments left, it's possible to switch into "list mode" and read semicolon-separated open lists
+# If there is only one list argument left, it's possible to switch into "nested list mode" or "pattern mode" and read semicolon-separated open lists or open patterns, and pack them into a single list argument
+def command_args(cmd, index, args=None, opts=None, flags=None, mode="normal"):
+    if args is None:
         args = []
-        """
-        some commands expect a list of argument lists separated by semicolon,
-        and we should set list_command = True so that they work correctly for
-        a single list without the semicolon; None means we don't know
-        """
-        arglists = []
-        list_command = None
-        """
-        some of the commands (%Wang) expecting a list have a name and _then_ the list
-        of argument, and we set initial_args = 1; some commands (%topology) just
-        have a list of argument lists
-        """
-        initial_args = 0
-
-        parse_as_default = True
-        
-        # cmd = e.g. ("Wang", ["wang"], True, 1)
-        for cmd in basic_commands:
-            name, alts, lc, ia = cmd
-            if name == op or op in alts:
-                parse_as_default = False
-                list_command = lc
-                initial_args = ia
-                break
-            #print(name, op)
-        
-        if parse_as_default and not parse_default:
-            raise Exception("Bad command %s near: " % op + s[:30])
-
-        # this allows us to try to keep parsing after a semicolon,
-        # but we can raise an exception if we actually manage to parse
-        # something; the point is we don't punish for a semicolon after
-        # a command
-        must_be_done = False
-
-        kwargs = {}
-        flags = {}
-        while True: # this parses list of argument lists
-            if len(args) > 0:
-                must_be_done = True
-            while True: # this parses a single argument list
-                #print("largs", repr(s))
-                kwarg, s = read_keyword_arg(s)
-                #print(kwarg)
-                if kwarg != None:
-                    #args.append(kwarg)
-                    assert kwarg[0] == "KWARG"
-                    #if len(arglists) != 0:
-                    #    raise Exception("Keyword arguments not allowed in list of argument lists.")
-
-                    # it turns out that it's nice to allow "keyword args" also in list,
-                    # namely in Wang tiles...
-                    # but then we won't put them on the kwargs list but return a SET-tuple...
-
-                    if len(arglists) == 0 and len(args) <= initial_args:
-                        kwargs[kwarg[1]] = kwarg[2]
-                    else:
-                        if must_be_done:
-                            raise Exception("%s wants a simple argument list, but is given a list of lists." % op)
-                        args.append(("SET", kwarg[1], kwarg[2]))
-                    continue
-                    #print(kwarg)
-                flag, s = read_flag(s)
-                if flag != None:
-                    assert flag[0] == "FLAG"
-                    if len(arglists) != 0:
-                        raise Exception("Flags not allowed in list of argument lists.")
-                    flags[flag[2]] = flag[1]
-                else:
-                    arg, s = read_object(s)
-                    if arg == None:
-                        break
-                    #print(repr(arg))
-                    if must_be_done: #list_command == False and len(arglists) > 0:
-                        raise Exception("%s wants a simple argument list, but is given a list of lists." % op)
-                    args.append(arg)
-            _, s = ignore_space(s)
-            if len(args) != 0 and (s[:1] == ";" or list_command == True) and (list_command != False):
-                #print("klu")
-                list_command = True
-                if len(arglists) == 0:
-                    initials = args[:initial_args]
-                    args = args[initial_args:]
-                if len(args) > 0: # if name is followed by ; we do not punish
-                    arglists.append(args)
-                args = []
-            #print(list_command, args, arglists)
-            #if list_command == False and len(args) != 0 and len(arglists) != 0:
-            #    raise Exception("%s wants a simple argument list." % op)
-
-            sym, s = ignore_symbol(s, ";")
-            if sym == None: # or list_command == False:
-                break
-            
-        if list_command == True:
-            #print("mois")
-            #if first_is_name:
-            return (op,) + tuple(initials) + (arglists, kwargs, flags), s
-            #print(arglists)
-            # return (op, arglists), s
-        #print("her")
-        return (op, args, kwargs, flags), s
+        opts = dict()
+        flags = set()
+    #print("command", cmd.name, "index", index, "mode", mode, "prev", args)
     
-# ignore space, including comments
-def ignore_space(s):
-    #print("Space", s[:20])
-    i = 0
-    while i < len(s):
-        if not s[i].isspace():
-            if s[i:i+2] == "--":
-                _, s = ignore_until_eol(s[i:])
-                i = 0
-                continue
-            return None, s[i:]
-        i += 1
-    return None, ""
-
-def ignore_until_eol(s):
-    assert s[:2] == "--"
-    idx = s.find("\n")
-    if idx == -1:
-        return None, ""
-    return None, s[idx+1:]
-
-# ignore space, including comments, but not eol
-def ignore_space_except_eol(s):
-    i = 0
-    while i < len(s):
-        if s[i] == "\n":
-            return None, s[i:]
-        elif not s[i].isspace():
-            if s[i:i+2] == "--":
-                return ignore_until_eol_except_eol(s[i:])
-            return None, s[i:]
-        i += 1
-    return None, ""
-
-def ignore_until_eol_except_eol(s):
-    assert s[:2] == "--"
-    idx = s.find("\n")
-    if idx == -1:
-        return None, ""
-    return None, s[idx:]
-
-def read_word(s, allow_digits = False):
-    #print("word", s[:20])
-    _, ss = ignore_space(s)
-    i = 0
-    while i < len(ss):
-        if allow_digits:
-            break_condition = not ss[i].isalpha() and ss[i] != "_" and not ss[i].isdigit()
-        else:
-            break_condition = not ss[i].isalpha() and ss[i] != "_"
-        if break_condition:
-            if i > 0 and not ss[:i].isdigit():
-                if ss[:i] not in keywords:
-                    return ss[:i], ss[i:]
-            return None, s
-        i += 1
-    if len(ss) > 0:
-        if ss not in keywords:
-            return ss, ""
-    return None, s
-
-# names in the command language allow combining numbers and letters
-def read_high_level_name(s):
-    return read_word(s, True)
-
-# names in the formula language are alpha only, so we just parse a word
-def read_name(s, allow_digits = False):
-    return read_word(s, allow_digits)
-
-def read_number(s):
-    _, s = ignore_space(s)
-    i = 0
-    while i < len(s):
-        if not s[i].isdigit():
-            if i > 0:
-                return int(s[:i]), s[i:]
-            return None, s
-        i += 1
-    if len(s) > 0:
-        return int(s), ""
-    return None, s
-
-def read_keyword_arg(s):
-    _, ss = ignore_space(s)
-    name, ss = read_name(ss)
-    if name == None:
-        return None, s
-    _, ss = ignore_space(ss)
-    sym, ss = read_symbol(ss, "=")
-    if sym == None:
-        return None, s
-    val, ss = read_object(ss)
-    if val == None:
-        return None, s
-    return ("KWARG", name, val), ss
-
-# read object for command language
-def read_object(s):
-    _, ss = ignore_space(s)
-    ret, ss = read_list(ss)
-    if ret != None:
-        return ret, ss
-    ret, ss = read_vector(ss)
-    if ret != None:
-        #print("vector", ret)
-        return ret, ss
-    ret, ss = read_signed_number(ss)
-    if ret != None:
-        #print("signed num", ret)
-        return ret, ss
-    ret, ss = read_fraction(ss)
-    if ret != None:
-        #print("fraction", ret)
-        return ret, ss
-    ret, ss = read_number(ss)
-    if ret != None:
-        #print("num", ret)
-        return ret, ss
-    ret, ss = read_high_level_name(ss)
-    if ret != None:
-        #print("name", ret)
-        return ret, ss
-    return None, s
-
-# this is more or less the same as a vector, but reads general objects
-def read_list(s):
-    _, ss = ignore_space(s)
-    if ss[:1] == "[":
-        ss = ss[1:]
-    else:
-        return None, s
-    vec = []
-    _, ss = ignore_space(ss)
-    while True:
-        entry, ss = read_object(ss)
-        if entry == None:
-            break
-        vec.append(entry)
-        _, ss = ignore_space(ss)
-        _, ss = ignore_symbol(ss, ",") # it's fine to separate by comma
-        _, ss = ignore_space(ss)
-        # raise Exception("Unexpected token while reading list:", s[0])
-    _, ss = ignore_space(ss)
-    if ss[:1] != "]":
-        return None, s
-    return vec, ss[1:]
-
-def read_flag(s):
-    _, ss = ignore_space(s)
-    sym, ss = read_symbol(ss, "@")
-    if sym == None and ss[:1] != "!":
-        return None, s
-
-    # we either read a sign or ! which means negation and only used for flags...
-    sign = True
-    while ss[:1] == "!":
-        sign = not sign
-        ss = ss[1:]
-    obj, ss = read_object(ss)
-    if obj == None:
-        return None, s
-    return ("FLAG", sign, obj), ss
-
-def read_signed_number(s):
-    _, s = ignore_space(s)
-    sign = 1
-    while s[:1] == "-":
-        sign *= -1
-        s = s[1:]
-        _, s = ignore_space(s)
-    i = 0
-    while i < len(s):
-        if not s[i].isdigit():
-            if i > 0:
-                #print("reht")
-                return int(s[:i]) * sign, s[i:]
-            #print("veli2")
-            return None, s
-        i += 1
-    if len(s) > 0:
-        return int(s) * sign, ""
-    return None, s
-
-def read_fraction(s):
-    _, ss = ignore_space(s)
-    sign = 1
-    while ss[:1] == "-":
-        sign *= -1
-        ss = ss[1:]
-        _, ss = ignore_space(ss)
-    i = 0
-    numerator = ""
-    while i < len(ss):
-        if not ss[i].isdigit():
-            if i > 0:
-                numerator = int(ss[:i]) * sign
-                break
-            else:
-                return None, s
-        i += 1
-    if ss[i:i+1] != "/":
-        return None, s
-    ss = ss[i+1:]
-    denominator = ""
-    while i <= len(ss):
-        if i == len(ss) or not ss[i].isdigit():
-            if i > 0:
-                denominator = int(ss[:i])
-                break
-            else:
-                return None, s
-        i += 1
-            
-    return fractions.Fraction(numerator, denominator), ss[i:]
-
-def read_vector(s):
-    _, s = ignore_space(s)
-    if s and s[0] == "(":
-        s = s[1:]
-    else:
-        return None, s
-    vec = []
-    _, s = ignore_space(s)
-    while True:
-        entry, s = read_signed_number(s)
-        vec.append(entry)
-        _, s = ignore_space(s)
-        if s[0] == ",":
-            _, s = ignore_space(s[1:])
-            continue
-        elif s[0] == ")":
-            s = s[1:]
-            break
-        else:
-            raise Exception("Unexpected token while reading vector:", s[0])
-    return tuple(vec), s
-
-def read_forbidden_patterns(s):
-    _, s = ignore_space(s)
-    forbos = []
-    while True:
-        forbo, s = read_forbidden_pattern(s)
-        if forbo == None:
-            return forbos, s
-        #print("forbo", forbo)
-        forbos.append(forbo)
-        _, s = ignore_space(s)
-        _, s = ignore_symbol(s, ";")
-        _, s = ignore_space(s)
-    return forbos, s
-
-def read_forbidden_pattern(s):
-    #print("asdfsa", s[:20])
-    _, s = ignore_space(s)
-    pattern = {}
-    while True:
-        vector, s = read_vector_for_simplex(s)
-        if vector == None:
-            #print("breaing")
-            break
-        #print(vector)
-        _, s = ignore_space_except_eol(s)
-        _, s = ignore_symbols(s, ["=", "->", ":"])
-        _, s = ignore_space_except_eol(s)
-        value, s = read_simple_token(s)
-        #print(value, "lkois")
-        vector = tuple(vector)
-        if not accept_repeats_in_forbos:
-            assert vector not in pattern
-        pattern[vector] = value
-        _, s = ignore_space_except_eol(s)
-        _, s = ignore_symbol(s, ",")
-        _, s = ignore_space_except_eol(s)
-    if len(pattern) == 0:
-        return None, s
-    # remove the variables
-    fixed_pattern = {}
-    varnames = None
-    for vec in pattern:
-        if varnames == None:
-            varnames = []
-            for i,t in enumerate(vec[:-1]):
-                varnames.append(t[0]) # for checking that all have same variable name
-        for i,t in enumerate(vec[:-1]):
-            assert t[0] == varnames[i] # check that is same as in first
-        assert vec[-1][0] == None # no varname in node
-        fixed_vec = tuple([i[1] for i in vec])
-        assert fixed_vec not in fixed_pattern
-        fixed_pattern[fixed_vec] = pattern[vec]
-    return fixed_pattern, s
-
-def read_simplex(s):
-    #print("simp", s[:20])
-    _, s = ignore_space(s)
-    name, s = read_word(s)
-    #print(name, s[:15], "vili")
-    if name == None:
-        return None, s
-    #print(name, s[:29], "----")
-    vectors = []
-    while True:
-        vector, s = read_vector_for_simplex(s)
-        #print(vector, s)
-        if vector == None:
-            break
-        vectors.append(vector)
-    if len(vectors) != 2:
-        raise Exception("Only edges supported in topology.")
-    a, b = vectors[0], vectors[1]
-    #print("ki", a, b)
-    assert len(a) == len(b)
-    aa, bb = [], []
-    for i in range(len(a) - 1):
-        assert a[i][0] == b[i][0] # variables the same
-        aa.append(a[i][1])
-        bb.append(b[i][1])
-    v = vsub(bb, aa)
-    #assert a[-1][0] == b[-1][0] == None # no variable in node
-    if a[-1][0] != None:
-        lasta = a[-1][0]
-    else:
-        lasta = a[-1][1]
-    if b[-1][0] != None:
-        lastb = b[-1][0]
-    else:
-        lastb = b[-1][1]
-    return (name, (0,)*(len(a)-1) + (lasta,), v + (lastb,)), s
-    
-def read_vector_for_simplex(s):
-    #print("vect", s[:20])
-    _, ss = ignore_space(s)
-    if ss[:1] == "(":
-        #print("je")
-        ss = ss[1:]
-        vector = []
-        while True:
-            #print("Ki", ss[:15])
-            var_plus_num, ss = read_var_plus_num(ss)
-            #print("ext",var_plus_num)
-            _, ss = ignore_space(ss)
-            _, ss = ignore_symbol(ss, ",")
-            _, ss = ignore_space(ss)
-            if var_plus_num == None:
-                break
-            vector.append(var_plus_num)
-            #print(var_plus_num)
-        if len(vector) > 0:
-            #print("elem", vector, ss)
-            assert ss[:1] == ")"
-            return vector, ss[1:]
-    return None, s
-
-def ignore_symbols(s, syms):
-    for sym in syms:
-        sym_gotten, s = ignore_symbol(s, sym)
-        if sym_gotten != None:
-            return sym_gotten, s
-    return None, s
-
-def ignore_symbol(s, sym):
-    if len(s) > 0 and s[0] == sym:
-        return s[0], s[1:]
-    return None, s
-
-def read_symbol(s, sym):
-    _, ss = ignore_space(s)
-    if ss[:len(sym)] == sym:
-        return sym, ss[len(sym):]
-    return None, s
-
-def read_any_symbol(s, syms):
-    for sym in syms:
-        l, s = read_symbol(s, sym)
-        if l != None:
-            return l, s
-    return None, s
-
-def read_var_plus_num(s):
-    ss = s
-    #print("vpm", s[:20])
-    # try to read just a number
-    _, ss = ignore_space(ss)
-    num, ss = read_signed_number(ss)
-    #print(num, s)
-    if num == None:
-        #print("rve")
-        name, ss = read_name(ss)
-        #print("name")
-        if name == None:
-            return None, s
-        _, ss = ignore_space(ss)
-        _, ss = ignore_symbol(ss, "+")
-        _, ss = ignore_space(ss)
-        num, ss = read_signed_number(ss)
-        if num == None:
-            num = 0
-        return (name, num), ss
-    return (None, num), ss    
-
-def read_simple_token_list(s):
-    #print("stl", s[:20])
-    tokens = []
-    while True:
-        #print(s)
-        token, s = read_simple_token(s)
-        #print(s)
-        if token != None:
-            tokens.append(token)
-        else:
-            return tokens, s
-
-# things like v.up.dn but ALSO numbers
-def read_dotted_token_list(s):
-    #print("rdtl", s[:10])
-    _, s = ignore_space(s)
-    word, s = read_word(s)
-    #print(word)
-    if word == None:
-        num, s = read_number(s)
-        if num == None:
-            #print("nonni")
-            return None, s
-        #print("numbro", num)
-        return num, s
-    words = [word]
-    while True:
-        #_, s = ignore_space(s)
-        if s[:1] != ".":
-            if len(words) == 1:
-                #print("aha wrd", words)
-                return words[0], s
-            #print("mny wrd", words)
-            return words, s
-        s = s[1:]
-        word, s = read_simple_token(s) # these can be numbers, since nodes can be numbers
-        words.append(word)
-
-def read_simple_token(s):
-    #print("sim tok", s[:20])
-    _, s = ignore_space(s)
-    word, s = read_word(s)
-    if word == None:
-        num, s = read_number(s)
-        if num == None:
-            return None, s
-        return num, s
-    return word, s
-
-
-#print(read_dotted_token_list(" in"))
-#a = bb
-
-def read_bound(s):
-    ss = s
-    _, ss = ignore_space(ss)
-    #print("read bouind", ss[:20])
-    if ss[0] == "[":
-        bounds = {}
-        ss = ss[1:]
-        while True:
-            _, ss = ignore_space(ss)
-            name, ss = read_name(ss)
-            _, ss = ignore_space(ss)
-            num, ss = read_number(ss)
-            if name == None or num == None:
-                break
-            bounds[name] = num
-        _, ss = ignore_space(ss)
-        assert ss[0] == "]"
-        ss = ss[1:]
-        return bounds, ss
-    return None, s
-
-def read_let(s):
-    #print("reading let", s[:15])
-    ss = s
-    _, ss = ignore_space(ss)
-    # first we read the name of the call, and the parameters, like name param1 param2 ... paramn
-    call = []
-    while True:
-        _, ss = ignore_space(ss)
-        name, ss = read_name(ss)
-        if name != None:
-            call.append(name)
-        else:
-            break
-    _, ss = ignore_space(ss)
-    # check that the next symbol is :=
-    assert ss[:2] == ":="
-    # and that we had at least a name for the call
-    assert len(call) > 0
-    ss = ss[2:]
-    # now read an arbitrary formula
-    expr, ss = read_formula(ss)
-    #print ("ex", expr)
-    _, ss = ignore_space(ss)
-    if ss[:2] != "in":
-        raise Exception("Excepted 'in' at " + ss[:30])
-    expr2, ss = read_formula(ss[2:])
-    return ("SETCIRCUIT", tuple(call), expr, expr2), ss
-
-def read_formula(s):
-    #print("readig form", s)
-    ss = s
-    _, ss = ignore_space(ss)
-    if len(ss) == 0:
-        raise Exception("Excepted formula at '" + ss[:30] + "...'")
-    if ss[0] in "AEO":
-        quant = {"A" : "FORALL", "E" : "EXISTS", "O" : "ORIGIN"}[ss[0]]
-        typ = "NODE"
-        if ss[1] == "C":
-            typ = "CELL"
-            ss = ss[2:]
-        else:
-            ss = ss[1:]
-        var, ss = read_name(ss)
-        _, ss = ignore_space(ss)
-        bound, ss = read_bound(ss)
-        formula, ss = read_formula(ss)
-        return (typ+quant, var, bound, formula), ss
-    elif ss[:3] == "let":
-        return read_let(ss[3:])
-    else: #ss[:3] == "let":
-        #print("read basic")
-        expr, ss = read_basic_expression(ss)
-        return expr, ss
-    raise Exception("Exception: Cannot parse formula at " + ss[:30])
-
-# read a bunch of <->'s, since that's the top level op type
-# then read a bunch of ->'s
-# then read a bunch of |'s
-# then &'s
-# at bottom we have @v = a, u ~ v, u = v, @u = @v
-def read_basic_expression(s):
-    #print("reading basic", s[:20])
-    ss = s
-    imps = []
-    while True:
-        #print("eq iter", ss[:20])
-        imp, ss = read_imp_expression(ss)
-        if imp != None:
-            imps.append(imp)
-        else:
-            break
-        _, ss = ignore_space(ss)
-        if ss[:3] != "<->":
-            break
-        ss = ss[3:]
-        
-    if len(imps) == 0:
-        return None, s
-    elif len(imps) == 1:
-        return imps[0], ss
-    else:
-        return ("IFF", *imps), ss
-
-def read_imp_expression(s):
-    #print("reading imp", s[:20])
-    ss = s
-    ors = []
-    while True:
-        #print("imp iter", ss[:20])
-        or_, ss = read_and_expression(ss)
-        if or_ != None:
-            ors.append(or_)
-        else:
-            break
-        _, ss = ignore_space(ss)
-        if ss[:2] != "->":
-            break
-        ss = ss[2:]
-    if len(ors) == 0:
-        return None, s
-    elif len(ors) == 1:
-        return ors[0], ss
-    else:
-        return ("IMP", *ors), ss
-
-def read_and_expression(s):
-    #print("reading or", s[:20])
-    ss = s
-    ors = []
-    while True:
-        or_, ss = read_or_expression(ss)
-        if or_ != None:
-            ors.append(or_)
-        else:
-            break
-        _, ss = ignore_space(ss)
-        if ss[:1] != "&":
-            break
-        ss = ss[1:]
-    if len(ors) == 0:
-        return None, s
-    elif len(ors) == 1:
-        return ors[0], ss
-    else:
-        return ("AND", *ors), ss
-
-def read_or_expression(s):
-    #print("reading or", s[:20])
-    ss = s
-    nots = []
-    while True:
-        not_, ss = read_not_expression(ss)
-        if not_ != None:
-            nots.append(not_)
-        else:
-            break
-        _, ss = ignore_space(ss)
-        if ss[:1] != "|":
-            break
-        ss = ss[1:]
-    if len(nots) == 0:
-        return None, s
-    elif len(nots) == 1:
-        return nots[0], ss
-    else:
-        return ("OR", *nots), ss
-
-def read_not_expression(s):
-    #print("reading not", s[:20])
-    ss = s
-    _, ss = ignore_space(ss)
-    neg = False
-    while True:
-        #print("not iter", ss[:20])
-        if ss[:1] == "!":
-            neg = not neg
-            ss = ss[1:]
-        else:
-            break
-        _, ss = ignore_space(ss)
-    #print(neg)
-    if ss[:1] == "(":
-        form, ss = read_formula(ss[1:])
-        _, ss = ignore_space(ss)
-        assert ss[0] == ")"
-        ss = ss[1:]
-    elif ss[:1] in "AEO":
-        form, ss = read_formula(ss)
-    else:
-        form, ss = read_basic(ss)
-    if neg:
-        form = ("NOT", form)
-    return form, ss
-
-def read_infix_expr(s):
-    #print("reading infix", repr(s))
-    ss = s
-    _, ss = ignore_space(ss)
-    thing1, ss = read_dotted_token_list(ss)
-    _, ss = ignore_space(ss)
-    neg = False
-    if ss[:2] == "~~":
-        op = "~~"
-        ss = ss[2:]
-    elif ss[:1] == "~":
-        op = "~"
-        ss = ss[1:]
-    elif ss[:1] == "=":
-        op = "="
-        ss = ss[1:]
-    elif ss[:1] == "@":
-        op = "@"
-        ss = ss[1:]
-    elif ss[:2] == "!=":
-        op = "="
-        neg = True
-        ss = ss[2:]
-    elif ss[:2] == "!@":
-        op = "@"
-        neg = True
-        ss = ss[2:]
-    elif ss[:3] == "!~~":
-        op = "~~"
-        neg = True
-        ss = ss[3:]
-    elif ss[:2] == "!~":
-        op = "~"
-        neg = True
-        ss = ss[2:]
-    else:
-        return None, s
-    _, ss = ignore_space(ss)
-    thing2, ss = read_dotted_token_list(ss)
-    _, ss = ignore_space(ss)
-
-    if thing1 == None or thing2 == None:
-        return None, s
-
-    if op == "~":
-        ret = ("ISNEIGHBOR", thing1, thing2), ss
-    if op == "~~":
-        ret = ("ISPROPERNEIGHBOR", thing1, thing2), ss
-    if op == "@":
-        ret = ("POSEQ", thing1, thing2), ss
-    if op == "=":
-        if thing1 in alphabet and thing2 in alphabet:
-            if thing1 == thing2:
-                ret = ("T",), ss
-            else:
-                ret = ("F",), ss
-        elif thing1 in alphabet and thing2 not in alphabet:
-            ret = ("HASVAL", thing2, thing1), ss
-        elif thing2 in alphabet and thing1 not in alphabet:
-            ret = ("HASVAL", thing1, thing2), ss
-        else:
-            ret = ("VALEQ", thing1, thing2), ss
-    if neg:
-        ret = ("NOT", ret[0]), ret[1]
-    return ret
-    
-
-def read_call(s):
-    #print("reading call", s[:15])
-    ss = s
-    _, ss = ignore_space(ss)
-    call = []
-    while True:
-        _, ss = ignore_space(ss)
-        if ss[:1] == "(":
-            #print ("subex")
-            formu, ss = read_formula(ss[1:])
-            #print(formu)
-            assert ss[:1] == ")"
-            ss = ss[1:]
-            call.append(formu)
-        else:
-            #print("try infix",ss[:10])
-            name, ss = read_infix_expr(ss)
-            if name != None:
-                #print("suces", name)
-                call.append(name)
-            else:
-                #print("ok try tods token lis", ss[:10])
-                name, ss = read_dotted_token_list(ss) #read_name(ss)
-                #print(name)
-                if name != None:
-                    #print("cusses", name)
-                    call.append(name)
-                else:
+    @p.generate
+    def parse_args():
+        nonlocal index
+        if mode == "normal":
+            # We are actually reading arguments
+            if index >= 0:
+                # Normal mode: parse options and keywords until a positional argument appears
+                while True:
+                    maybe_flag = yield (p.string('@') >> label).desc("flag").optional()
+                    if maybe_flag is not None:
+                        flags.append(maybe_flag)
+                        continue
+                    maybe_opt = yield set_arg_value.optional()
+                    if maybe_opt is not None:
+                        name, value = maybe_opt
+                        opts[name] = value
+                        continue
                     break
-    _, ss = ignore_space(ss)
-    if len(call) == 0:
-        return None, s
-    if len(call) == 1:
-        return ("BOOL", call[0]), ss
-    #print("simis", call)
-    return ("CIRCUIT", tuple(call)), ss
+                # No more optional, keyword or positional arguments: return all data
+                if index == len(cmd.pos_args):
+                    return (cmd.name, args, opts, flags)
+                # Choose the argument parser(s) based on its expected type and try to apply each
+                # Accept the first one that succeeds
+                arg_type = cmd.pos_args[index]
+                arg_parsers = []
+                if ArgType.TOPOLOGY_KEYWORD in arg_type:
+                    arg_parsers.append(topology_keyword)
+                if ArgType.LABEL in arg_type:
+                    arg_parsers.append(label)
+                if ArgType.NUMBER in arg_type:
+                    arg_parsers.append(fraction)
+                if ArgType.SIMPLE_LIST in arg_type or ArgType.NESTED_LIST in arg_type or ArgType.PATTERN_LIST in arg_type:
+                    arg_parsers.append(nested_list)
+                if ArgType.PATTERN in arg_type:
+                    arg_parsers.append(pattern)
+                if ArgType.MAPPING in arg_type:
+                    arg_parsers.append(mapping(flat_value, flat_value | nested_list))
+                if ArgType.FORMULA in arg_type:
+                    arg_parsers.append(formula)
+                arg = yield p.alt(*arg_parsers)
+                args.append(arg)
+            # Choose the mode for the remaining arguments
+            # Normal mode is the default
+            next_modes = [command_args(cmd, index+1, args, opts, flags, "normal")]
+            # Non-normal modes can be forced with a semicolon, if applicable
+            # If we only have simple list arguments left, try list mode
+            if index < len(cmd.pos_args)-1 and all(ArgType.SIMPLE_LIST in typ or ArgType.MAPPING in typ for typ in cmd.pos_args[index+1:]):
+                next_modes.append(semicolon.optional() >> command_args(cmd, index+1, args.copy(), opts.copy(), flags.copy(), "list"))
+            # If we have only one list argument left, try nested list or pattern modes
+            if index == len(cmd.pos_args)-2 and ArgType.NESTED_LIST in cmd.pos_args[index+1]:
+                next_modes.append(semicolon.optional() >> command_args(cmd, index+1, args.copy(), opts.copy(), flags.copy(), "nested_list"))
+            if index == len(cmd.pos_args)-2 and ArgType.PATTERN_LIST in cmd.pos_args[index+1]:
+                next_modes.append(semicolon.optional() >> command_args(cmd, index+1, args.copy(), opts.copy(), flags.copy(), "pattern_list"))
+            ret = yield p.alt(*next_modes)
+            return ret
+        elif mode == "list":
+            # List mode: read remaining arguments as semicolon-separated open lists
+            # Flags can be read, but optional arguments cannot, as they're interpreted as assignments
+            # May also read a mapping
+            while index <= len(cmd.pos_args):
+                curr_collection = None
+                while True:
+                    # Optional argument
+                    maybe_flag = yield (p.string('@') >> label).desc("flag").optional()
+                    if maybe_flag is not None:
+                        flags.append(maybe_flag)
+                        continue
+                    # Semicolon: finish current list and begin the next one
+                    # Also finish if we ran out of arguments
+                    maybe_sep = yield semicolon.optional()
+                    if maybe_sep:
+                        break
+                    # Otherwise, read an item and store it to the list
+                    maybe_pair = yield mapping_pair(flat_value, flat_value | nested_list).optional()
+                    if maybe_pair is not None:
+                        if curr_collection is None:
+                            curr_collection = dict()
+                        if type(curr_collection) == dict:
+                            curr_collection[maybe_pair[0]] = maybe_pair[1]
+                        else:
+                            yield p.fail("list item")
+                    else:
+                        maybe_item = yield flat_value.optional()
+                        if maybe_item is not None:
+                            if curr_collection is None:
+                                curr_collection = []
+                            if type(curr_collection) == list:
+                                curr_collection.append(maybe_item)
+                            else:
+                                yield p.fail("mapping item")
+                        else:
+                            break
+                # Store current list and increment index
+                args.append(curr_collection)
+                index += 1
+            return (cmd.name, args, opts, flags)
+        elif mode == "nested_list":
+            # Nested list mode: read the one remaining argument as a semicolon-separated list of open lists
+            # Flags can be read, but not options
+            lists = []
+            finding = True
+            while finding:
+                curr_list = []
+                while True:
+                    # Optional argument
+                    maybe_flag = yield (p.string('@') >> label).desc("flag").optional()
+                    if maybe_flag is not None:
+                        flags.append(maybe_flag)
+                        continue
+                    # Semicolon: finish current list and begin the next one
+                    # Also finish if we ran out of arguments
+                    maybe_sep = yield semicolon.optional()
+                    if maybe_sep:
+                        break
+                    # Otherwise, read an item and store it to the list
+                    item = yield (formula | flat_value | nested_list).optional()
+                    if item is None:
+                        finding = False
+                        break
+                    else:
+                        #print("found item", item)
+                        curr_list.append(item)
+                if finding:
+                    lists.append(curr_list)
+            return (cmd.name, args+[lists], opts, flags)
+        elif mode == "pattern_list":
+            # As above, but with semicolon-separated open patterns
+            patterns = []
+            finding = True
+            while finding:
+                curr_pat = dict()
+                while True:
+                    # Optional argument
+                    maybe_flag = yield (p.string('@') >> label).desc("flag").optional()
+                    if maybe_flag is not None:
+                        flags.append(maybe_flag)
+                        continue
+                    # Semicolon: finish current list and begin the next one
+                    # Also finish if we ran out of arguments
+                    maybe_sep = yield semicolon.optional()
+                    if maybe_sep:
+                        break
+                    # Otherwise, read an item and store it to the list
+                    pair = yield mapping_pair(flat_value, flat_value | nested_list).optional()
+                    #print("pair", pair)
+                    if pair is None:
+                        finding = False
+                        break
+                    else:
+                        curr_pat[pair[0]] = pair[1]
+                patterns.append(curr_pat)
+            return (cmd.name, args+[patterns], opts, flags)
+        else:
+            raise Exception("Unknown parse mode: " + mode)
+        
+    return parse_args
+
+# Parse any command
+@p.generate
+def command():
+    yield p.string('%')
+    alias = yield label
+    try:
+        com = yield command_args(command_dict[alias], -1)
+        return com
+    except KeyError:
+        yield p.fail("valid command name")
+
+# Parse a full Diddy file
+diddy_file = many_strict(command)
+
+
+### Formula parser
+
+# Operator associativity
+# Prefix, left and right are self-explanatory
+# Flatten collects all arguments into a single list (the operator is associative)
+# Chain joins the propositions with ANDs
+class Assoc(Flag):
+    PREFIX = auto()
+    LEFT = auto() # unused for now
+    RIGHT = auto()
+    FLATTEN = auto()
+    CHAIN = auto()
+    STRICT_CHAIN = auto()
     
-def read_basic(s):
-    ret, s = read_infix_expr(s)
-    if ret:
-        return ret, s
-    ret, s = read_call(s)
-    if ret:
-        return ret, s
-    raise Exception("Cannot read basic at " + s[:30])
-    
+# Create a parser out of a precedence table
+def expr_with_ops(prec_table, atomic, prec_index=0):
+
+    if prec_index == len(prec_table):
+        return atomic
+        
+    else:
+        @p.generate(prec_table[prec_index][0] + " expression")
+        def parse_the_expr():
+            name, assoc, operators = prec_table[prec_index]
+            #print("parsing", name, "expression, precedence", prec_index)
+            parse_next = expr_with_ops(prec_table, atomic, prec_index=prec_index+1)
+            if assoc == Assoc.PREFIX:
+                # Parse a chain of prefix operators
+                prefixes = yield p.alt(*operators).many()
+                value = yield parse_next
+                ret = reduce(lambda val, op: op(val), reversed(prefixes), value)
+            elif assoc == Assoc.LEFT:
+                # Parse tokens separated by a left associative operator
+                raise NotImplementedError
+            elif assoc == Assoc.RIGHT:
+                # Parse tokens separated by a right associative operator
+                first = yield parse_next
+                maybe_others = yield p.alt(*operators).bind(lambda op: parse_the_expr.map(lambda second: op(first, second))).optional()
+                if maybe_others is not None:
+                    #print("Parsed many", maybe_others, "at level", table_ix, assoc_name[table_ix])
+                    ret = maybe_others
+                else:
+                    #print("Parsed one", first, "at level", table_ix, assoc_name[table_ix])
+                    ret = first
+            elif assoc == Assoc.FLATTEN:
+                # Parse tokens separated by a flattening operator
+                op_parser, op_func = operators
+                values = yield parse_next.sep_by(op_parser, min=1)
+                if len(values) > 1:
+                    #print("Parsed many", values, "at level", table_ix, assoc_name[table_ix])
+                    ret = op_func(values)
+                else:
+                    #print("Parsed one", values, "at level", table_ix, assoc_name[table_ix])
+                    ret = values[0]
+            elif assoc in Assoc.CHAIN | Assoc.STRICT_CHAIN:
+                # Parse tokens separated by a chained operator
+                first = yield parse_next
+                maybe_others = yield p.alt(*operators).bind(lambda op: parse_next.map(lambda val: (op, val))).at_least(1 if assoc == Assoc.STRICT_CHAIN else 0)
+                if len(maybe_others) == 1:
+                    op, val = maybe_others[0]
+                    #print("Parsed two", op(first, val), "at level", table_ix, assoc_name[table_ix])
+                    ret = op(first, val)
+                elif maybe_others:
+                    propositions = ["AND"]
+                    for (op, val) in maybe_others:
+                        propositions.append(op(first, val))
+                        first = val
+                    #print("Parsed many", propositions, "at level", table_ix, assoc_name[table_ix])
+                    ret = tuple(propositions)
+                else:
+                    #print("Parsed one", first, "at level", table_ix, assoc_name[table_ix])
+                    ret = first
+            #print("parsed", ret)
+            return ret
+        return parse_the_expr
+
+# Alphabetic label
+strict_label = lexeme((keyword | p.regex(r'[AEO].*')).should_fail("keyword") >> p.regex(r'[a-zA-Z_]+')).desc("formula variable")
+
+# Positional expression
+pos_expr = p.seq(strict_label | integer.desc("integer"),
+                 (lexeme(p.string('.')) >> (label | integer).desc("address")).many()).combine(lambda var, addrs: ("ADDR", var, *addrs) if addrs else var)
+                 
+# Chainable comparison operators
+comp_table = [("node comparison", Assoc.STRICT_CHAIN,
+               [lexeme(p.string('~~')) >> p.success(lambda x, y: ("ISPROPERNEIGHBOR", x, y)),
+                lexeme(p.string('~')) >> p.success(lambda x, y: ("ISNEIGHBOR", x, y)),
+                lexeme(p.string('=')) >> p.success(lambda x, y: ("VALEQ", x, y)),
+                lexeme(p.string('@')) >> p.success(lambda x, y: ("POSEQ", x, y)),
+                lexeme(p.string('!~~')) >> p.success(lambda x, y: ("NOT", ("ISPROPERNEIGHBOR", x, y))),
+                lexeme(p.string('!~')) >> p.success(lambda x, y: ("NOT", ("ISNEIGHBOR", x, y))),
+                lexeme(p.string('!=')) >> p.success(lambda x, y: ("NOT", ("VALEQ", x, y))),
+                lexeme(p.string('!@')) >> p.success(lambda x, y: ("NOT", ("POSEQ", x, y)))])]
+
+# Atomic proposition that compares nodes
+node_expr = expr_with_ops(comp_table, pos_expr)
+
+# Function call
+@p.generate("boolean variable or function call")
+def bool_or_call():
+    #print("parsing call")
+    name = yield strict_label
+    args = yield (pos_expr | lparen >> formula << rparen).many()
+    #print("parsed call", name, args)
+    if args:
+        return ("CALL", name, *args)
+    else:
+        return ("BOOL", name)
+
+# Restrictions in quantifiers
+@p.generate("restriction part")
+def restriction():
+    name = yield strict_label
+    num = yield natural
+    return (name, num)
+
+restrictions = lexeme(p.string('[')) >> restriction.many() << lexeme(p.string(']')).desc("variable restriction")
+
+# Logical quantifier, potentially restricted
+@p.generate("quantified formula")
+def quantified():
+    #print("parsing quantified")
+    the_quantifier = yield p.alt(p.string("AC") >> p.success("CELLFORALL"),
+                                 p.string("EC") >> p.success("CELLEXISTS"),
+                                 p.string("OC") >> p.success("CELLORIGIN"),
+                                 p.string("A") >> p.success("NODEFORALL"),
+                                 p.string("E") >> p.success("NODEEXISTS"),
+                                 p.string("O") >> p.success("NODEORIGIN"))
+    var = yield strict_label
+    restr = yield restrictions.map(dict).optional()
+    #print("parsed quantifier part", the_quantifier, var)
+    the_formula = yield formula
+    return (the_quantifier, var, restr or dict(), the_formula)
+
+# Table of operators and their associativities
+# The first operator binds the loosest, the last one the tightest
+# Prefix expects a list of parsers that return a unary function
+# Left, right and chain expect a list of parsers that return binary functions (TODO: maybe they should be pairs instead)
+# Flatten expects a pair (parser, variable-arity function)
+boolean_ops = [
+    # Logical connectives
+    ("implication", Assoc.RIGHT, [lexeme(p.string('->')) >> p.success(lambda x, y: ("IMP", x, y))]),
+    ("equivalence", Assoc.CHAIN, [lexeme(p.string('<->')) >> p.success(lambda x, y: ("IFF", x, y))]),
+    ("disjunction", Assoc.FLATTEN, (lexeme(p.string('|')), lambda xs: ("OR",) + tuple(xs))),
+    ("conjunction", Assoc.FLATTEN, (lexeme(p.string('&')), lambda xs: ("AND",) + tuple(xs))),
+    # Negation
+    ("negation", Assoc.PREFIX, [lexeme(p.string('!')) >> p.success(lambda x: ("NOT", x))])
+    ]
+
+# A let-in definition
+@p.generate("let expression")
+def let_expr():
+    yield lexeme(p.string('let'))
+    call = yield strict_label.at_least(1)
+    yield lexeme(p.string(':='))
+    result = yield formula
+    yield lexeme(p.string('in'))
+    rest = yield formula
+    return ("LET", tuple(call), result, rest)
+
+# A full formula
+formula = p.forward_declaration()
+formula.become(expr_with_ops(boolean_ops, quantified | let_expr | node_expr | bool_or_call | (lparen >> formula << rparen)))
+
+### Testing
 
 
-
-
-#formula = """Ao let xor a b := (a & !b) | (!a & b) in
-#formula = "xor (xor o o.up) o.dn"
-#formula = "a.b"
-#parsed = read_dotted_token_list(formula)
-#parsed = read_call(formula) #
-#parsed = parse(code)
-#formula = """Ao let xor a b := (a & !b) | (!a & b) in
-#xor (xor (o=1) (o.up=1)) (o.dn=1)"""
-#parsed = read_formula(formula)
-
-#a = bbb
-
-
-
-#alphabet = [0, 1]
-
-#print(read_basic_expression("p = o & (p = o | p = p)"))
-#a = bbb
-
-
-#print(read_basic_expression("!1 = u & u = 1 <-> u @ v & 1 = 0 | u = v"))
-#print(read_bound("[u1]"))
-
-
-#f = read_formula("""Ao let c u v := v = 1 & u ~ v in 
-#       (Ed[o1] c o d) & (Ap[o2] p !@ o -> Eq[o1p1] (c o q & ! c p q) | (c p q & !c o q))""")
-
-#print(read_simplex("dn (x,y,1) (x,y-1,0)"))
-
-#print(ignore_space("""    -- moi
-
-#--- Hello
-#moi moi"""))
-
-
-#a = bbb
-#-- defines the SFT of identifying codes
-
-
-#a = bbb
-s = """
-%nodes 0
-%dim 2
-%topology grid
-%alphabet 0 1
-%SFT fullshift              Ao 0 = 0
-%SFT ver_golden_mean_shift  Ao o = 1 -> o.dn = 0
-%SFT ver_golden_mean_shift2 Ao o = 1 -> o.dn = 0
-%SFT hor_golden_mean_shift  Ao o = 1 -> o.rt = 1
-%SFT golden_mean_shift      Ao o = 1 -> o.up = 1 & o.rt = 1
-%equal ver_golden_mean_shift ver_golden_mean_shift2
-"""
-
-#print(parse(s))
 
 #print(read_formula("0"))
 

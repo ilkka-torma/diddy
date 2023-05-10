@@ -50,6 +50,7 @@ def optimal_density(the_sft, specs, radius, weights=None, ret_shares=False, verb
     total_constr = 0
     all_pats = set()
     send = {}
+    
     for (k, (domain, vectors)) in enumerate(specs):
         if verbose:
             print("Computing pattern variables in spec {}/{}".format(k+1, len(specs)))
@@ -95,7 +96,8 @@ def optimal_density(the_sft, specs, radius, weights=None, ret_shares=False, verb
         if verbose and i%print_freq == 0:
             print("{} found so far".format(i))
 
-    print("Done with {} constraints, now solving".format(i))
+    if verbose:
+        print("Done with {} constraints, now solving".format(i))
     pulp.PULP_CBC_CMD(msg=0).solve(prob)
 
     if ret_shares:
