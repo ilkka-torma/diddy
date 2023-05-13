@@ -1,5 +1,6 @@
 from general import *
 from circuit import *
+from itertools import chain
 
 # check that circuit is forced to be true when variable set
 def forced_by(circuit, vals_as_list):
@@ -58,7 +59,8 @@ def add_uniqueness_constraints(nodes, alphabet, circuits, vecs):
 class SFT:
     "dim-dimensional SFT on a gridlike graph"
 
-    def __init__(self, dim, nodes, alph, forbs=None, circuit=None, formula=None):
+    # Onesided is a list of dimensions
+    def __init__(self, dim, nodes, alph, forbs=None, circuit=None, formula=None, onesided=None):
         self.dim = dim
         self.nodes = nodes
         self.alph = alph
@@ -67,9 +69,84 @@ class SFT:
         self.formula = formula # just for display, not actually used in computations
         if self.circuit is None:
             self.deduce_circuit()
+        if onesided is None:
+            onesided = dict()
+        self.onesided = onesided
 
     def __str__(self):
-        return "SFT(dim={}, nodes={}, alph={})".format(self.dim, self.nodes, self.alph)
+        return "SFT(dim={}, nodes={}, alph={}{})".format(self.dim, self.nodes, self.alph, (", onesided="+str(self.onesided)) if self.onesided else "")
+
+    # Find recognizable configuration (i.e. semilinear in orthogonal directions) in self which is not in other
+    # The semilinear structure is a periodic rectangular tiling, and the contents of a rectangle depend on which axes its lowest corner lies
+   # We could also have the sizes of the rectangles depend on this, but this is simpler for now
+    def exists_recognizable_not_in(self, other, radii, return_conf=False):
+        #print("koko")
+
+        my_vecs = set(var[:-2] for var in self.circuit.get_variables())
+        other_vecs = set(var[:-2] for var in other.circuit.get_variables())
+        conf_bounds = [(0 if i in self.onesided else -radii[i], 2*radii[i]) for i in range(self.dim)]
+        all_positions = set(hyperrect(conf_bounds))
+        tr_bounds = []
+        for i in range(self.dim):
+            if i in self.onesided:
+                min_bound = 0
+            else:
+                min_bound = -radii[i] - max(vec[i] for vec in chain(my_vecs, other_vecs))
+            max_bound = 2*radii[i] - min(vec[i] for vec in chain(my_vecs, other_vecs))
+            tr_bounds.append((min_bound, max_bound))
+        print("radii", radii)
+        print("tr_bounds", tr_bounds)
+
+        def wrap(var):
+            #print("var", var)
+            ret = []
+            for (r,x) in zip(radii, var):
+                if x < 0:
+                    ret.append(x%r - r)
+                elif x < r:
+                    ret.append(x)
+                else:
+                    ret.append(x%r + r)
+            ret.extend(var[-2:])
+            #print("ret", ret)
+            return tuple(ret)
+
+        circuits = []
+        others = []
+        for vec in hyperrect(tr_bounds):
+            if any(vadd(vec, my_vec) in all_positions for my_vec in my_vecs):
+                circ = self.circuit.copy()
+                transform(circ, lambda var: wrap(nvadd(var[:-1], vec) + var[-1:]))
+                circuits.append(circ)
+            if any(vadd(vec, other_vec) in all_positions for other_vec in other_vecs):
+                not_other = NOT(other.circuit.copy())
+                transform(not_other, lambda var: wrap(nvadd(var[:-1], vec) + var[-1:]))
+                others.append(not_other)
+        circuits.append(OR(*others))
+
+        add_uniqueness_constraints(self.nodes, self.alph, circuits, all_positions)
+
+        m = SAT(AND(*circuits), True)
+        
+        if m == False:
+            if return_conf:
+                return False, None
+            else:
+                return False
+        #print("model", m)
+        if return_conf:
+            conf = dict()
+            for vec in hyperrect(conf_bounds):
+                for node in self.nodes:
+                    for sym in self.alph[1:]:
+                        var = vec + (node, sym)
+                        if m.get(var, False):
+                            conf[vec + (node,)] = sym
+                            break
+                    else:
+                        conf[vec + (node,)] = self.alph[0]
+            return True, conf
+        return True
         
     # find periodic configuration in c1 which is not in c2
     def exists_periodic_not_in(self, other, r, return_conf=False):
@@ -80,7 +157,7 @@ class SFT:
         for vec in onesided_hypercube(self.dim, r):
             #print(v, "vee")
             circ = self.circuit.copy()
-            transform(circ, lambda var: nvmod(r, nvadd(var[:-1], vec)) + var[-1:])         
+            transform(circ, lambda var: nvmod(r, nvadd(var[:-1], vec)) + var[-1:])
             circuits.append(circ)
             all_positions.add(vec)
 
@@ -103,12 +180,14 @@ class SFT:
                 return False
         #for t in sorted(m):
         #    print (t, m[t])
+        print(m)
         if return_conf:
             conf = dict()
             for vec in onesided_hypercube(self.dim, r):
                 for node in self.nodes:
                     for sym in self.alph[1:]:
-                        if m[vec + (node,sym)]:
+                        var = vec + (node, sym)
+                        if m.get(var, False):
                             conf[vec + (node,)] = sym
                             break
                     else:
@@ -386,14 +465,20 @@ class SFT:
         
         self.deduce_forbs_(domain)
 
-    def contains(self, other, limit = None, return_radius_and_sep = False):
+    def contains(self, other, limit = None, return_radius_and_sep = False, method="periodic"):
+        "Test containment using forced allowed patterns or special configurations"
         r = 1
         while limit is None or r <= limit:
             if other.ball_forces_allowed(self, r):
                 if return_radius_and_sep:
                     return True, r, None
                 return True
-            res, sep = other.exists_periodic_not_in(self, r, return_conf=return_radius_and_sep)
+            if method == "recognizable":
+                res, sep = other.exists_recognizable_not_in(self, [r]*self.dim, return_conf=return_radius_and_sep)
+            elif method == "periodic":
+                res, sep = other.exists_periodic_not_in(self, r, return_conf=return_radius_and_sep)
+            else:
+                raise Exception("Unknown mehtod: {}".format(method))
             if res:
                 if return_radius_and_sep:
                     return False, r, sep
@@ -401,13 +486,13 @@ class SFT:
             r += 1
         return None
 
-    def equals(self, other, limit = None, return_radius = False):
-        c12, rad, _ = self.contains(other, limit, return_radius_and_sep = True)
+    def equals(self, other, limit = None, return_radius = False, method=None):
+        c12, rad, _ = self.contains(other, limit, return_radius_and_sep = True, method="periodic")
         if c12 == None:
             return None, limit
         elif c12 == False:
             return False, rad
-        c21, rad2, _ = other.contains(self, limit, return_radius_and_sep = True)
+        c21, rad2, _ = other.contains(self, limit, return_radius_and_sep = True, method=method)
         if c21 == None:
             return None, limit
         return c21, max(rad, rad2)

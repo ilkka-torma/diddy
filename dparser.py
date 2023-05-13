@@ -107,6 +107,7 @@ commands = [
             [ArgType.TOPOLOGY_KEYWORD | ArgType.NESTED_LIST]),
     Command("dim",
             [ArgType.NUMBER],
+            opts = ["onesided"],
             aliases = ["dimension"]),
     Command("nodes",
             [ArgType.SIMPLE_LIST],
@@ -147,13 +148,15 @@ commands = [
     # Comparing objects
     Command("equal",
             [ArgType.LABEL, ArgType.LABEL],
-            opts = ["expect"]),
+            opts = ["method", "expect"]),
     Command("contains",
             [ArgType.LABEL, ArgType.LABEL],
-            opts = ["expect"]),
+            opts = ["method", "expect"]),
     Command("compare_sft_pairs", [],
+            opts = ["method"],
             aliases = ["compare_SFT_pairs"]),
     Command("compare_sft_pairs_equality", [],
+            opts = ["method"],
             aliases = ["compare_SFT_pairs_equality"]),
     Command("compute_CA_ball",
             [ArgType.NUMBER, ArgType.SIMPLE_LIST],
@@ -261,7 +264,7 @@ flat_value = fraction | vector | set_arg_value.desc("setter") | label | pattern
 @p.generate("list")
 def nested_list():
     yield lbracket
-    vals = yield (flat_value | nested_list).many()
+    vals = yield (quantified | flat_value | nested_list).many()
     yield rbracket
     return vals
     
@@ -317,7 +320,7 @@ def command_args(cmd, index, args=None, opts=None, flags=None, mode="normal"):
                 if ArgType.MAPPING in arg_type:
                     arg_parsers.append(mapping(flat_value, flat_value | nested_list))
                 if ArgType.FORMULA in arg_type:
-                    arg_parsers.append(formula)
+                    arg_parsers.append(quantified)
                 arg = yield p.alt(*arg_parsers)
                 args.append(arg)
             # Choose the mode for the remaining arguments
@@ -394,7 +397,7 @@ def command_args(cmd, index, args=None, opts=None, flags=None, mode="normal"):
                     if maybe_sep:
                         break
                     # Otherwise, read an item and store it to the list
-                    item = yield (formula | flat_value | nested_list).optional()
+                    item = yield (quantified | flat_value | nested_list).optional()
                     if item is None:
                         finding = False
                         break
@@ -533,7 +536,7 @@ strict_label = lexeme((keyword | p.regex(r'[AEO].*')).should_fail("keyword") >> 
 # Positional expression
 pos_expr = p.seq(strict_label | integer.desc("integer"),
                  (lexeme(p.string('.')) >> (label | integer).desc("address")).many()).combine(lambda var, addrs: ("ADDR", var, *addrs) if addrs else var)
-                 
+
 # Chainable comparison operators
 comp_table = [("node comparison", Assoc.STRICT_CHAIN,
                [lexeme(p.string('~~')) >> p.success(lambda x, y: ("ISPROPERNEIGHBOR", x, y)),

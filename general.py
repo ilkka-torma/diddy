@@ -30,6 +30,15 @@ def onesided_hypercube(dim, rad):
         for a in range(0, rad):
             yield v + (a,)
 
+def hyperrect(bounds):
+    if bounds:
+        xmin, xmax = bounds[0]
+        for vec in hyperrect(bounds[1:]):
+            for a in range(xmin, xmax):
+                yield vec + (a,)
+    else:
+        yield ()
+
 def vmod(m, vec):
     return tuple(a%m for a in vec)
 

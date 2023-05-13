@@ -213,10 +213,11 @@ class Diddy:
                 name1 = args[0]
                 name2 = args[1]
                 expect = kwds.get("expect", None)
+                method = kwds.get("method", "periodic")
                 if name1 in self.SFTs and name2 in self.SFTs:
                     SFT1 = self.SFTs[name1]
                     SFT2 = self.SFTs[name2]
-                    report_SFT_equal((name1, SFT1), (name2, SFT2), mode=mode, truth=expect)
+                    report_SFT_equal((name1, SFT1), (name2, SFT2), mode=mode, truth=expect, method=method)
 
                 elif name1 in self.CAs and name2 in self.CAs:
                     CA1 = self.CAs[name1]
@@ -236,27 +237,30 @@ class Diddy:
                 item1 = args[0]
                 item2 = args[1]
                 expect = kwds.get("expect", None)
+                method = kwds.get("method", "periodic")
                 if item1 in self.SFTs:
                     SFT1 = self.SFTs[item1]
                     SFT2 = self.SFTs[item2]
-                    report_SFT_contains((item1, SFT1), (item2, SFT2), mode=mode, truth=expect)
+                    report_SFT_contains((item1, SFT1), (item2, SFT2), mode=mode, truth=expect, method=method)
                 else:
                     clopen1 = self.clopens[item1]
                     clopen2 = self.clopens[item2]
                     raise Exception("Comparison of clopen sets not implemented.")
 
             elif cmd == "compare_SFT_pairs" and mode == "report":
+                method = kwds.get("method", "periodic")
                 for a in self.SFTs:
                     for b in self.SFTs:
                         if a == b:
                             continue
-                        report_SFT_contains((a, self.SFTs[a]), (b, self.SFTs[b]))
+                        report_SFT_contains((a, self.SFTs[a]), (b, self.SFTs[b]), method=method)
 
             elif cmd == "compare_SFT_pairs_equality" and mode == "report":
+                method = kwds.get("method", "periodic")
                 #print(SFTs_as_list)
                 for (i, (aname, a)) in enumerate(self.SFTs.items()):# SFTs_as_list):
                     for (bname, b) in list(self.SFTs.items())[i+1:]: #SFTs_as_list[i+1:]:
-                        report_SFT_equal((aname, a), (bname, b))
+                        report_SFT_equal((aname, a), (bname, b), method=method)
 
             elif cmd == "show_forbidden_patterns":
                 name = args[0]
@@ -314,7 +318,7 @@ class Diddy:
                 compiler.end_cache()
 
             elif cmd == "CA":
-                print(args)
+                #print(args)
                 name = args[0]
                 rules = args[1]
                 circuits = {}
@@ -616,31 +620,31 @@ def forbos_to_formula(fof):
     #print(ret, "MIL")
     return ret
         
-def report_SFT_contains(a, b, mode="report", truth=True):
+def report_SFT_contains(a, b, mode="report", truth=True, method=None):
     aname, aSFT = a
     bname, bSFT = b
     print("Testing whether %s contains %s." % (aname, bname))
     tim = time.time()
-    res, rad, conf = aSFT.contains(bSFT, return_radius_and_sep = True)
+    res, rad, conf = aSFT.contains(bSFT, return_radius_and_sep = True, method=method)
     tim = time.time() - tim
     if res:
         print("%s CONTAINS %s (radius %s, time %s)" % (aname, bname, rad, tim))
     else:
         print("%s DOES NOT CONTAIN %s (radius %s, time %s)" % (aname, bname, rad, tim))
         if mode == "report":
-            print("Separating periodic configuration:")
+            print("Separating {} configuration:".format(method))
             print(conf)
     print()
     if mode == "assert":
         print(res, truth)
         assert res == (truth == "T")
 
-def report_SFT_equal(a, b, mode="report", truth=True):
+def report_SFT_equal(a, b, mode="report", truth=True, method=None):
     aname, aSFT = a
     bname, bSFT = b
     print("Testing whether SFTs %s and %s are equal." % (aname, bname))
     tim = time.time()
-    res, rad = aSFT.equals(bSFT, return_radius = True)
+    res, rad = aSFT.equals(bSFT, return_radius = True, method=method)
     tim = time.time() - tim
     if res: 
         print("They are EQUAL (radius %s, time %s)." % (rad, tim))

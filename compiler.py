@@ -394,25 +394,30 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes):
     #print("ini", pos)
     #print(topology)
     for i in expr[2:]:
-        #print("move", i)
+        #print("pos", pos, "i", i)
         for t in topology:
             if len(t) == 3:
+                #print(t)
                 a, b = t[1], t[2]
                 if t[0] == i and (pos[dim] == None or pos[dim] == a[dim]):
-                    #print("found top move")
+                    #print("found edge", t)
                     if pos[dim] == None:
+                        #print("cell")
                         pos = vadd(vsub(pos[:-1], a[:-1]), b[:-1]) + (None,)
                     else:
-                        pos = vadd(vsub(pos[:-1], a[:-1]), b[:-1]) + (a[dim],)
+                        #print("node")
+                        pos = vadd(vsub(pos[:-1], a[:-1]), b[:-1]) + (b[dim],)
                     break
         else:
-            #print("not top move")
+            #print("not edge")
             if i in nodes: # single thing => change node
                 pos = pos[:-1] + (i,)
-            elif len(i) == dim and type(i) == tuple: # tuple of len dim => move
+            elif type(i) == tuple and len(i) == dim: # tuple of len dim => move
                 pos = vadd(pos[:-1], i) + (pos[-1],)
-            elif len(i) == dim+1 and type(i) == tuple: # tuple of len dim+1 => both
+            elif type(i) == tuple and len(i) == dim+1: # tuple of len dim+1 => both
                 pos = vadd(pos[:-1], i[:-1]) + (i[-1],)
+            else:
+                raise Exception("Could not process transition {} from node {}".format(i, pos))
         #print(pos)
     #print ("got 2 pos", pos)
     return pos
