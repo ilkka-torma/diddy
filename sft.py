@@ -56,15 +56,15 @@ def add_uniqueness_constraints(nodes, alphabet, circuits, vecs):
             #print(ATMOSTONE(*pnvars))
             circuits.append(ATMOSTONE(*pnvars))
 
-def nonnegative_pattern(dim, tr_dims, pattern):
+def nonnegative_patterns(dim, tr_dims, patterns):
     "Translate the pattern to have nonnegative coodrinates along the specified dimensions"
     tr_vec = []
     for i in range(dim):
         if i in tr_dims:
-            tr_vec.append(-min(vec[i] for vec in pattern))
+            tr_vec.append(-min(vec[i] for vec in pat for pat in patterns))
         else:
             tr_vec.append(0)
-    return {nvadd(nvec, tr_vec) : val for (nvec, val) in pattern.items()}
+    return [{nvadd(nvec, tr_vec) : val for (nvec, val) in pat.items()} for pat in patterns]
 
 def nonnegative_circuit(dim, tr_dims, circ):
     circ = circ.copy()
@@ -82,7 +82,7 @@ class SFT:
     "dim-dimensional SFT on a gridlike graph"
 
     # Onesided is a list of dimensions
-    # In a onesided SFT, all forbidden patterns and circuits are translated so that the onesided coordinates are nonnegative and start at 0
+    # In a onesided SFT, the set of forbidden patterns and the circuit are translated so that the onesided coordinates are nonnegative and start at 0
     def __init__(self, dim, nodes, alph, forbs=None, circuit=None, formula=None, onesided=None):
         self.dim = dim
         self.nodes = nodes
@@ -94,7 +94,7 @@ class SFT:
         if forbs is None:
             self.forbs = None
         else:
-            self.forbs = [nonnegative_pattern(self.dim, self.onesided, forb) for forb in forbs]
+            self.forbs = nonnegative_patterns(self.dim, self.onesided, forbs)
         self.formula = formula # just for display, not actually used in computations
         if circuit is None:
             self.circuit = None
