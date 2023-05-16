@@ -56,52 +56,94 @@ def add_uniqueness_constraints(nodes, alphabet, circuits, vecs):
             #print(ATMOSTONE(*pnvars))
             circuits.append(ATMOSTONE(*pnvars))
 
+def nonnegative_pattern(dim, tr_dims, pattern):
+    "Translate the pattern to have nonnegative coodrinates along the specified dimensions"
+    tr_vec = []
+    for i in range(dim):
+        if i in tr_dims:
+            tr_vec.append(-min(vec[i] for vec in pattern))
+        else:
+            tr_vec.append(0)
+    return {nvadd(nvec, tr_vec) : val for (nvec, val) in pattern.items()}
+
+def nonnegative_circuit(dim, tr_dims, circ):
+    circ = circ.copy()
+    variables = circ.get_variables()
+    tr_vec = []
+    for i in range(dim):
+        if i in tr_dims:
+            tr_vec.append(-min(var[i] for var in variables))
+        else:
+            tr_vec.append(0)
+    transform(circ, lambda var: vadd(var[:-2], tr_vec) + var[-2:])
+    return circ
+
 class SFT:
     "dim-dimensional SFT on a gridlike graph"
 
     # Onesided is a list of dimensions
+    # In a onesided SFT, all forbidden patterns and circuits are translated so that the onesided coordinates are nonnegative and start at 0
     def __init__(self, dim, nodes, alph, forbs=None, circuit=None, formula=None, onesided=None):
         self.dim = dim
         self.nodes = nodes
         self.alph = alph
-        self.forbs = forbs
-        self.circuit = circuit
-        self.formula = formula # just for display, not actually used in computations
-        if self.circuit is None:
-            self.deduce_circuit()
         if onesided is None:
-            onesided = dict()
+            onesided = []
         self.onesided = onesided
+
+        if forbs is None:
+            self.forbs = None
+        else:
+            self.forbs = [nonnegative_pattern(self.dim, self.onesided, forb) for forb in forbs]
+        self.formula = formula # just for display, not actually used in computations
+        if circuit is None:
+            self.circuit = None
+            self.deduce_circuit()
+        else:
+            self.circuit = nonnegative_circuit(self.dim, self.onesided, circuit)
 
     def __str__(self):
         return "SFT(dim={}, nodes={}, alph={}{})".format(self.dim, self.nodes, self.alph, (", onesided="+str(self.onesided)) if self.onesided else "")
 
-    # Find recognizable configuration (i.e. semilinear in orthogonal directions) in self which is not in other
+    # Find recognizable configuration (i.e. uniformly eventually periodic in each orthogonal direction) in self which is not in other
     # The semilinear structure is a periodic rectangular tiling, and the contents of a rectangle depend on which axes its lowest corner lies
-   # We could also have the sizes of the rectangles depend on this, but this is simpler for now
-    def exists_recognizable_not_in(self, other, radii, return_conf=False):
-        #print("koko")
+    # We could also have the sizes of the rectangles depend on this, but this is simpler for now
+    # Some directions can be declared fully periodic instead of eventually periodic
+    # For a onesided non-periodic direction, only consider translates of the formula whose variables are on the nonnegative part of the axis
+    def exists_recognizable_not_in(self, other, radii, periodics=None, return_conf=False):
+        #print("koko", self, other)
 
+        if periodics is None:
+            periodics = []
+        
         my_vecs = set(var[:-2] for var in self.circuit.get_variables())
         other_vecs = set(var[:-2] for var in other.circuit.get_variables())
-        conf_bounds = [(0 if i in self.onesided else -radii[i], 2*radii[i]) for i in range(self.dim)]
+        conf_bounds = [(0 if i in self.onesided+periodics else -rad,
+                        rad if i in periodics else 2*rad)
+                       for (i, rad) in enumerate(radii)]
         all_positions = set(hyperrect(conf_bounds))
         tr_bounds = []
-        for i in range(self.dim):
-            if i in self.onesided:
+        for (i, rad) in enumerate(radii):
+            if i in self.onesided+periodics:
                 min_bound = 0
             else:
-                min_bound = -radii[i] - max(vec[i] for vec in chain(my_vecs, other_vecs))
-            max_bound = 2*radii[i] - min(vec[i] for vec in chain(my_vecs, other_vecs))
+                min_bound = -rad - max(vec[i] for vec in chain(my_vecs, other_vecs))
+            if i in periodics:
+                max_bound = rad
+            else:
+                max_bound = 2*rad - min(vec[i] for vec in chain(my_vecs, other_vecs))
             tr_bounds.append((min_bound, max_bound))
-        print("radii", radii)
-        print("tr_bounds", tr_bounds)
+        #print("radii", radii)
+        #print("conf_bounds", conf_bounds)
+        #print("tr_bounds", tr_bounds)
 
         def wrap(var):
             #print("var", var)
             ret = []
-            for (r,x) in zip(radii, var):
-                if x < 0:
+            for (i, (r,x)) in enumerate(zip(radii, var)):
+                if i in periodics:
+                    ret.append(x%r)
+                elif x < 0:
                     ret.append(x%r - r)
                 elif x < r:
                     ret.append(x)
@@ -114,11 +156,14 @@ class SFT:
         circuits = []
         others = []
         for vec in hyperrect(tr_bounds):
-            if any(vadd(vec, my_vec) in all_positions for my_vec in my_vecs):
+            if any(vadd(vec, my_vec) in all_positions for my_vec in my_vecs) and\
+               all(vec[i]+my_vec[i] >= 0 for my_vec in my_vecs for i in self.onesided):
                 circ = self.circuit.copy()
                 transform(circ, lambda var: wrap(nvadd(var[:-1], vec) + var[-1:]))
                 circuits.append(circ)
-            if any(vadd(vec, other_vec) in all_positions for other_vec in other_vecs):
+            if any(vadd(vec, other_vec) in all_positions for other_vec in other_vecs) and\
+               all(vec[i]+other_vec[i] >= 0 for other_vec in other_vecs for i in self.onesided) and\
+               all(vec[i] == 0 or i not in periodics for i in range(self.dim)):
                 not_other = NOT(other.circuit.copy())
                 transform(not_other, lambda var: wrap(nvadd(var[:-1], vec) + var[-1:]))
                 others.append(not_other)
@@ -147,59 +192,14 @@ class SFT:
                         conf[vec + (node,)] = self.alph[0]
             return True, conf
         return True
-        
-    # find periodic configuration in c1 which is not in c2
-    def exists_periodic_not_in(self, other, r, return_conf=False):
-
-        all_positions = set()
-        circuits = []
-        
-        for vec in onesided_hypercube(self.dim, r):
-            #print(v, "vee")
-            circ = self.circuit.copy()
-            transform(circ, lambda var: nvmod(r, nvadd(var[:-1], vec)) + var[-1:])
-            circuits.append(circ)
-            all_positions.add(vec)
-
-        not_other = NOT(other.circuit.copy())
-        transform(not_other, lambda var: nvmod(r, var[:-1]) + var[-1:])
-        circuits.append(not_other)
-        
-        add_uniqueness_constraints(self.nodes, self.alph, circuits, all_positions)
-        #a = bbb
-
-        #for k in circuits:
-        #    print(k, circuits[k])
-        #print("no22")
-        m = SAT(AND(*circuits), True)
-        #print(AND(*(list(circuits.values()))))
-        if m == False:
-            if return_conf:
-                return False, None
-            else:
-                return False
-        #for t in sorted(m):
-        #    print (t, m[t])
-        print(m)
-        if return_conf:
-            conf = dict()
-            for vec in onesided_hypercube(self.dim, r):
-                for node in self.nodes:
-                    for sym in self.alph[1:]:
-                        var = vec + (node, sym)
-                        if m.get(var, False):
-                            conf[vec + (node,)] = sym
-                            break
-                    else:
-                        conf[vec + (node,)] = self.alph[0]
-            return True, conf
-        return True
 
     def ball_forces_allowed(self, other, r):
         all_positions = set()
         circuits = []
+
+        bounds = [(0 if i in self.onesided else -r, r) for i in range(self.dim)]
         
-        for vec in centered_hypercube(self.dim, r):
+        for vec in hyperrect(bounds):
             circ = self.circuit.copy()
             transform(circ, lambda var: nvadd(var[:-1], vec) + var[-1:])
             for var in circ.get_variables():
@@ -476,9 +476,9 @@ class SFT:
             if method == "recognizable":
                 res, sep = other.exists_recognizable_not_in(self, [r]*self.dim, return_conf=return_radius_and_sep)
             elif method == "periodic":
-                res, sep = other.exists_periodic_not_in(self, r, return_conf=return_radius_and_sep)
+                res, sep = other.exists_recognizable_not_in(self, [r]*self.dim, periodics = [i for i in range(self.dim) if i not in self.onesided], return_conf=return_radius_and_sep)
             else:
-                raise Exception("Unknown mehtod: {}".format(method))
+                raise Exception("Unknown method: {}".format(method))
             if res:
                 if return_radius_and_sep:
                     return False, r, sep

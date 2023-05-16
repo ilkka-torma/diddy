@@ -248,6 +248,28 @@ code = """
 """
 unit_tests.append(("golden mean lower density", code))
 
+code = """
+%SFT quarter Ao o=1 -> o.up=1 & o.rt=1
+%SFT half Ao (o=o.lt=o.rt & (o=1 -> o.up=1)) | (o=o.up=o.dn & (o=1 -> o.rt=1))
+%SFT two Ao o=o.up=o.rt
+%contains expect=T quarter half
+%contains expect=T half two
+%contains expect=F method=recognizable two half
+%contains expect=F method=recognizable two quarter
+%contains expect=F method=recognizable half quarter
+"""
+unit_tests.append(("recog comparison", code))
+
+code = """
+%SFT onezero Ao (o=0 -> o.up=0) & (o=1 -> o.dn.dn=0)
+%SFT zero Ao o=0
+%equal expect=T onezero zero
+%SFT onezero1 onesided=[1] Ao (o=0 -> o.up=0) & (o=1 -> o.dn.dn=0)
+%SFT zero1 onesided=[1] Ao o=0
+%contains expect=T onezero1 zero1
+%contains expect=F zero1 onezero1
+"""
+unit_tests.append(("onesided comparison", code))
 
 
 if __name__ == "__main__":

@@ -73,12 +73,13 @@ class Diddy:
             elif cmd == "sft":
                 name = args[0]
                 defn = args[1]
+                onesided = kwds.get("onesided", [])
                 # Definition is either a list of forbidden patterns or a formula
                 if type(defn) == list:
-                    self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, forbs=defn)
+                    self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, forbs=defn, onesided=onesided)
                 elif type(defn) == tuple:
                     circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, defn)
-                    self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, circuit=circ, formula=defn)
+                    self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, circuit=circ, formula=defn, onesided=onesided)
                 else:
                     raise Exception("Unknown SFT definition: {}".format(defn))
 

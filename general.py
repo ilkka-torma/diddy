@@ -35,7 +35,7 @@ def hyperrect(bounds):
         xmin, xmax = bounds[0]
         for vec in hyperrect(bounds[1:]):
             for a in range(xmin, xmax):
-                yield vec + (a,)
+                yield (a,) + vec
     else:
         yield ()
 
