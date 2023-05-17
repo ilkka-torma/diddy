@@ -276,7 +276,7 @@ class Diddy:
             elif cmd == "compute_forbidden_patterns":
                 name = args[0]
                 the_sft = self.SFTs[name]
-                rad = kwds.get("radius", None)
+                rad = kwds.get("radius", 0)
                 if mode == "report":
                     if rad is None:
                         print("Computing forbidden patterns for %s." % name)

@@ -232,7 +232,7 @@ unit_tests.append(("trivial CA associativity", code))
 code = """
 %alphabet a b
 %SFT goldenmean Ao o=a -> o.rt=b & o.up=b
-%compute_forbidden_patterns goldenmean
+%compute_forbidden_patterns radius=2 goldenmean
 %set_weights a:0 b:2
 %minimum_density expect=2 goldenmean (0,1)
 %minimum_density expect=1 goldenmean (0,2)
