@@ -97,9 +97,9 @@ class Diddy:
                     raise Exception("{} is not a CA".format(ca_name))
                 sft_name = args[1]
                 time_axis = kwds.get("time_axis", None)
-                onesided = "onesided" in flags
+                twosided = "twosided" in flags
                 print("Computing the spacetime diagram of {} into {}".format(ca_name, sft_name))
-                self.SFTs[sft_name] = the_ca.spacetime_diagram(onesided=onesided, time_axis=time_axis)
+                self.SFTs[sft_name] = the_ca.spacetime_diagram(onesided=not twosided, time_axis=time_axis)
                 
             elif cmd == "minimum_density":
                 verbose_here = False

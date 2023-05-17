@@ -136,7 +136,7 @@ commands = [
     Command("spacetime_diagram",
             [ArgType.LABEL, ArgType.LABEL],
             opts = ["time_axis"],
-            flags = ["onesided"]),
+            flags = ["twosided"]),
 
     # Printing objects' basic properties
     Command("show_formula",
