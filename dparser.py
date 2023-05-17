@@ -133,6 +133,10 @@ commands = [
             aliases = ["cellular_automaton"]),
     Command("compose_CA",
             [ArgType.LABEL, ArgType.SIMPLE_LIST]),
+    Command("spacetime_diagram",
+            [ArgType.LABEL, ArgType.LABEL],
+            opts = ["time_axis"],
+            flags = ["onesided"]),
 
     # Printing objects' basic properties
     Command("show_formula",
@@ -402,10 +406,8 @@ def command_args(cmd, index, args=None, opts=None, flags=None, mode="normal"):
                         finding = False
                         break
                     else:
-                        #print("found item", item)
                         curr_list.append(item)
-                if finding:
-                    lists.append(curr_list)
+                lists.append(curr_list)
             return (cmd.name, args+[lists], opts, flags)
         elif mode == "pattern_list":
             # As above, but with semicolon-separated open patterns

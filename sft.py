@@ -110,6 +110,7 @@ class SFT:
         
         my_vecs = set(var[:-2] for var in self.circuit.get_variables())
         other_vecs = set(var[:-2] for var in other.circuit.get_variables())
+        #print("sfts", self, other, "vecs", my_vecs, other_vecs)
         conf_bounds = [(0 if i in self.onesided+periodics else -rad,
                         rad if i in periodics else 2*rad)
                        for (i, rad) in enumerate(radii)]
@@ -394,6 +395,7 @@ class SFT:
                             for vec in vec_domain)
         #vec_domain = set(var[:-2] for var in domain)
         #print("nvec_domain", vec_domain)
+        #print("var_nvecs", var_nvecs)
         #assert len(self.alph) == 2
         assert all(nvec in all_positions for nvec in var_nvecs)
 
@@ -406,17 +408,14 @@ class SFT:
         for forb in self.forbs:
             #print("implementing forb", forb)
             for vec in vec_domain:
-                for forb_vec in forb:
-                    #print("here")
-                    # we make a circuit that says that we differ from the pattern somewhere
-                    oreds = []
-                    for (forb_vec, value) in forb.items():
-                        local_vec = nvadd(forb_vec, vec)
-                        if value == self.alph[0]:
-                            oreds.extend(V(local_vec+(sym,)) for sym in self.alph[1:])
-                        else:
-                            oreds.append(NOT(V(local_vec+(value,))))
-                    forb_circuits.append(OR(*oreds))
+                oreds = []
+                for (forb_nvec, value) in forb.items():
+                    local_vec = nvadd(forb_nvec, vec)
+                    if value == self.alph[0]:
+                        oreds.extend(V(local_vec+(sym,)) for sym in self.alph[1:])
+                    else:
+                        oreds.append(NOT(V(local_vec+(value,))))
+                forb_circuits.append(OR(*oreds))
 
         #print("formulas", forbiddens)
         add_uniqueness_constraints(self.alph, forb_circuits, all_positions)

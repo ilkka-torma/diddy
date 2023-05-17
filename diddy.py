@@ -35,6 +35,7 @@ class Diddy:
         parsed = dparser.parse_diddy(code)
         for parsed_line in parsed:
             cmd, args, kwds, flags = parsed_line
+            #print("cmd", cmd)
             #print("parsed line", parsed_line)
             if cmd == "nodes":
                 self.nodes = args[0]
@@ -87,6 +88,18 @@ class Diddy:
                 raise NotImplementedError("Clopen sets not implemented")
                 #compiled = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, i[2])
                 #self.clopens[i[1]] = i[2]
+
+            elif cmd == "spacetime_diagram":
+                ca_name = args[0]
+                try:
+                    the_ca = self.CAs[ca_name]
+                except KeyError:
+                    raise Exception("{} is not a CA".format(ca_name))
+                sft_name = args[1]
+                time_axis = kwds.get("time_axis", None)
+                onesided = "onesided" in flags
+                print("Computing the spacetime diagram of {} into {}".format(ca_name, sft_name))
+                self.SFTs[sft_name] = the_ca.spacetime_diagram(onesided=onesided, time_axis=time_axis)
                 
             elif cmd == "minimum_density":
                 verbose_here = False
@@ -322,6 +335,7 @@ class Diddy:
                 #print(args)
                 name = args[0]
                 rules = args[1]
+                #print("parsed ca rules", rules)
                 circuits = {}
                 for r in rules:
                     circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, r[2])
