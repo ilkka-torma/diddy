@@ -1,5 +1,6 @@
 from circuit import *
 from general import *
+from sft import *
 import mocircuits
 import time
 
@@ -156,6 +157,29 @@ class BlockMap:
 class CA(BlockMap):
     def __init__(self, alphabet, nodes, dimension, circuits):
         super().__init__(alphabet, alphabet, nodes, nodes, dimension, circuits)
+
+    def spacetime_diagram(self, onesided=True, time_axis=None):
+        "The SFT of spacetime diagrams of this CA"
+        alph = self.from_alphabet
+        nodes = self.from_nodes
+        dim = self.dimension
+        
+        if time_axis is None:
+            time_axis = self.dimension
+
+        anded = []
+        for ((node, sym), circ) in self.circuits.items():
+            new_circ = circ.copy()
+            transform(new_circ, lambda var: var[:time_axis] + (0,) + var[time_axis:])
+            val_vec = (0,)*time_axis + (1,) + (0,)*(dim-time_axis) + (node,)
+            if sym == alph[0]:
+                is_val = AND(*(NOT(V(val_vec + (sym2,))) for sym2 in alph[1:]))
+            else:
+                is_val = V(val_vec + (sym,))
+            anded.append(IFF(new_circ, is_val))
+            
+        return SFT(dim+1, nodes, alph, circuit=AND(*anded), onesided=[time_axis] if onesided else [])
+        
 
 # given a list of cellular automata, compute relations
 # among them up to radius rad as semigroup

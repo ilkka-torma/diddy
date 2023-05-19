@@ -220,7 +220,7 @@ if long_ones_too:
 
 code = """
 %CA a
-0 1 Ao o!=o.rt;
+0 1 Ao o!=o.rt
 %equal expect=T a a
 %compose_CA aa a a
 %compose_CA aa_a aa a
@@ -232,7 +232,7 @@ unit_tests.append(("trivial CA associativity", code))
 code = """
 %alphabet a b
 %SFT goldenmean Ao o=a -> o.rt=b & o.up=b
-%compute_forbidden_patterns goldenmean
+%compute_forbidden_patterns radius=2 goldenmean
 %set_weights a:0 b:2
 %minimum_density expect=2 goldenmean (0,1)
 %minimum_density expect=1 goldenmean (0,2)
@@ -270,6 +270,20 @@ code = """
 %contains expect=F zero1 onezero1
 """
 unit_tests.append(("onesided comparison", code))
+
+code = """
+%dim 1
+%nodes 0
+%topology succ (0,0) (1,0)
+%CA xor
+0 1 Ao o!=o.succ
+%spacetime_diagram xor diagram
+%dim 2
+%topology grid
+%SFT var onesided=[1] Ao o!=o.rt <-> o.up=1
+%equal expect=T diagram var
+"""
+unit_tests.append(("spacetime diagram", code))
 
 
 if __name__ == "__main__":

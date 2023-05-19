@@ -41,20 +41,12 @@ def minimize_solution_(circuit, vals, necessary_vals):
     return minimize_solution_(circuit, rest, necessary_vals + [first])
 
 # vecs is a list of vectors
-def add_uniqueness_constraints(nodes, alphabet, circuits, vecs):
+def add_uniqueness_constraints(alphabet, circuits, nvecs):
     if len(alphabet) == 2:
         return None
     #print("vecs", vecs)
-    for vec in vecs:
-        for node in nodes:
-            pnvars = []
-            for sym in alphabet[1:]:
-                #print(alphabet)
-                pnvars.append(V(vec + (node,sym)))
-            #print("pnvars", pnvars)
-            #print(list(map(str, pnvars)))
-            #print(ATMOSTONE(*pnvars))
-            circuits.append(ATMOSTONE(*pnvars))
+    for nvec in nvecs:
+        circuits.append(ATMOSTONE(*(V(nvec + (sym,)) for sym in alphabet[1:])))
 
 def nonnegative_patterns(dim, tr_dims, patterns):
     "Translate the pattern to have nonnegative coodrinates along the specified dimensions"
@@ -118,10 +110,11 @@ class SFT:
         
         my_vecs = set(var[:-2] for var in self.circuit.get_variables())
         other_vecs = set(var[:-2] for var in other.circuit.get_variables())
+        #print("sfts", self, other, "vecs", my_vecs, other_vecs)
         conf_bounds = [(0 if i in self.onesided+periodics else -rad,
                         rad if i in periodics else 2*rad)
                        for (i, rad) in enumerate(radii)]
-        all_positions = set(hyperrect(conf_bounds))
+        all_vecs = set(hyperrect(conf_bounds))
         tr_bounds = []
         for (i, rad) in enumerate(radii):
             if i in self.onesided+periodics:
@@ -156,12 +149,12 @@ class SFT:
         circuits = []
         others = []
         for vec in hyperrect(tr_bounds):
-            if any(vadd(vec, my_vec) in all_positions for my_vec in my_vecs) and\
+            if any(vadd(vec, my_vec) in all_vecs for my_vec in my_vecs) and\
                all(vec[i]+my_vec[i] >= 0 for my_vec in my_vecs for i in self.onesided):
                 circ = self.circuit.copy()
                 transform(circ, lambda var: wrap(nvadd(var[:-1], vec) + var[-1:]))
                 circuits.append(circ)
-            if any(vadd(vec, other_vec) in all_positions for other_vec in other_vecs) and\
+            if any(vadd(vec, other_vec) in all_vecs for other_vec in other_vecs) and\
                all(vec[i]+other_vec[i] >= 0 for other_vec in other_vecs for i in self.onesided) and\
                all(vec[i] == 0 or i not in periodics for i in range(self.dim)):
                 not_other = NOT(other.circuit.copy())
@@ -169,7 +162,7 @@ class SFT:
                 others.append(not_other)
         circuits.append(OR(*others))
 
-        add_uniqueness_constraints(self.nodes, self.alph, circuits, all_positions)
+        add_uniqueness_constraints(self.alph, circuits, [vec + (node,) for vec in all_vecs for node in self.nodes])
 
         m = SAT(AND(*circuits), True)
         
@@ -203,16 +196,16 @@ class SFT:
             circ = self.circuit.copy()
             transform(circ, lambda var: nvadd(var[:-1], vec) + var[-1:])
             for var in circ.get_variables():
-                all_positions.add(var[:-2]) # drop node and letter
+                all_positions.add(var[:-1]) # drop letter
                 #print(rel_pos)
             circuits.append(circ)
 
         not_other = NOT(other.circuit.copy())
         for var in not_other.get_variables():
-            all_positions.add(var[:-2])
+            all_positions.add(var[:-1])
         circuits.append(not_other)
 
-        add_uniqueness_constraints(self.nodes, self.alph, circuits, all_positions)
+        add_uniqueness_constraints(self.alph, circuits, all_positions)
         #print("no22")
         m = SAT(AND(*circuits))
         if m == False:
@@ -292,7 +285,7 @@ class SFT:
             circ = self.circuit.copy()
             transform(circ, lambda var: nvadd(var[:-1], vec) + var[-1:])
             for var in circ.get_variables():
-                all_positions.add(var[:-2])
+                all_positions.add(var[:-1])
             circuits.append(circ)
             
         for (nvec, sym) in existing.items():
@@ -301,7 +294,7 @@ class SFT:
             else:
                 circuits.append(V(nvec+(sym,)))
 
-        add_uniqueness_constraints(self.nodes, self.alph, circuits, all_positions)
+        add_uniqueness_constraints(self.alph, circuits, all_positions)
 
         for model in projections(AND(*circuits), [nvec+(sym,) for nvec in domain for sym in self.alph[1:]]):
             pat = dict()
@@ -323,7 +316,6 @@ class SFT:
         domain = set([tuple()])
         for h in dims:
             domain = set(vec + (i,) for vec in domain for i in range(h))
-        all_positions = domain
         domain = set(vec + (n,) for vec in domain for n in self.nodes)
 
         circuits = []
@@ -338,7 +330,7 @@ class SFT:
             else:
                 circuits.append(V(nvec+(sym,)))
 
-        add_uniqueness_constraints(self.nodes, self.alph, circuits, all_positions)
+        add_uniqueness_constraints(self.alph, circuits, [vec + (node,) for vec in domain for node in self.nodes])
 
         for model in projections(AND(*circuits), [nvec+(sym,) for nvec in domain for sym in self.alph[1:]]):
             pat = dict()
@@ -387,58 +379,54 @@ class SFT:
             new_forbs.append(new_forb)
         self.forbs = new_forbs
 
-    # domain is a list of vec+node+sym tuples
-    def deduce_forbs_(self, domain=None):
+    # domain_or_rad is a collection of vectors OR an integer
+    def deduce_forbs_(self, domain_or_rad=None):
         verbose_deb = True
-        if type(domain) == int:
-            domain = [vec + (node, a) for vec in centered_hypercube(self.dim, domain)
-                      for node in self.nodes for a in self.alph[1:]]
-        if domain is None:
-            domain = list(self.circuit.get_variables())
-        vec_domain = set(var[:-2] for var in domain)
+        var_nvecs = [var[:-1] for var in self.circuit.get_variables()]
+        if domain_or_rad is None:
+            domain_or_rad = 0
+        if type(domain_or_rad) == int:
+            bounds = [(0 if i in self.onesided else -domain_or_rad, domain_or_rad+1) for i in range(self.dim)]
+            vec_domain = list(hyperrect(bounds))
+        else:
+            vec_domain = domain_or_rad
+        all_positions = set(nvadd(nvec, vec)
+                            for nvec in var_nvecs
+                            for vec in vec_domain)
+        #vec_domain = set(var[:-2] for var in domain)
         #print("nvec_domain", vec_domain)
+        #print("var_nvecs", var_nvecs)
         #assert len(self.alph) == 2
-        assert all(v in domain for v in self.circuit.get_variables())
+        assert all(nvec in all_positions for nvec in var_nvecs)
 
         # we want to tile domain so that it has no existing forbos, but
         # the circuit fails at the origin
         complemented = NOT(self.circuit.copy())
         #print("complemented", complemented)
-        forbiddens = []
+        forb_circuits = []
+        # note: every forb is forbidden by the untranslated circuit, so it's safe to place anywhere
         for forb in self.forbs:
             #print("implementing forb", forb)
-            # anchor is just some position in domain of forbo (without node info)
-            # which we will position in various places
-            anchor = list(forb)[0][:-1]
             for vec in vec_domain:
-                for forb_vec in forb:
-                    #print("testing vec", nvadd(nvsub(forb_vec, anchor), vec))
-                    if vadd(vsub(forb_vec[1:], anchor), vec) not in vec_domain:
-                        #print("nope")
-                        break
-                # we go here if the entire forbidden pattern translate fits in domain
-                else:
-                    #print("here")
-                    # we make a circuit that says that we differ from the pattern somewhere
-                    oreds = []
-                    for (forb_vec, value) in forb.items():
-                        local_vec = nvadd(nvsub(forb_vec, anchor), vec)
-                        if value == self.alph[0]:
-                            oreds.extend(V(local_vec+(sym,)) for sym in self.alph[1:])
-                        else:
-                            oreds.append(NOT(V(local_vec+(value,))))
-                    forbiddens.append(OR(*oreds))
+                oreds = []
+                for (forb_nvec, value) in forb.items():
+                    local_vec = nvadd(forb_nvec, vec)
+                    if value == self.alph[0]:
+                        oreds.extend(V(local_vec+(sym,)) for sym in self.alph[1:])
+                    else:
+                        oreds.append(NOT(V(local_vec+(value,))))
+                forb_circuits.append(OR(*oreds))
 
         #print("formulas", forbiddens)
-        add_uniqueness_constraints(self.nodes, self.alph, forbiddens, vec_domain)
+        add_uniqueness_constraints(self.alph, forb_circuits, all_positions)
         #print("uniq formulas", forbiddens)
 
-        m = SAT(AND(complemented, *forbiddens), True)
+        m = SAT(AND(complemented, *forb_circuits), True)
         if m == False:
             return None
 
         # we now know that m is a forbidden thingy
-        # we then try to minimize it...
+        # we then try to minimize it
         minimal = {}
         for v in complemented.get_variables():
             minimal[v] = m[v]
@@ -454,16 +442,10 @@ class SFT:
                 new_forb[nvec_sym[:-1]] = self.alph[0]
 
         #print("new forb", new_forb)
-        if verbose_deb and False: # todo
-            assert len(self.alph) == 2
-            forb_str = ""
-            for t in sorted(minimal):
-                 print(t, minimal[t])
-            
 
         self.forbs.append(new_forb)
         
-        self.deduce_forbs_(domain)
+        self.deduce_forbs_(vec_domain)
 
     def contains(self, other, limit = None, return_radius_and_sep = False, method="periodic"):
         "Test containment using forced allowed patterns or special configurations"
@@ -590,10 +572,10 @@ class SFT:
             circ = self.circuit.copy()
             transform(circ, lambda var: nvadd(var[:-1], vec) + var[-1:])
             for var in circ.get_variables():
-                all_positions.add(var[:-2]) # drop node and letter
+                all_positions.add(var[:-1]) # drop letter
             circuits.append(circ)
 
-        add_uniqueness_constraints(self.nodes, self.alph, circuits, all_positions)
+        add_uniqueness_constraints(self.alph, circuits, all_positions)
 
         m = SAT(AND(*circuits))
         return not (m == False)
