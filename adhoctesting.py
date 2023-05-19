@@ -21,14 +21,23 @@ code_hex_idcodes = """
 (0,0,1):0 (1,0,0):0 (1,1,1):0 (0,-1,1):0 (1,-1,0):0 (1,-1,1):0;
 (0,0,1):0 (1,0,0):0 (1,0,1):0 (2,1,0):0 (2,1,1):0 (2,2,1):0;
 (0,0,1):0 (1,0,0):0 (1,1,1):0 (2,0,0):0 (2,0,1):0 (2,1,1):0
--- %equal idcode idcode2
+---- %equal idcode idcode2
 %compute_forbidden_patterns idcode
 --%show_forbidden_patterns idcode
 --%show_forbidden_patterns idcode2
 %minimum_density idcode (1,3)
 %minimum_density idcode2 (1,3)
 """
-#unit_tests.append(("hex idcodes", code_hex_idcodes))
+
+
+code_hex_idcodes = """ 
+%topology hex
+%SFT idcode Ao let c u v := v = 1 & u ~ v in
+(Ed[o1] c o d) & (Ap[o2] p !@ o -> Eq[o1p1] (c o q & ! c p q) | (c p q & !c o q))
+%compute_forbidden_patterns idcode 2
+%minimum_density idcode (11,1)
+"""
+unit_tests.append(("hex idcodes", code_hex_idcodes))
 
 
 code_locdomrad2 = """
