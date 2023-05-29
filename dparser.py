@@ -67,6 +67,16 @@ semicolon = lexeme(p.string(';'))
 # Protected keywords
 keyword = p.regex(r'(let|in)(\W|$)')
 
+# Range of nonnegative integers; "inf" means no upper bound
+@p.generate
+def natural_range():
+    start = yield natural
+    end = yield (lexeme(p.string('-')) >> natural.optional(default="inf")).optional(start)
+    return (start, end)
+
+# Set of nonnegative integers (union of ranges)
+natural_set = natural_range.sep_by(comma, min=1)
+
 ### Command parser
 
 class ArgType(Flag):
@@ -539,9 +549,21 @@ strict_label = lexeme((keyword | p.regex(r'[AEO].*')).should_fail("keyword") >> 
 pos_expr = p.seq(strict_label | integer.desc("integer"),
                  (lexeme(p.string('.')) >> (label | integer | vector).desc("address")).many()).combine(lambda var, addrs: ("ADDR", var, *addrs) if addrs else var)
 
+# Distance operator: specify allowed distances between two nodes
+@p.generate
+def dist_operation():
+    neg = yield p.string('!').optional()
+    yield lexeme(p.string('~^'))
+    dist_ranges = yield natural_set
+    if neg:
+        return lambda x, y: ("NOT", ("HASDIST", dist_ranges, x, y))
+    else:
+        return lambda x, y: ("HASDIST", dist_ranges, x, y)
+
 # Chainable comparison operators
 comp_table = [("node comparison", Assoc.STRICT_CHAIN,
                [lexeme(p.string('~~')) >> p.success(lambda x, y: ("ISPROPERNEIGHBOR", x, y)),
+                dist_operation,
                 lexeme(p.string('~')) >> p.success(lambda x, y: ("ISNEIGHBOR", x, y)),
                 lexeme(p.string('=')) >> p.success(lambda x, y: ("VALEQ", x, y)),
                 lexeme(p.string('@')) >> p.success(lambda x, y: ("POSEQ", x, y)),

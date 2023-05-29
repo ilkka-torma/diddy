@@ -283,6 +283,54 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
             else:
                 ret = F
         #print(ret)
+    elif op == "HASDIST":
+        ret = None
+        dist_ranges = formula[1]
+        p1 = eval_to_position(dim, topology, formula[2], variables, nodes)
+        if p1 == None:
+            ret = F
+        all_vars.add(var_of_pos_expr(formula[2]))
+        p2 = eval_to_position(dim, topology, formula[3], variables, nodes)
+        if p2 == None:
+            ret = F
+        all_vars.add(var_of_pos_expr(formula[3]))
+        if ret is None:
+            dist = 0
+            if p1 != p2:
+                # compute distance with bidirectional BFS
+                seen1 = {p1}
+                frontier1 = [p1]
+                seen2 = {p2}
+                frontier2 = [p2]
+                while True:
+                    dist += 1
+                    new_frontier = []
+                    for p in frontier1:
+                        for n in get_open_nbhd(dim, topology, p):
+                            if n in seen2:
+                                # found middle vertex
+                                break
+                            if n not in seen1:
+                                seen1.add(n)
+                                new_frontier.append(n)
+                        else:
+                            # did not find middle vertex
+                            continue
+                        # found middle vertex
+                        break
+                    else:
+                        # did not find any middle vertex
+                        frontier1, frontier2 = frontier2, new_frontier
+                        seen1, seen2 = seen2, seen1
+                        continue
+                    # found middle vertex
+                    break
+            for (start, end) in dist_ranges:
+                if start <= dist and (dist <= end or end == "inf"):
+                    ret = T
+                    break
+            else:
+                ret = F
     else:
         raise Exception("What " + op)
     #print ("from formula", formula)
@@ -356,6 +404,9 @@ def collect_unbound_vars(formula, bound = None):
     elif op == "ISNEIGHBOR":
         possibles.add(var_of_pos_expr(formula[1]))
         possibles.add(var_of_pos_expr(formula[2]))
+    elif op == "HASDIST":
+        possibles.add(var_of_pos_expr(formula[2]))
+        possibles.add(var_of_pos_expr(formula[3]))
     else:
         raise Exception("What " + op)
     ret = set()

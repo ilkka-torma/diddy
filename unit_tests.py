@@ -288,6 +288,18 @@ code = """
 """
 unit_tests.append(("spacetime diagram", code))
 
+code = """
+%alphabet 0 1 2
+%SFT long_dist Ao o=1 -> Ep[o4] p=2 & o ~^1,3 p
+%SFT long_dist2 Ao o=1 ->
+o.(3,0)=2 | o.(2,1)=2 | o.(1,2)=2 | o.(0,3)=2 |
+o.(-1,2)=2 | o.(-2,1)=2 | o.(-3,0)=2 |
+o.(-2,-1)=2 | o.(-1,-2)=2 | o.(0,-3)=2 |
+o.(1,-2)=2 | o.(2,-1)=2 |
+o.(0,1)=2 | o.(1,0)=2 | o.(0,-1)=2 | o.(-1,0)=2
+%equal expect=T long_dist long_dist2
+"""
+unit_tests.append(("distance", code))
 
 
 if __name__ == "__main__":
