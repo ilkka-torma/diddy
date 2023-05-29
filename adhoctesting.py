@@ -34,8 +34,8 @@ code_hex_idcodes = """
 %topology hex
 %SFT idcode Ao let c u v := v = 1 & u ~ v in
 (Ed[o1] c o d) & (Ap[o2] p !@ o -> Eq[o1p1] (c o q & ! c p q) | (c p q & !c o q))
-%compute_forbidden_patterns idcode 2
-%minimum_density idcode (11,1)
+%compute_forbidden_patterns idcode radius=2
+%minimum_density idcode (2,1)
 """
 unit_tests.append(("hex idcodes", code_hex_idcodes))
 
@@ -718,9 +718,9 @@ code_JR = """
 %nodes N E S W
 %alphabet 0 1 2 3 4
 %topology
-up (0,0,N) (0,1,S)
-dn (0,0,S) (0,-1,N)
-rt (0,0,E) (1,0,W)
+up (0,0,N) (0,1,S);
+dn (0,0,S) (0,-1,N);
+rt (0,0,E) (1,0,W);
 lt (0,0,W) (-1,0,E)
 %SFT JeandelRao ACo
 let WangConstraint o := o.N = o.up.S & o.E = o.rt.W in
