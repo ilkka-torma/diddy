@@ -537,7 +537,7 @@ strict_label = lexeme((keyword | p.regex(r'[AEO].*')).should_fail("keyword") >> 
 
 # Positional expression
 pos_expr = p.seq(strict_label | integer.desc("integer"),
-                 (lexeme(p.string('.')) >> (label | integer).desc("address")).many()).combine(lambda var, addrs: ("ADDR", var, *addrs) if addrs else var)
+                 (lexeme(p.string('.')) >> (label | integer | vector).desc("address")).many()).combine(lambda var, addrs: ("ADDR", var, *addrs) if addrs else var)
 
 # Chainable comparison operators
 comp_table = [("node comparison", Assoc.STRICT_CHAIN,

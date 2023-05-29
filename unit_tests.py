@@ -37,9 +37,12 @@ code_crazy_gms = """
 (0,0,0):1 (1,0,0):1 (0,3,0):1;
 (0,0,0):1 (1,0,0):1 (2,2,0):0;
 (0,0,0):1 (1,0,0):1 (2,2,0):1
+%SFT hor_golden_mean_shift3 Ao (o.(2,0) = 1 -> o.(1,0) = 0) & Ae[o3] e.(0,1) = 0 | e.(-1,1) != e.(0,1)
 %show_formula hor_golden_mean_shift
 %show_formula hor_golden_mean_shift2
+%show_formula hor_golden_mean_shift3
 %equal expect=T hor_golden_mean_shift2 hor_golden_mean_shift
+%equal expect=T hor_golden_mean_shift3 hor_golden_mean_shift
 """
 unit_tests.append(("crazy gms", code_crazy_gms))
 
@@ -284,6 +287,7 @@ code = """
 %equal expect=T diagram var
 """
 unit_tests.append(("spacetime diagram", code))
+
 
 
 if __name__ == "__main__":
