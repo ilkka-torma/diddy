@@ -113,6 +113,7 @@ commands = [
     # Setting up the environment
     Command("alphabet",
             [ArgType.SIMPLE_LIST | ArgType.MAPPING],
+            opts = ["default"],
             aliases = ["alph"]),
     Command("topology",
             [ArgType.TOPOLOGY_KEYWORD | ArgType.NESTED_LIST]),
@@ -282,7 +283,7 @@ pattern = mapping(vector, label|fraction)
 open_pattern = open_mapping(vector, label|fraction)
 
 # Flat value
-flat_value = fraction | vector | set_arg_value.desc("setter") | node_name | pattern
+flat_value = vector | set_arg_value.desc("setter") | node_name | fraction | pattern
 
 # List (possibly nested) of numbers, vectors, labels, setters and patterns
 @p.generate("list")

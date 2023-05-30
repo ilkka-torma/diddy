@@ -328,6 +328,16 @@ e8 (0,0,t2.t22.b) (0,0,t1.a)
 """
 unit_tests.append(("tracks", code))
 
+code = """
+%nodes 0 1 2 3
+%alphabet default=[0 1] {2 : [2 X] 3 : [1 2]}
+%SFT test ACo o.0!=1 -> (o.up.1=1 & o.3=2 & o.rt.0=1) | o.2=X
+%compute_forbidden_patterns test
+%set_weights 0:1 1:3 2:2 X:4
+%minimum_density test (0,3)
+"""
+unit_tests.append(("node-specific alphabets", code))
+
 
 if __name__ == "__main__":
 

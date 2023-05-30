@@ -36,15 +36,15 @@ def pats(domain, alph):
     if not domain:
         yield dict()
     else:
-        vec = domain.pop()
+        nvec = domain.pop()
         for pat in pats(domain, alph):
-            for c in alph[:-1]:
+            for c in alph[nvec[-1]][:-1]:
                 pat2 = pat.copy()
-                pat2[vec] = c
+                pat2[nvec] = c
                 yield pat2
-            pat[vec] = alph[-1]
+            pat[nvec] = alph[nvec[-1]][-1]
             yield pat
-        domain.add(vec)
+        domain.add(nvec)
         
 def gcd_bezout(nums):
     "Return the pair (gcd, bezout_coefficients)"

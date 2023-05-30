@@ -149,7 +149,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         ret_code = formula[3]
         closure = {}
         for v in unbound_vars:
-            if v in arg_names or v in alphabet:
+            if v in arg_names or any(v in local_alph for local_alph in alphabet.values()):
                 continue
             closure[v] = variables[v]
         #print(closure)
@@ -189,13 +189,14 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         v = formula[2]
         if ret == None:
             #print("here", p1, v, type(v), alphabet)
-            if v not in alphabet:
+            local_alph = alphabet[p1[-1]]
+            if v not in local_alph:
                 #print("%s not in", alphabet)
                 if v not in variables:
                     raise Exception("%s is not in alphabet nor a variable" % v)
                 v = variables[v] # variables can also contain symbols
-            if v == alphabet[0]:
-                ret = AND(*(NOT(V(p1 + (sym,))) for sym in alphabet[1:]))
+            if v == local_alph[0]:
+                ret = AND(*(NOT(V(p1 + (sym,))) for sym in local_alph[1:]))
             else:
                 ret = V(p1 + (v,))
     # the idea was that we would use hasval when we want to directly
@@ -215,7 +216,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
             #print("eval to pos failed")
             p1ispos = False
             #print(formula[1], "formula 1 fast")
-            if formula[1] in alphabet:
+            if any(formula[1] in local_alph for local_alph in alphabet.values()):
                 p1val = formula[1]
             else:
                 p1val = variables[formula[1]] # we assume the keyerror is because this is symbol variable
@@ -231,7 +232,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         except KeyError:
             #print("eval to pos failed")
             p2ispos = False
-            if formula[2] in alphabet:
+            if any(formula[2] in local_alph for local_alph in alphabet.values()):
                 p2val = formula[2]
             else:
                 p2val = variables[formula[2]] # we assume the keyerror is because this is symbol variable
@@ -245,15 +246,50 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         elif p1ispos and p2ispos:
             if ret == None:
                 args = []
-                for a in alphabet[1:]:
-                    args.append(IFF(V(p1 + (a,)), V(p2 + (a,))))
+                p1_alph = alphabet[p1[-1]]
+                p2_alph = alphabet[p2[-1]]
+                if p1_alph == p2_alph:
+                    # the nice case: equal alphabets
+                    for a in p1_alph[1:]:
+                        args.append(IFF(V(p1 + (a,)), V(p2 + (a,))))
+                else:
+                    # the messy case: different alphabets
+                    for (i,a) in enumerate(p1_alph):
+                        for (j,b) in enumerate(p2_alph):
+                            if a == b:
+                                # force the occurrences to be logically equivalent
+                                if i and j:
+                                    args.append(IFF(V(p1 + (a,)), V(p2 + (a,))))
+                                elif i:
+                                    args.append(IFF(NOT(V(p1 + (a,))), OR(*(V(p2 + (a2,)) for a2 in p2_alph[1:]))))
+                                elif j:
+                                    args.append(IFF(OR(*(V(p1 + (a2,)) for a2 in p1_alph[1:])), NOT(V(p2 + (a,)))))
+                                else:
+                                    args.append(IFF(OR(*(V(p1 + (a2,)) for a2 in p1_alph[1:])),
+                                                    OR(*(V(p2 + (a2,)) for a2 in p2_alph[1:]))))
+                        else:
+                            # a is not in the other alphabet; forbid it
+                            if i:
+                                args.append(NOT(V(p1 + (a,))))
+                            else:
+                                args.append(OR(*(V(p1 + (a2,)) for a2 in p1_alph[1:])))
+                        # for good measure, also forbid everything unmatched in the other alphabet
+                        for (i,a) in enumerate(p2_alph):
+                            if a not in p1_alph:
+                                if i:
+                                    args.append(NOT(V(p2 + (a,))))
+                                else:
+                                    args.append(OR(*(V(p2 + (a2,)) for a2 in p2_alph[1:])))
                 ret = AND(*args)
 
         else:
             if not p1ispos and p2ispos:
                 p1, p2val = p2, p1val
-            if p2val == alphabet[0]:
-                ret = AND(*(NOT(V(p1 + (sym,))) for sym in alphabet[1:]))
+            local_alph = alphabet[p1[-1]]
+            if p2val not in local_alph:
+                ret = F
+            if p2val == local_alph[0]:
+                ret = AND(*(NOT(V(p1 + (sym,))) for sym in local_alph[1:]))
             else:
                 ret = V(p1 + (p2val,))
             
@@ -338,7 +374,6 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
     return ret
 
 def formula_to_circuit(nodes, dim, topology, alphabet, formula):
-    assert len(alphabet) >= 2
     variables = {} 
     aux_var = [0] # da fuck is this?
     all_vars = set()
