@@ -22,7 +22,7 @@ class Diddy:
         self.SFTs = {}
         self.CAs = {}
         self.clopens = {}
-        self.nodes = [0]
+        self.nodes = sft.Nodes([0])
         self.alphabet = [0, 1]
         self.dim = 2
         self.topology = grid
@@ -38,7 +38,7 @@ class Diddy:
             #print("cmd", cmd)
             #print("parsed line", parsed_line)
             if cmd == "nodes":
-                self.nodes = args[0]
+                self.nodes = sft.Nodes(args[0])
             elif cmd == "dim":
                 self.dim = args[0]
             elif cmd == "alphabet":

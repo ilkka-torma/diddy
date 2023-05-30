@@ -19,7 +19,7 @@ circuit_variables are aa little tricky... they should be functions
 """
 
 def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_var, all_vars):
-    #print("formula", formula)
+    #print("nodes", nodes)
     #print("variables", variables)
     # print ("aux vars", aux_var)
     # print ("alls", all_vars)
@@ -425,34 +425,39 @@ def var_of_pos_expr(f):
 # we have first a position variable,
 # then a bunch of edges. we will go forward along
 # those edges
-def eval_to_position(dim, topology, expr, pos_variables, nodes):
-    #print("EVALTOPOS", expr, pos_variables)
+def eval_to_position(dim, topology, expr, pos_variables, nodes, top=True):
+    #print("EVALTOPOS", expr, pos_variables, nodes)
     if type(expr) != tuple:
         #print("not tup")
         #print("tking", pos_variables[expr])
         pos = pos_variables[expr]
         if type(pos) != tuple:
             #print("recurse")
-            return eval_to_position(dim, topology, pos, pos_variables, nodes)
+            return eval_to_position(dim, topology, pos, pos_variables, nodes, top=False)
         #print("got 1 pos", pos)
         return pos
-    assert expr[0] == "ADDR"
+    if expr[0] != "ADDR":
+        # we have a node with tracks
+        return expr[0]
     pos = pos_variables[expr[1]]
     #print(pos, "ke")
     if type(pos) != tuple:
         #print("temp recurse")
-        pos = eval_to_position(dim, topology, pos, pos_variables, nodes)
+        pos = eval_to_position(dim, topology, pos, pos_variables, nodes, top=False)
     #print("ini", pos)
     #print(topology)
     for i in expr[2:]:
-        #print("pos", pos, "i", i)
+        # empty string means go to cell level
+        if i == "":
+            pos = pos[:-1] + (None,)
+            continue
         for t in topology:
             if len(t) == 3:
                 #print(t)
                 a, b = t[1], t[2]
-                if t[0] == i and (pos[dim] == None or pos[dim] == a[dim]):
+                if t[0] == i and (pos[dim] is None or a[dim] == pos[dim]):
                     #print("found edge", t)
-                    if pos[dim] == None:
+                    if pos[dim] is None:
                         #print("cell")
                         pos = vadd(vsub(pos[:-1], a[:-1]), b[:-1]) + (None,)
                     else:
@@ -463,6 +468,15 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes):
             #print("not edge")
             if i in nodes: # single thing => change node
                 pos = pos[:-1] + (i,)
+                continue
+            if pos[-1] is None:
+                items = (i,)
+            elif type(pos[-1]) == tuple:
+                items = pos[-1] + (i,)
+            else:
+                items = (pos[-1], i)
+            if nodes.compatible(items):
+                pos = pos[:-1] + (items,)
             elif type(i) == tuple and len(i) == dim: # tuple of len dim => move
                 pos = vadd(pos[:-1], i) + (pos[-1],)
             elif type(i) == tuple and len(i) == dim+1: # tuple of len dim+1 => both
@@ -471,6 +485,8 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes):
                 raise Exception("Could not process transition {} from node {}".format(i, pos))
         #print(pos)
     #print ("got 2 pos", pos)
+    if top:
+        assert pos[-1] is None or pos[-1] in nodes
     return pos
 
 # given topology, positions of variables and bound dict

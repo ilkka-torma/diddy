@@ -2,6 +2,69 @@ from general import *
 from circuit import *
 from itertools import chain
 
+class Nodes:
+    "A hierarchical set of nodes"
+
+    # nodes can be either a flat list of labels
+    # or a recursive dict from labels
+    # in symbols: nodes = list(label) | dict(label : nodes)
+    def __init__(self, nodes):
+        if type(nodes) == list:
+            self.nodes = nodes
+            self.flat = True
+        else:
+            self.nodes = {label : Nodes(track) for (label, track) in nodes.items()}
+            self.flat = False
+
+    def __iter__(self):
+        if self.flat:
+            return iter(self.nodes)
+        else:
+            return (((label, node) if track.flat else (label,) + node) for (label, track) in self.nodes.items() for node in track)
+
+    def __len__(self):
+        if self.flat:
+            return len(self.nodes)
+        else:
+            return sum(len(track) for track in self.nodes.values())
+            
+    def __in__(self, item):
+        if self.flat:
+            return item in self.nodes
+        else:
+            track = self.nodes[item[0]]
+            if len(item) == 2:
+                return item[1] in track
+            else:
+                return item[1:] in track
+
+    def track(self, label):
+        if self.flat:
+            raise KeyError("A flat node list has no tracks")
+        else:
+            return self.nodes[label]
+        
+    def compatible(self, items):
+        #print("compatible", self, items)
+        if not items:
+            return True
+        if items[0] not in self.nodes:
+            return False
+        if self.flat:
+            return len(items) == 1
+        return self.nodes[items[0]].compatible(items[1:])
+
+    def __str__(self):
+        return "Nodes[" + ", ".join(self.str_nodes()) + "]"
+
+    def str_nodes(self):
+        if self.flat:
+            for node in self.nodes:
+                yield str(node)
+        else:
+            for node in self:
+                yield '.'.join(str(part) for part in node)
+
 # check that circuit is forced to be true when variable set
 def forced_by(circuit, vals_as_list):
     andeds = []
