@@ -306,6 +306,16 @@ class SFT:
                 else:
                     pat[nvec] = self.alph[0]
             yield pat
+
+    # for one-dimensional sfts, the language can be requested as strings
+    # TODO: replace extra_rad with exact calculation
+    def language_as_words(self, n):
+        assert self.dim == 1
+        for p in self.all_patterns(list(range(n)), extra_rad = 10):
+            s = []
+            for q in sorted(p):
+                s.append(p[q])
+            yield tuple(s)
             
     # domain is a collection of nodevectors
     def all_periodic_points(self, dims, existing=None):

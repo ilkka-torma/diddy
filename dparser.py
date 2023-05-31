@@ -130,13 +130,16 @@ commands = [
             aliases = ["Wang"]),
     Command("CA",
             [ArgType.LABEL, ArgType.NESTED_LIST],
-            aliases = ["cellular_automaton"]),
+            aliases = ["cellular_automaton"]), 
     Command("compose_CA",
             [ArgType.LABEL, ArgType.SIMPLE_LIST]),
     Command("spacetime_diagram",
             [ArgType.LABEL, ArgType.LABEL],
             opts = ["time_axis"],
             flags = ["twosided"]),
+    Command("TFG",
+            [ArgType.LABEL, ArgType.NESTED_LIST],
+            aliases = ["topological_full_group_element"]),
 
     # Printing objects' basic properties
     Command("show_formula",
@@ -181,6 +184,9 @@ commands = [
             opts = ["radius"]),
     Command("entropy_lower_bound",
             [ArgType.LABEL, ArgType.SIMPLE_LIST, ArgType.SIMPLE_LIST]),
+    Command("TFG_loops",
+            [ArgType.LABEL, ArgType.LABEL],
+            aliases = ["topological_full_group_element_loops"]),
 
     # Visualization
     Command("tiler",

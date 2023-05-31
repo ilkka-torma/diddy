@@ -13,14 +13,15 @@ import argparse
 import fractions
 import math
 
-
 import blockmap
+import tfg
 
 
 class Diddy:
     def __init__(self):
         self.SFTs = {}
         self.CAs = {}
+        self.TFGs = {}
         self.clopens = {}
         self.nodes = [0]
         self.alphabet = [0, 1]
@@ -45,7 +46,12 @@ class Diddy:
                 self.alphabet = args[0]
             elif cmd == "topology":
                 top = args[0]
-                if top in ["square", "grid", "squaregrid"]:
+                if top in ["line"]:
+                    self.topology = line
+                    self.nodes = [0]
+                    self.gridmoves = [1]
+                    self.nodeoffsets = {0 : (0,0)}
+                elif top in ["square", "grid", "squaregrid"]:
                     self.topology = grid
                     self.nodes = [0]
                     self.gridmoves = [(1,0), (0,1)]
@@ -342,6 +348,23 @@ class Diddy:
                     circuits[(r[0], r[1])] = circ
                 #print(circuits)
                 self.CAs[name] = blockmap.CA(self.alphabet, self.nodes, self.dim, circuits)
+
+            elif cmd == "TFG":
+                name = args[0]
+                rules = args[1]
+                circuits = {}
+                
+                for r in rules:
+                    circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, r[3])
+                    circuits[(r[0], r[1], r[2])] = circ # node node offset circuit
+                self.TFGs[name] = tfg.TFG(self.alphabet, self.nodes, self.dim, circuits)
+
+            elif cmd == "TFG_loops":
+                raise Exception("Loop calculation is work in progress.")
+                #TFG_name = args[0]
+                #SFT_name = args[1]
+                #actual_sft = self.SFTs[SFT_name]
+                #print (self.TFGs[TFG_name].loops(actual_sft))
 
             elif cmd == "compose_CA":
                 name = args[0]
@@ -687,6 +710,8 @@ def report_CA_equal(a, b, mode="report", truth=True):
         assert res == (truth == "T")
 
 
+line = [("rt", (0,0), (1,0)),
+        ("lt", (0,0), (-1,0))]
 grid = [("up", (0,0,0), (0,1,0)),
         ("dn", (0,0,0), (0,-1,0)),
         ("rt", (0,0,0), (1,0,0)),
