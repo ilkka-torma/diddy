@@ -24,13 +24,13 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
     # print ("aux vars", aux_var)
     # print ("alls", all_vars)
     op = formula[0]
-    print("op", op)
+    #print("op", op, "dim", dim)
     if op == "BOOL":
         ret = variables[formula[1]]
     elif op == "CALL":
         var = formula[1]
         args = formula[2:]
-        print("function %s called" % var)
+        #print("function %s called" % var)
         # calling a macro
         if var in variables:
             #print(var, "being called with", args, "in", formula)
@@ -91,7 +91,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
                     sym = v[-1]
                     if sym != alphabet[node][0]:
                         return v
-                    return OR(*(V(pos + (node, a)) for a in alphabet[node][1:]))
+                    return AND(*(NOT(V(pos + (node, a))) for a in alphabet[node][1:]))
                 #print("before elimination", ret)
                 circuit.transform(ret, eliminate_zero)
                 #print("after elimination", ret)

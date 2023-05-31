@@ -123,6 +123,7 @@ class Diddy:
                     self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, circuit=circ, formula=defn, onesided=onesided)
                 else:
                     raise Exception("Unknown SFT definition: {}".format(defn))
+                print("CIRCUIT", circ)
 
             elif cmd == "clopen":
                 raise NotImplementedError("Clopen sets not implemented")

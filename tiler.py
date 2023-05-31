@@ -63,10 +63,18 @@ TILING_BAD_GRID_COLOR = (100, 50, 50)
 TILING_UNKNOWN_GRID_COLOR = (50,50,50)
 
 # colors used for alphabet symbols, and tinted versions for deduced ones
-colors = {0 : WHITE, 1 : GREEN}
-deduced_colors = {0 : (150, 150, 150), 1 : (50, 130, 50)}
+colors = {0 : WHITE, 1 : (255,0,0), 2 : (0,255,0), 3 :(0,0,255),
+          4 : (255,255,0), 5 : (255,0,255), 6 : (0,255,255),
+          7 : (255, 80, 80), 8 : (80, 255, 80), 9 : (80, 80, 255)}
+deduced_colors = {}
+for c in colors:
+    deduced_colors[c] = tuple(map(lambda a:a//2, colors[c]))
 
-UNKNOWN_COLOR = YELLOW
+#deduced_colors = {0 : (150, 150, 150), 1 : (50, 130, 50),
+#                  2 : (16,56,190), 3: (85, 111, 222),
+#                  4: (190, 180, 170)}
+
+UNKNOWN_COLOR = GRAY
 EMPTY_COLOR = BLACK # actually we just don't draw these
 
 
@@ -92,15 +100,25 @@ def deduce_a_tiling(grid, the_SFT):
     known_values = {}
     domain = set()
     for g in grid:
+        if the_SFT.dim == 1 and g[1] != 0:
+            continue
         if grid[g] != UNKNOWN:
             assert grid[g][0] == SET
             val = the_SFT.alph[g[-1]][grid[g][1]]
-            known_values[g] = val
-        domain.add(g[:-1])
-    #print("domain", domain)
-    #print("known", known_values)
+            if the_SFT.dim == 1:
+                known_values[(g[0], g[-1])] = val
+            else:
+                known_values[g] = val
+            #print("knowing", val, "at", g)
+        if the_SFT.dim == 1:
+            domain.add((g[0],))
+        else:
+            domain.add(g[:-1])
+    print("domain", domain)
+    print("known", known_values)        
+
     model = the_SFT.deduce(known_values, domain)
-    #print(model)
+    print(model)
 
     if model == None:
         currentstate = TILING_BAD
@@ -108,13 +126,19 @@ def deduce_a_tiling(grid, the_SFT):
         currentstate = TILING_OK
 
         for d in model:
-            if grid[d] == UNKNOWN:
+            if the_SFT.dim == 1:
+                dd = (d[0], 0, d[-1])
+            else:
+                dd = d
+            #print(d, "in model", grid[dd])
+            if grid[dd] == UNKNOWN:
                 val = model[d]
-                #print("val", val)
+                
                 if val != None:
-                    grid[d] = (DEDUCED, the_SFT.alph[g[-1]].index(val))
+                    grid[dd] = (DEDUCED, the_SFT.alph[g[-1]].index(val))
                 else:
-                    grid[d] = UNKNOWN
+                    grid[dd] = UNKNOWN
+                #print(d, "in model", grid[dd])
 
 def vadd(u, v):
     return u[0] + v[0], u[1] + v[1]
@@ -184,9 +208,12 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
     #gridwidth = 15
     
     camera = (0, 0) # where we looking; center of screen is here
-    zoom = 20 # how big are cells basically
-    screenwidth = 500
+    zoom = 30 # how big are cells basically
+    screenwidth = 700
     screenheight = 500
+
+    pygame.font.init() 
+    my_font = pygame.font.SysFont('Consolas', 30)
      
     # our grid is now just all initial_state
     grid = {}
@@ -196,7 +223,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
             # EMPTY means we'll try to deduce a color here
             for n in nodes:
                 grid[(x, y, n)] = UNKNOWN
-    # grid[(0, 0, nodes[0])] = (SET, 1)
+    grid[(0, 0, nodes[0])] = (SET, 1)
+    grid[(1, 0, nodes[0])] = (SET, 1)
     # print(grid)
 
     nodepositions = {}
@@ -413,8 +441,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
         node = get_node(*pos) #, mouseisdown)
         #if mouseisdown:
         #    assert gimmel[0] != None
-        if node != None:
-            print(node)
+        #if node != None:
+        #    print(node)
         """
         if mousecolumn < 0: mousecolumn = 0
         if mousecolumn >= gridwidth: mousecolumn = gridwidth-1
@@ -486,9 +514,11 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
                         continue
                     else:
 
+                        sym = None
                         #if grid[(x,y,n)] != UNKNOWN:
                         #    print (grid[(x,y,n)],  DEDUCED)
-                        
+
+                        white_circle = False
                         #print(grid[(x,y,n)] )
                         if grid[(x,y,n)] == UNKNOWN:
                             color = UNKNOWN_COLOR
@@ -496,11 +526,12 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
                         #    print(grid[(x,y,n)], "!=", UNKNOWN)
                         elif grid[(x,y,n)][0] == DEDUCED:
                             sym = alphabets[n].index(grid[(x,y,n)][1])
-                            color = deduced_colors[sym]
+                            color = colors[sym] #deduced_colors[sym]
                         elif grid[(x,y,n)][0] == SET:
                             sym = alphabets[n].index(grid[(x,y,n)][1])
                             #print(sym)
                             color = colors[sym]
+                            white_circle = True
 
                         if (x, y, n) in vemmel:
                             xxxx = int(255- gimmel[(x, y, n)]*3)
@@ -511,9 +542,17 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
                             #print("did")
                         #    color = (60,70,80)
                         #print(gimmel, nnn) #time.time())
-                        
+
+                        if white_circle:
+                            pygame.draw.circle(screen, WHITE, p, nodesize+3)
                         pygame.draw.circle(screen, color, p, nodesize)
 
+                        if sym != None:
+                            col = (255, 255, 255)
+                            if sum(color) > 255*1.5:
+                                col = (0, 0, 0)
+                            font_surf = my_font.render(str(sym), False, col)
+                            screen.blit(font_surf, p)
                     
                     #print(vadd(to_screen(x, y), nodeoffsets[n]))
                     
