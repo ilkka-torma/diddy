@@ -23,8 +23,8 @@ class Diddy:
         self.CAs = {}
         self.TFGs = {}
         self.clopens = {}
-        self.nodes = [0]
-        self.alphabet = [0, 1]
+        self.nodes = sft.Nodes([0])
+        self.alphabet = {node : [0, 1] for node in self.nodes}
         self.dim = 2
         self.topology = grid
         self.gridmoves = [(1,0), (0,1)]
@@ -39,11 +39,31 @@ class Diddy:
             #print("cmd", cmd)
             #print("parsed line", parsed_line)
             if cmd == "nodes":
-                self.nodes = args[0]
+                self.nodes = sft.Nodes(args[0])
+                alph0 = list(self.alphabet.values())[0]
+                if all(alph == alph0 for alph in self.alphabet.values()):
+                    self.alphabet = {node : alph0 for node in self.nodes}
             elif cmd == "dim":
                 self.dim = args[0]
             elif cmd == "alphabet":
-                self.alphabet = args[0]
+                alph = args[0]
+                default = kwds.get("default", None)
+                if type(alph) == list and default is None:
+                    default = alph
+                self.alphabet = {node:default for node in self.nodes}
+                if type(alph) == dict:
+                    for (labels, local_alph) in alph.items():
+                        if type(labels) != tuple:
+                            labels = (labels,)
+                        for subnode in self.nodes.subtrack(labels):
+                            if type(subnode) != tuple:
+                                subnode = (subnode,)
+                            node = labels + subnode
+                            if len(node) == 1:
+                                node = node[0]
+                            self.alphabet[node] = local_alph
+                if None in self.alphabet.values():
+                    raise Exception("Incomplete alphabet definition")
             elif cmd == "topology":
                 top = args[0]
                 if top in ["line"]:
@@ -75,6 +95,10 @@ class Diddy:
                     self.topology = top
                     self.gridmoves = [(1,0), (0,1)]
                     self.nodeoffsets = {node : (2*j/(3*len(self.nodes)), 2*j/(3*len(self.nodes))) for (j,node) in enumerate(self.nodes)}
+                if type(top) == str:
+                    alph0 = list(self.alphabet.values())[0]
+                    if all(alph == alph0 for alph in self.alphabet.values()):
+                        self.alphabet = {node : alph0 for node in self.nodes}
                 #print(topology)
                     
             elif cmd == "sft":
@@ -415,7 +439,7 @@ class Diddy:
                 name = args[0]
                 the_sft = self.SFTs[name]
                 dimensions = args[1]
-                rad = i[3].get("radius", 0)
+                rad = kwds.get("radius", 0)
                 
                 rect = set([tuple()])
                 size = 1
@@ -434,7 +458,7 @@ class Diddy:
             elif cmd == "entropy_lower_bound":
                 # TODO: split the periodic points as in upper bound
                 name = args[0]
-                the_sft = self.SFTs[i[1]]
+                the_sft = self.SFTs[name]
                 # i[2] has: periods of periodic points, dimensions of block
                 periods = args[1]
                 dims = args[2]

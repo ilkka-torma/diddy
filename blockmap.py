@@ -22,13 +22,13 @@ class BlockMap:
         self.circuits = circuits
         for n in to_nodes:
             circs = {}
-            for a in to_alphabet:
+            for a in to_alphabet[n]:
                 if (n, a) in self.circuits:
                     circs[a] = self.circuits[(n, a)]
             # check if we should add default case
             if len(circs) < len(to_alphabet):
                 default_found = False
-                for a in to_alphabet:
+                for a in to_alphabet[n]:
                     if a not in circs:
                         if not default_found:
                             self.circuits[(n, a)] = AND(*(map(lambda b:NOT(b), circs.values())))
@@ -172,8 +172,9 @@ class CA(BlockMap):
             new_circ = circ.copy()
             transform(new_circ, lambda var: var[:time_axis] + (0,) + var[time_axis:])
             val_vec = (0,)*time_axis + (1,) + (0,)*(dim-time_axis) + (node,)
-            if sym == alph[0]:
-                is_val = AND(*(NOT(V(val_vec + (sym2,))) for sym2 in alph[1:]))
+            local_alph = alph[node]
+            if sym == local_alph[0]:
+                is_val = AND(*(NOT(V(val_vec + (sym2,))) for sym2 in local_alph[1:]))
             else:
                 is_val = V(val_vec + (sym,))
             anded.append(IFF(new_circ, is_val))

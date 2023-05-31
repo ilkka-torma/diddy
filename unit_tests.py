@@ -37,9 +37,12 @@ code_crazy_gms = """
 (0,0,0):1 (1,0,0):1 (0,3,0):1;
 (0,0,0):1 (1,0,0):1 (2,2,0):0;
 (0,0,0):1 (1,0,0):1 (2,2,0):1
+%SFT hor_golden_mean_shift3 Ao (o.(2,0) = 1 -> o.(1,0) = 0) & Ae[o3] e.(0,1) = 0 | e.(-1,1) != e.(0,1)
 %show_formula hor_golden_mean_shift
 %show_formula hor_golden_mean_shift2
+%show_formula hor_golden_mean_shift3
 %equal expect=T hor_golden_mean_shift2 hor_golden_mean_shift
+%equal expect=T hor_golden_mean_shift3 hor_golden_mean_shift
 """
 unit_tests.append(("crazy gms", code_crazy_gms))
 
@@ -284,6 +287,56 @@ code = """
 %equal expect=T diagram var
 """
 unit_tests.append(("spacetime diagram", code))
+
+code = """
+%alphabet 0 1 2
+%SFT long_dist Ao o=1 -> Ep[o4] p=2 & o ~^1,3 p
+%SFT long_dist2 Ao o=1 ->
+o.(3,0)=2 | o.(2,1)=2 | o.(1,2)=2 | o.(0,3)=2 |
+o.(-1,2)=2 | o.(-2,1)=2 | o.(-3,0)=2 |
+o.(-2,-1)=2 | o.(-1,-2)=2 | o.(0,-3)=2 |
+o.(1,-2)=2 | o.(2,-1)=2 |
+o.(0,1)=2 | o.(1,0)=2 | o.(0,-1)=2 | o.(-1,0)=2
+%equal expect=T long_dist long_dist2
+"""
+unit_tests.append(("distance", code))
+
+code = """
+%nodes {t1 : [a] t2 : {t21:[0 1] t22:[a b]}}
+%topology
+e1 (0,0,t1.a) (0,0,t2.t21.0);
+e2 (0,0,t1.a) (0,0,t2.t21.1);
+e3 (0,0,t1.a) (0,0,t2.t22.a);
+e4 (0,0,t1.a) (0,0,t2.t22.b);
+e5 (0,0,t2.t21.0) (0,0,t1.a);
+e6 (0,0,t2.t21.1) (0,0,t1.a);
+e7 (0,0,t2.t22.a) (0,0,t1.a);
+e8 (0,0,t2.t22.b) (0,0,t1.a)
+%SFT a0 Ao o..t1.a=0 <-> o=0
+%SFT a1 Ao Ax[o1] o=x
+%SFT a2
+(0,0,t1.a):0 (0,0,t2.t21.0):1;
+(0,0,t1.a):0 (0,0,t2.t21.1):1;
+(0,0,t1.a):0 (0,0,t2.t22.a):1;
+(0,0,t1.a):0 (0,0,t2.t22.b):1;
+(0,0,t1.a):1 (0,0,t2.t21.0):0;
+(0,0,t1.a):1 (0,0,t2.t21.1):0;
+(0,0,t1.a):1 (0,0,t2.t22.a):0;
+(0,0,t1.a):1 (0,0,t2.t22.b):0
+%equal expect=T a0 a1
+%equal expect=T a0 a2
+"""
+unit_tests.append(("tracks", code))
+
+code = """
+%nodes 0 1 2 3
+%alphabet default=[0 1] {2 : [2 X] 3 : [1 2]}
+%SFT test ACo o.0!=1 -> (o.up.1=1 & o.3=2 & o.rt.0=1) | o.2=X
+%compute_forbidden_patterns test
+%set_weights 0:1 1:3 2:2 X:4
+%minimum_density test (0,3)
+"""
+unit_tests.append(("node-specific alphabets", code))
 
 
 if __name__ == "__main__":

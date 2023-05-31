@@ -19,7 +19,7 @@ circuit_variables are aa little tricky... they should be functions
 """
 
 def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_var, all_vars):
-    #print("formula", formula)
+    #print("nodes", nodes)
     #print("variables", variables)
     # print ("aux vars", aux_var)
     # print ("alls", all_vars)
@@ -149,7 +149,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         ret_code = formula[3]
         closure = {}
         for v in unbound_vars:
-            if v in arg_names or v in alphabet:
+            if v in arg_names or any(v in local_alph for local_alph in alphabet.values()):
                 continue
             closure[v] = variables[v]
         #print(closure)
@@ -189,13 +189,14 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         v = formula[2]
         if ret == None:
             #print("here", p1, v, type(v), alphabet)
-            if v not in alphabet:
+            local_alph = alphabet[p1[-1]]
+            if v not in local_alph:
                 #print("%s not in", alphabet)
                 if v not in variables:
                     raise Exception("%s is not in alphabet nor a variable" % v)
                 v = variables[v] # variables can also contain symbols
-            if v == alphabet[0]:
-                ret = AND(*(NOT(V(p1 + (sym,))) for sym in alphabet[1:]))
+            if v == local_alph[0]:
+                ret = AND(*(NOT(V(p1 + (sym,))) for sym in local_alph[1:]))
             else:
                 ret = V(p1 + (v,))
     # the idea was that we would use hasval when we want to directly
@@ -215,7 +216,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
             #print("eval to pos failed")
             p1ispos = False
             #print(formula[1], "formula 1 fast")
-            if formula[1] in alphabet:
+            if any(formula[1] in local_alph for local_alph in alphabet.values()):
                 p1val = formula[1]
             else:
                 p1val = variables[formula[1]] # we assume the keyerror is because this is symbol variable
@@ -231,7 +232,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         except KeyError:
             #print("eval to pos failed")
             p2ispos = False
-            if formula[2] in alphabet:
+            if any(formula[2] in local_alph for local_alph in alphabet.values()):
                 p2val = formula[2]
             else:
                 p2val = variables[formula[2]] # we assume the keyerror is because this is symbol variable
@@ -245,15 +246,50 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         elif p1ispos and p2ispos:
             if ret == None:
                 args = []
-                for a in alphabet[1:]:
-                    args.append(IFF(V(p1 + (a,)), V(p2 + (a,))))
+                p1_alph = alphabet[p1[-1]]
+                p2_alph = alphabet[p2[-1]]
+                if p1_alph == p2_alph:
+                    # the nice case: equal alphabets
+                    for a in p1_alph[1:]:
+                        args.append(IFF(V(p1 + (a,)), V(p2 + (a,))))
+                else:
+                    # the messy case: different alphabets
+                    for (i,a) in enumerate(p1_alph):
+                        for (j,b) in enumerate(p2_alph):
+                            if a == b:
+                                # force the occurrences to be logically equivalent
+                                if i and j:
+                                    args.append(IFF(V(p1 + (a,)), V(p2 + (a,))))
+                                elif i:
+                                    args.append(IFF(NOT(V(p1 + (a,))), OR(*(V(p2 + (a2,)) for a2 in p2_alph[1:]))))
+                                elif j:
+                                    args.append(IFF(OR(*(V(p1 + (a2,)) for a2 in p1_alph[1:])), NOT(V(p2 + (a,)))))
+                                else:
+                                    args.append(IFF(OR(*(V(p1 + (a2,)) for a2 in p1_alph[1:])),
+                                                    OR(*(V(p2 + (a2,)) for a2 in p2_alph[1:]))))
+                        else:
+                            # a is not in the other alphabet; forbid it
+                            if i:
+                                args.append(NOT(V(p1 + (a,))))
+                            else:
+                                args.append(OR(*(V(p1 + (a2,)) for a2 in p1_alph[1:])))
+                        # for good measure, also forbid everything unmatched in the other alphabet
+                        for (i,a) in enumerate(p2_alph):
+                            if a not in p1_alph:
+                                if i:
+                                    args.append(NOT(V(p2 + (a,))))
+                                else:
+                                    args.append(OR(*(V(p2 + (a2,)) for a2 in p2_alph[1:])))
                 ret = AND(*args)
 
         else:
             if not p1ispos and p2ispos:
                 p1, p2val = p2, p1val
-            if p2val == alphabet[0]:
-                ret = AND(*(NOT(V(p1 + (sym,))) for sym in alphabet[1:]))
+            local_alph = alphabet[p1[-1]]
+            if p2val not in local_alph:
+                ret = F
+            if p2val == local_alph[0]:
+                ret = AND(*(NOT(V(p1 + (sym,))) for sym in local_alph[1:]))
             else:
                 ret = V(p1 + (p2val,))
             
@@ -283,6 +319,54 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
             else:
                 ret = F
         #print(ret)
+    elif op == "HASDIST":
+        ret = None
+        dist_ranges = formula[1]
+        p1 = eval_to_position(dim, topology, formula[2], variables, nodes)
+        if p1 == None:
+            ret = F
+        all_vars.add(var_of_pos_expr(formula[2]))
+        p2 = eval_to_position(dim, topology, formula[3], variables, nodes)
+        if p2 == None:
+            ret = F
+        all_vars.add(var_of_pos_expr(formula[3]))
+        if ret is None:
+            dist = 0
+            if p1 != p2:
+                # compute distance with bidirectional BFS
+                seen1 = {p1}
+                frontier1 = [p1]
+                seen2 = {p2}
+                frontier2 = [p2]
+                while True:
+                    dist += 1
+                    new_frontier = []
+                    for p in frontier1:
+                        for n in get_open_nbhd(dim, topology, p):
+                            if n in seen2:
+                                # found middle vertex
+                                break
+                            if n not in seen1:
+                                seen1.add(n)
+                                new_frontier.append(n)
+                        else:
+                            # did not find middle vertex
+                            continue
+                        # found middle vertex
+                        break
+                    else:
+                        # did not find any middle vertex
+                        frontier1, frontier2 = frontier2, new_frontier
+                        seen1, seen2 = seen2, seen1
+                        continue
+                    # found middle vertex
+                    break
+            for (start, end) in dist_ranges:
+                if start <= dist and (dist <= end or end == "inf"):
+                    ret = T
+                    break
+            else:
+                ret = F
     else:
         raise Exception("What " + op)
     #print ("from formula", formula)
@@ -290,7 +374,6 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
     return ret
 
 def formula_to_circuit(nodes, dim, topology, alphabet, formula):
-    assert len(alphabet) >= 2
     variables = {} 
     aux_var = [0] # da fuck is this?
     all_vars = set()
@@ -356,6 +439,9 @@ def collect_unbound_vars(formula, bound = None):
     elif op == "ISNEIGHBOR":
         possibles.add(var_of_pos_expr(formula[1]))
         possibles.add(var_of_pos_expr(formula[2]))
+    elif op == "HASDIST":
+        possibles.add(var_of_pos_expr(formula[2]))
+        possibles.add(var_of_pos_expr(formula[3]))
     else:
         raise Exception("What " + op)
     ret = set()
@@ -374,34 +460,39 @@ def var_of_pos_expr(f):
 # we have first a position variable,
 # then a bunch of edges. we will go forward along
 # those edges
-def eval_to_position(dim, topology, expr, pos_variables, nodes):
-    #print("EVALTOPOS", expr, pos_variables)
+def eval_to_position(dim, topology, expr, pos_variables, nodes, top=True):
+    #print("EVALTOPOS", expr, pos_variables, nodes)
     if type(expr) != tuple:
         #print("not tup")
         #print("tking", pos_variables[expr])
         pos = pos_variables[expr]
         if type(pos) != tuple:
             #print("recurse")
-            return eval_to_position(dim, topology, pos, pos_variables, nodes)
+            return eval_to_position(dim, topology, pos, pos_variables, nodes, top=False)
         #print("got 1 pos", pos)
         return pos
-    assert expr[0] == "ADDR"
+    if expr[0] != "ADDR":
+        # we have a node with tracks
+        return expr[0]
     pos = pos_variables[expr[1]]
     #print(pos, "ke")
     if type(pos) != tuple:
         #print("temp recurse")
-        pos = eval_to_position(dim, topology, pos, pos_variables, nodes)
+        pos = eval_to_position(dim, topology, pos, pos_variables, nodes, top=False)
     #print("ini", pos)
     #print(topology)
     for i in expr[2:]:
-        #print("pos", pos, "i", i)
+        # empty string means go to cell level
+        if i == "":
+            pos = pos[:-1] + (None,)
+            continue
         for t in topology:
             if len(t) == 3:
                 #print(t)
                 a, b = t[1], t[2]
-                if t[0] == i and (pos[dim] == None or pos[dim] == a[dim]):
+                if t[0] == i and (pos[dim] is None or a[dim] == pos[dim]):
                     #print("found edge", t)
-                    if pos[dim] == None:
+                    if pos[dim] is None:
                         #print("cell")
                         pos = vadd(vsub(pos[:-1], a[:-1]), b[:-1]) + (None,)
                     else:
@@ -412,6 +503,15 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes):
             #print("not edge")
             if i in nodes: # single thing => change node
                 pos = pos[:-1] + (i,)
+                continue
+            if pos[-1] is None:
+                items = (i,)
+            elif type(pos[-1]) == tuple:
+                items = pos[-1] + (i,)
+            else:
+                items = (pos[-1], i)
+            if nodes.compatible(items):
+                pos = pos[:-1] + (items,)
             elif type(i) == tuple and len(i) == dim: # tuple of len dim => move
                 pos = vadd(pos[:-1], i) + (pos[-1],)
             elif type(i) == tuple and len(i) == dim+1: # tuple of len dim+1 => both
@@ -420,6 +520,8 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes):
                 raise Exception("Could not process transition {} from node {}".format(i, pos))
         #print(pos)
     #print ("got 2 pos", pos)
+    if top:
+        assert pos[-1] is None or pos[-1] in nodes
     return pos
 
 # given topology, positions of variables and bound dict

@@ -2,6 +2,79 @@ from general import *
 from circuit import *
 from itertools import chain
 
+class Nodes:
+    "A hierarchical set of nodes"
+
+    # nodes can be either a flat list of labels
+    # or a recursive dict from labels
+    # in symbols: nodes = list(label) | dict(label : nodes)
+    def __init__(self, nodes):
+        if type(nodes) == list:
+            self.nodes = nodes
+            self.flat = True
+        else:
+            self.nodes = {label : Nodes(track) for (label, track) in nodes.items()}
+            self.flat = False
+
+    def __iter__(self):
+        if self.flat:
+            return iter(self.nodes)
+        else:
+            return (((label, node) if track.flat else (label,) + node) for (label, track) in self.nodes.items() for node in track)
+
+    def __len__(self):
+        if self.flat:
+            return len(self.nodes)
+        else:
+            return sum(len(track) for track in self.nodes.values())
+            
+    def __in__(self, item):
+        if self.flat:
+            return item in self.nodes
+        else:
+            track = self.nodes[item[0]]
+            if len(item) == 2:
+                return item[1] in track
+            else:
+                return item[1:] in track
+
+    def track(self, label):
+        if self.flat:
+            raise KeyError("A flat node list has no tracks")
+        else:
+            return self.nodes[label]
+        
+    def compatible(self, items):
+        #print("compatible", self, items)
+        if not items:
+            return True
+        if items[0] not in self.nodes:
+            return False
+        if self.flat:
+            return len(items) == 1
+        return self.nodes[items[0]].compatible(items[1:])
+        
+    def subtrack(self, items):
+        if not items:
+            return self
+        if self.flat:
+            if len(items) == 1 and items[0] in self:
+                return [()]
+            else:
+                return False
+        return self.track(items[0]).subtrack(items[1:])
+
+    def __str__(self):
+        return "Nodes[" + ", ".join(self.str_nodes()) + "]"
+
+    def str_nodes(self):
+        if self.flat:
+            for node in self.nodes:
+                yield str(node)
+        else:
+            for node in self:
+                yield '.'.join(str(part) for part in node)
+
 # check that circuit is forced to be true when variable set
 def forced_by(circuit, vals_as_list):
     andeds = []
@@ -42,11 +115,10 @@ def minimize_solution_(circuit, vals, necessary_vals):
 
 # vecs is a list of vectors
 def add_uniqueness_constraints(alphabet, circuits, nvecs):
-    if len(alphabet) == 2:
-        return None
-    #print("vecs", vecs)
     for nvec in nvecs:
-        circuits.append(ATMOSTONE(*(V(nvec + (sym,)) for sym in alphabet[1:])))
+        local_alph = alphabet[nvec[-1]]
+        if len(local_alph) > 2:
+            circuits.append(ATMOSTONE(*(V(nvec + (sym,)) for sym in local_alph[1:])))
 
 def nonnegative_patterns(dim, tr_dims, patterns):
     "Translate the pattern to have nonnegative coodrinates along the specified dimensions"
@@ -176,13 +248,13 @@ class SFT:
             conf = dict()
             for vec in hyperrect(conf_bounds):
                 for node in self.nodes:
-                    for sym in self.alph[1:]:
+                    for sym in self.alph[node][1:]:
                         var = vec + (node, sym)
                         if m.get(var, False):
                             conf[vec + (node,)] = sym
                             break
                     else:
-                        conf[vec + (node,)] = self.alph[0]
+                        conf[vec + (node,)] = self.alph[node][0]
             return True, conf
         return True
 
@@ -213,6 +285,7 @@ class SFT:
         return False
 
     def deduce(self, known_values, domain):
+        raise Exception("sft.deduce is currently broken")
         #print(domain, known_values)
         #if len(self.alph) != 2:
         #    raise Exception("Only binary alphabets supported in deduce")
@@ -289,22 +362,22 @@ class SFT:
             circuits.append(circ)
             
         for (nvec, sym) in existing.items():
-            if sym == self.alph[0]:
-                circuits.extend(NOT(V(nvec+(a,))) for a in self.alph[1:])
+            if sym == self.alph[nvec[-1]][0]:
+                circuits.extend(NOT(V(nvec+(a,))) for a in self.alph[nvec[-1]][1:])
             else:
                 circuits.append(V(nvec+(sym,)))
 
         add_uniqueness_constraints(self.alph, circuits, all_positions)
 
-        for model in projections(AND(*circuits), [nvec+(sym,) for nvec in domain for sym in self.alph[1:]]):
+        for model in projections(AND(*circuits), [nvec+(sym,) for nvec in domain for sym in self.alph[nvec[-1]][1:]]):
             pat = dict()
             for nvec in domain:
-                for sym in self.alph[1:]:
+                for sym in self.alph[nvec[-1]][1:]:
                     if model[nvec+(sym,)]:
                         pat[nvec] = sym
                         break
                 else:
-                    pat[nvec] = self.alph[0]
+                    pat[nvec] = self.alph[nvec[-1]][0]
             yield pat
 
     # for one-dimensional sfts, the language can be requested as strings
@@ -335,22 +408,22 @@ class SFT:
             circuits.append(circ)
             
         for (nvec, sym) in existing.items():
-            if sym == self.alph[0]:
-                circuits.extend(NOT(V(nvec+(a,))) for a in self.alph[1:])
+            if sym == self.alph[nvec[-1]][0]:
+                circuits.extend(NOT(V(nvec+(a,))) for a in self.alph[nvec[-1]][1:])
             else:
                 circuits.append(V(nvec+(sym,)))
 
         add_uniqueness_constraints(self.alph, circuits, [vec + (node,) for vec in domain for node in self.nodes])
 
-        for model in projections(AND(*circuits), [nvec+(sym,) for nvec in domain for sym in self.alph[1:]]):
+        for model in projections(AND(*circuits), [nvec+(sym,) for nvec in domain for sym in self.alph[nvec[-1]][1:]]):
             pat = dict()
             for nvec in domain:
-                for sym in self.alph[1:]:
+                for sym in self.alph[nvec[-1]][1:]:
                     if model[nvec+(sym,)]:
                         pat[nvec] = sym
                         break
                 else:
-                    pat[nvec] = self.alph[0]
+                    pat[nvec] = self.alph[nvec[-1]][0]
             yield pat
 
     def deduce_circuit(self):
@@ -359,8 +432,8 @@ class SFT:
             for forb in self.forbs:
                 ored = []
                 for (nvec, c) in forb.items():
-                    if c == self.alph[0]:
-                        ored.extend(V(nvec+(d,)) for d in self.alph[1:])
+                    if c == self.alph[nvec[-1]][0]:
+                        ored.extend(V(nvec+(d,)) for d in self.alph[nvec[-1]][1:])
                     else:
                         ored.append(NOT(V(nvec+(c,))))
                 anded.append(OR(*ored))
@@ -421,8 +494,8 @@ class SFT:
                 oreds = []
                 for (forb_nvec, value) in forb.items():
                     local_vec = nvadd(forb_nvec, vec)
-                    if value == self.alph[0]:
-                        oreds.extend(V(local_vec+(sym,)) for sym in self.alph[1:])
+                    if value == self.alph[local_vec[-1]][0]:
+                        oreds.extend(V(local_vec+(sym,)) for sym in self.alph[local_vec[-1]][1:])
                     else:
                         oreds.append(NOT(V(local_vec+(value,))))
                 forb_circuits.append(OR(*oreds))
@@ -449,7 +522,7 @@ class SFT:
             if val:
                 new_forb[nvec_sym[:-1]] = nvec_sym[-1]
             else:
-                new_forb[nvec_sym[:-1]] = self.alph[0]
+                new_forb[nvec_sym[:-1]] = self.alph[nvec_sym[-2]][0]
 
         #print("new forb", new_forb)
 
@@ -561,7 +634,7 @@ class SFT:
             return summa
         else:
             # compute by brute force
-            return sum(1 for _ in sealf.all_patterns(domain, existing=known_values, extra_rad=extra_rad))
+            return sum(1 for _ in self.all_patterns(domain, existing=known_values, extra_rad=extra_rad))
 
     def keep_tiling(self):
         r = 1

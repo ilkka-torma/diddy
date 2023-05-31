@@ -60,12 +60,23 @@ rbracket = lexeme(p.string(']'))
 lbrace = lexeme(p.string('{'))
 rbrace = lexeme(p.string('}'))
 # Separators
+period = lexeme(p.string('.'))
 comma = lexeme(p.string(','))
 colon = lexeme(p.string(':'))
 semicolon = lexeme(p.string(';'))
 
 # Protected keywords
 keyword = p.regex(r'(let|in)(\W|$)')
+
+# Range of nonnegative integers; "inf" means no upper bound
+@p.generate
+def natural_range():
+    start = yield natural
+    end = yield (lexeme(p.string('-')) >> natural.optional(default="inf")).optional(start)
+    return (start, end)
+
+# Set of nonnegative integers (union of ranges)
+natural_set = natural_range.sep_by(comma, min=1)
 
 ### Command parser
 
@@ -101,7 +112,8 @@ class Command:
 commands = [
     # Setting up the environment
     Command("alphabet",
-            [ArgType.SIMPLE_LIST],
+            [ArgType.SIMPLE_LIST | ArgType.MAPPING],
+            opts = ["default"],
             aliases = ["alph"]),
     Command("topology",
             [ArgType.TOPOLOGY_KEYWORD | ArgType.NESTED_LIST]),
@@ -110,7 +122,7 @@ commands = [
             opts = ["onesided"],
             aliases = ["dimension"]),
     Command("nodes",
-            [ArgType.SIMPLE_LIST],
+            [ArgType.SIMPLE_LIST | ArgType.MAPPING],
             aliases = ["vertices"]),
     Command("set_weights",
             [ArgType.MAPPING]),
@@ -233,13 +245,16 @@ def set_arg_value():
     yield p.string('=')
     arg_value = yield fraction | label | nested_list
     return (arg_name, arg_value)
+    
+# Node name: period-separated sequence of labels
+node_name = (label | natural).sep_by(period, min=1).map(lambda items: items[0] if len(items) == 1  else tuple(items))
 
 # Vector or node vector
 @p.generate("vector")
 def vector():
     yield lparen
     nums = yield integer.sep_by(comma << p.peek(integer))
-    maybe_node = yield (comma >> label).optional()
+    maybe_node = yield (comma >> node_name).optional()
     yield rparen
     if maybe_node is None:
         return tuple(nums)
@@ -259,6 +274,12 @@ def mapping_pair(key, value):
 # Mapping: list of key:value pairs, parsed into a dict
 def mapping(key, value):
     return (lbrace >> mapping_pair(key, value).many().map(dict) << rbrace).desc("mapping")
+def nested_mapping(key, value):
+    @p.generate
+    def nested_map():
+        the_map = yield mapping(key, value | nested_mapping(key, value))
+        return the_map
+    return nested_map
 # Mapping without braces
 def open_mapping(key, value):
     return mapping_pair(key, value).many().map(dict).desc("mapping")
@@ -268,7 +289,7 @@ pattern = mapping(vector, label|fraction)
 open_pattern = open_mapping(vector, label|fraction)
 
 # Flat value
-flat_value = fraction | vector | set_arg_value.desc("setter") | label | pattern
+flat_value = vector | set_arg_value.desc("setter") | node_name | fraction | pattern
 
 # List (possibly nested) of numbers, vectors, labels, setters and patterns
 @p.generate("list")
@@ -328,7 +349,7 @@ def command_args(cmd, index, args=None, opts=None, flags=None, mode="normal"):
                 if ArgType.PATTERN in arg_type:
                     arg_parsers.append(pattern)
                 if ArgType.MAPPING in arg_type:
-                    arg_parsers.append(mapping(flat_value, flat_value | nested_list))
+                    arg_parsers.append(nested_mapping(flat_value, flat_value | nested_list))
                 if ArgType.FORMULA in arg_type:
                     arg_parsers.append(quantified)
                 arg = yield p.alt(*arg_parsers)
@@ -543,11 +564,23 @@ strict_label = lexeme((keyword | p.regex(r'[AEO].*')).should_fail("keyword") >> 
 
 # Positional expression
 pos_expr = p.seq(strict_label | integer.desc("integer"),
-                 (lexeme(p.string('.')) >> (label | integer).desc("address")).many()).combine(lambda var, addrs: ("ADDR", var, *addrs) if addrs else var)
+                 (lexeme(p.string('.')) >> (label | integer | vector | p.string('')).desc("address")).many()).combine(lambda var, addrs: ("ADDR", var, *addrs) if addrs else var)
+
+# Distance operator: specify allowed distances between two nodes
+@p.generate
+def dist_operation():
+    neg = yield p.string('!').optional()
+    yield lexeme(p.string('~^'))
+    dist_ranges = yield natural_set
+    if neg:
+        return lambda x, y: ("NOT", ("HASDIST", dist_ranges, x, y))
+    else:
+        return lambda x, y: ("HASDIST", dist_ranges, x, y)
 
 # Chainable comparison operators
 comp_table = [("node comparison", Assoc.STRICT_CHAIN,
                [lexeme(p.string('~~')) >> p.success(lambda x, y: ("ISPROPERNEIGHBOR", x, y)),
+                dist_operation,
                 lexeme(p.string('~')) >> p.success(lambda x, y: ("ISNEIGHBOR", x, y)),
                 lexeme(p.string('=')) >> p.success(lambda x, y: ("VALEQ", x, y)),
                 lexeme(p.string('@')) >> p.success(lambda x, y: ("POSEQ", x, y)),
