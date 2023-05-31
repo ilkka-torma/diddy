@@ -285,7 +285,7 @@ class SFT:
         return False
 
     def deduce(self, known_values, domain):
-        raise Exception("sft.deduce is currently broken")
+        #raise Exception("sft.deduce is currently broken")
         #print(domain, known_values)
         #if len(self.alph) != 2:
         #    raise Exception("Only binary alphabets supported in deduce")

@@ -31,9 +31,13 @@ class Diddy:
         self.nodeoffsets = {0 : (0,0)}
         self.formulae = []
         self.weights = None
+        self.externals = {}
 
     def run(self, code, mode="report"):
+        print(code)
         parsed = dparser.parse_diddy(code)
+        print (parsed)
+        #a = bbb
         for parsed_line in parsed:
             cmd, args, kwds, flags = parsed_line
             #print("cmd", cmd)
@@ -67,26 +71,32 @@ class Diddy:
             elif cmd == "topology":
                 top = args[0]
                 if top in ["line"]:
+                    self.dim = 1
                     self.topology = line
                     self.nodes = [0]
-                    self.gridmoves = [1]
+                    # only the first will be used
+                    self.gridmoves = [(1, 0), (0, 1)]
                     self.nodeoffsets = {0 : (0,0)}
                 elif top in ["square", "grid", "squaregrid"]:
+                    self.dim = 2
                     self.topology = grid
                     self.nodes = [0]
                     self.gridmoves = [(1,0), (0,1)]
                     self.nodeoffsets = {0 : (0,0)}
                 elif top in ["hex", "hexgrid"]:
+                    self.dim = 2
                     self.topology = hexgrid
                     self.nodes = [0, 1]
                     self.gridmoves = [(1,0), (-0.5,1)]
                     self.nodeoffsets = {0 : (0,0), 1 : (0.5,0)}
                 elif top in ["king", "kinggrid"]:
+                    self.dim = 2
                     self.topology = kinggrid
                     self.nodes = [0]
                     self.gridmoves = [(1,0), (0,1)]
                     self.nodeoffsets = {0 : (0,0)}
                 elif top in ["triangle", "trianglegrid"]:
+                    self.dim = 2
                     self.topology = trianglegrid
                     self.nodes = [0]
                     self.gridmoves = [(1,0), (0.5,0.6)]
@@ -109,7 +119,7 @@ class Diddy:
                 if type(defn) == list:
                     self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, forbs=defn, onesided=onesided)
                 elif type(defn) == tuple:
-                    circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, defn)
+                    circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, defn, self.externals)
                     self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, circuit=circ, formula=defn, onesided=onesided)
                 else:
                     raise Exception("Unknown SFT definition: {}".format(defn))
@@ -350,7 +360,7 @@ class Diddy:
                 else:
                     colors, formula = basic_2d_Wang(tiles)
                     
-                circ = compiler.formula_to_circuit(Wang_nodes, 2, Wang_topology, colors, formula)
+                circ = compiler.formula_to_circuit(Wang_nodes, 2, Wang_topology, colors, formula, self.externals)
                 self.SFTs[name] = sft.SFT(2, Wang_nodes, self.alphabet, circuit=circ, formula=formula)
 
             # caching is global, is that dangerous?
@@ -368,7 +378,7 @@ class Diddy:
                 #print("parsed ca rules", rules)
                 circuits = {}
                 for r in rules:
-                    circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, r[2])
+                    circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, r[2], self.externals)
                     circuits[(r[0], r[1])] = circ
                 #print(circuits)
                 self.CAs[name] = blockmap.CA(self.alphabet, self.nodes, self.dim, circuits)
@@ -379,7 +389,7 @@ class Diddy:
                 circuits = {}
                 
                 for r in rules:
-                    circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, r[3])
+                    circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, r[3], self.externals)
                     circuits[(r[0], r[1], r[2])] = circ # node node offset circuit
                 self.TFGs[name] = tfg.TFG(self.alphabet, self.nodes, self.dim, circuits)
 
@@ -504,6 +514,9 @@ class Diddy:
                                         
             elif mode == "report":
                 raise Exception("Unknown command %s." % cmd)
+
+    def add_external(self, name, obj):
+        self.externals[name] = obj
 
 
 # for a dict with lists on the right, return all sections

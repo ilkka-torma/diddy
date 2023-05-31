@@ -235,7 +235,7 @@ def fraction():
 
 # Labels (of commands, alphabets, nodes etc.)
 label = lexeme(keyword.should_fail("keyword") >> p.regex(r'[a-zA-Z]\w*')).desc("label")
-topology_keyword = lexeme(p.regex(r'grid|square|squaregrid|king|kinggrid|triangle|trianglegrid|hex|hexgrid')).desc("topology name")
+topology_keyword = lexeme(p.regex(r'line|grid|square|squaregrid|king|kinggrid|triangle|trianglegrid|hex|hexgrid')).desc("topology name")
 
 # Optional argument / setter; value is a signed number or label
 # Type checking is not done at parse time
