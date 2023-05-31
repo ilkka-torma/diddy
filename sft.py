@@ -561,7 +561,7 @@ class SFT:
         return None
 
     def equals(self, other, limit = None, return_radius = False, method=None):
-        c12, rad, _ = self.contains(other, limit, return_radius_and_sep = True, method="periodic")
+        c12, rad, _ = self.contains(other, limit, return_radius_and_sep = True, method=method)
         if c12 == None:
             return None, limit
         elif c12 == False:

@@ -525,12 +525,13 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
                         #else:
                         #    print(grid[(x,y,n)], "!=", UNKNOWN)
                         elif grid[(x,y,n)][0] == DEDUCED:
-                            sym = alphabets[n].index(grid[(x,y,n)][1])
-                            color = colors[sym] #deduced_colors[sym]
+                            print(alphabets[nodes[n]])
+                            sym = alphabets[nodes[n]][grid[(x,y,n)][1]]
+                            color = colors[grid[(x,y,n)][1]] #deduced_colors[sym]
                         elif grid[(x,y,n)][0] == SET:
-                            sym = alphabets[n].index(grid[(x,y,n)][1])
+                            sym = alphabets[nodes[n]][grid[(x,y,n)][1]]
                             #print(sym)
-                            color = colors[sym]
+                            color = colors[grid[(x,y,n)][1]]
                             white_circle = True
 
                         if (x, y, n) in vemmel:
