@@ -62,9 +62,9 @@ class Circuit:
         for i in inputs:
             if type(i) == Circuit:
                 self.complexity += i.complexity
+        self.SAT = None
+        self.TAUTO = None
         if Circuit.smart_simplify:
-            self.SAT = None
-            self.TAUTO = None
             self.simplify()
             
     def simplify(self):
@@ -550,6 +550,47 @@ def last_diff_and_count(circs, count):
     #    print(str(a))
     return AND(*andeds)
 
+# same sa LDAC, but the alphabet size (or set) is a function
+# that gives alphabets or their cardinalities
+def LDAC2(alphabet_func):
+    def leng(a):
+        if type(a) == int:
+            return a
+        return len(a)
+    af = (lambda aff:(lambda a:leng(aff(a))))(alphabet_func)
+    return lambda a: last_diff_and_count2(a, af)
+
+# given a circuit whose variables are tuples,
+# construct a circuit that states that last values
+# are different, and if we reach count, then one should
+# be true
+# of course very specific to our coding of 
+def last_diff_and_count2(circs, count):
+    #print(count, list(map(str, circs)))
+    lasts = {}
+    for c in circs:
+        #print(type(c))
+        #print(c.op)
+        #print(type(c.inputs[0]))
+        #print(c.inputs[0].inputs[0].op)
+        for v in c.get_variables():
+            #print(v)
+            if v[:-1] not in lasts:
+                lasts[v[:-1]] = set()
+            lasts[v[:-1]].add(v)
+    newlasts = {} # change to variables
+    for l in lasts:
+        newlasts[l] = list(map(lambda a : V(a), lasts[l]))
+    lasts = newlasts
+    andeds = []
+    for l in lasts:
+        if len(lasts[l]) > 1:
+            if len(lasts[l]) == count(l):
+                andeds.append(AND(ATMOSTONE(*lasts[l]), OR(*lasts[l])))
+            else:
+                andeds.append(ATMOSTONE(*lasts[l]))
+    return AND(*andeds)
+
 
 # copied from models
 # TODO: rewrite
@@ -844,7 +885,17 @@ def AND(*inputs):
     #print(Circuit.smart_simplify)
     #print("making ADN", list(map(str, inputs)))
     #print("res", Circuit("&", *inputs))
-    return circuit("&", *inputs)
+    andeds = []
+    for inp in inputs:
+        if inp == T:
+            continue
+        if inp == F:
+            return F
+        if inp.op == "&":
+            andeds.extend(inp.inputs)
+        else:
+            andeds.append(inp)
+    return circuit("&", *andeds)
 
 def OR(*inputs):
     if len(inputs) == 1:
@@ -852,13 +903,22 @@ def OR(*inputs):
         return inputs[0]
     if len(inputs) == 0:
         return F
-    #Circuit.vidi = inputs[3]
-    #print(Circuit.smart_simplify)
-    #print("making ÖR", list(map(str, inputs)))
-    #print("res", Circuit("|", *inputs))
+    oreds = []
+    for inp in inputs:
+        if inp == T:
+            return T
+        if inp == F:
+            continue
+        if inp.op == "|":
+            oreds.extend(inp.inputs)
+        else:
+            oreds.append(inp)
     return circuit("|", *inputs)
 def NOT(*inputs):
+    #print(inputs)
     assert len(inputs) == 1
+    if inputs[0].op == "!":
+        return inputs[0].inputs[0]
     return circuit("!", *inputs)
 T = circuit("T")
 F = circuit("F")
