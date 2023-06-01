@@ -404,7 +404,7 @@ class SFT:
             
     # domain is a collection of nodevectors
     def all_periodic_points(self, dims, existing=None):
-    
+
         if existing is None:
             existing = dict()
         
@@ -412,7 +412,7 @@ class SFT:
         for h in dims:
             domain = set(vec + (i,) for vec in domain for i in range(h))
         domain = set(vec + (n,) for vec in domain for n in self.nodes)
-
+        
         circuits = []
         for vec in domain:
             circ = self.circuit.copy()
@@ -425,7 +425,7 @@ class SFT:
             else:
                 circuits.append(V(nvec+(sym,)))
 
-        add_uniqueness_constraints(self.alph, circuits, [vec + (node,) for vec in domain for node in self.nodes])
+        add_uniqueness_constraints(self.alph, circuits, domain)
 
         for model in projections(AND(*circuits), [nvec+(sym,) for nvec in domain for sym in self.alph[nvec[-1]][1:]]):
             pat = dict()

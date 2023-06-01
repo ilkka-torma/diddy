@@ -35,7 +35,15 @@ class Diddy:
 
     def run(self, code, mode="report"):
         #print(code)
-        parsed = dparser.parse_diddy(code)
+        try:
+            parsed = dparser.parse_diddy(code)
+        except parsy.ParseError as e:
+            print("Parse error: {}".format(e))
+            linenum, lineindex = parsy.line_info_at(e.stream, e.index)
+            line = e.stream.splitlines()[linenum]
+            print(line)
+            print(" "*lineindex + "^")
+            return None
         #print (parsed)
         #a = bbb
         for parsed_line in parsed:
@@ -488,6 +496,7 @@ class Diddy:
                 size *= len(the_sft.nodes)
                 print("Computing lower bound for topological entropy of {} using {}-periodic points and {}-size blocks".format(name, periods, big_periods))
                 the_max = 0
+                tim = time.time()
                 for pat in the_sft.all_periodic_points(periods):
                     border = {nvec : pat[general.nvmods(periods, nvec)] for nvec in big_domain if any(a <= b for (a,b) in zip(nvec, var_dims))}
                     the_max = max(the_max, sum(1 for _ in the_sft.all_periodic_points(big_periods, existing=border)))
@@ -792,13 +801,7 @@ if __name__ == "__main__":
         code = f.read()
 
     runner = Diddy()
-    try:
-        runner.run(code)
-    except parsy.ParseError as e:
-        print("Parse error: {}".format(e))
-        linenum, lineindex = parsy.line_info_at(e.stream, e.index)
-        line = e.stream.splitlines()[linenum]
-        print(line)
-        print(" "*lineindex + "^")
+    runner.run(code)
+        
 
     
