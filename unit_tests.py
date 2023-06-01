@@ -338,6 +338,19 @@ code = """
 """
 unit_tests.append(("node-specific alphabets", code))
 
+code = """
+%sft empty Ao 0=1
+%sft empty2 Ao 1=0
+%sft nonempty Ao o=0
+%sft nontriv_empty Ao
+(o=0 -> o.rt=0 & o.up=1) &
+(o=1 -> o.rt.rt=0)
+%equal expect=F empty nonempty
+%equal expect=T empty empty2
+%equal expect=T empty nontriv_empty
+"""
+unit_tests.append(("emptiness", code))
+
 
 if __name__ == "__main__":
 

@@ -181,7 +181,11 @@ class SFT:
             periodics = []
         
         my_vecs = set(var[:-2] for var in self.circuit.get_variables())
+        if not my_vecs:
+            my_vecs.add((0,)*self.dim)
         other_vecs = set(var[:-2] for var in other.circuit.get_variables())
+        if not other_vecs:
+            other_vecs.add((0,)*self.dim)
         #print("sfts", self, other, "vecs", my_vecs, other_vecs)
         conf_bounds = [(0 if i in self.onesided+periodics else -rad,
                         rad if i in periodics else 2*rad)
@@ -542,7 +546,7 @@ class SFT:
         return None
 
     def equals(self, other, limit = None, return_radius = False, method=None):
-        c12, rad, _ = self.contains(other, limit, return_radius_and_sep = True, method="periodic")
+        c12, rad, _ = self.contains(other, limit, return_radius_and_sep = True, method=method)
         if c12 == None:
             return None, limit
         elif c12 == False:
