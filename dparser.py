@@ -142,13 +142,16 @@ commands = [
             aliases = ["Wang"]),
     Command("CA",
             [ArgType.LABEL, ArgType.NESTED_LIST],
-            aliases = ["cellular_automaton"]),
+            aliases = ["cellular_automaton"]), 
     Command("compose_CA",
             [ArgType.LABEL, ArgType.SIMPLE_LIST]),
     Command("spacetime_diagram",
             [ArgType.LABEL, ArgType.LABEL],
             opts = ["time_axis"],
             flags = ["twosided"]),
+    Command("TFG",
+            [ArgType.LABEL, ArgType.NESTED_LIST],
+            aliases = ["topological_full_group_element"]),
 
     # Printing objects' basic properties
     Command("show_formula",
@@ -193,6 +196,9 @@ commands = [
             opts = ["radius"]),
     Command("entropy_lower_bound",
             [ArgType.LABEL, ArgType.SIMPLE_LIST, ArgType.SIMPLE_LIST]),
+    Command("TFG_loops",
+            [ArgType.LABEL, ArgType.LABEL],
+            aliases = ["topological_full_group_element_loops"]),
 
     # Visualization
     Command("tiler",
@@ -229,7 +235,7 @@ def fraction():
 
 # Labels (of commands, alphabets, nodes etc.)
 label = lexeme(keyword.should_fail("keyword") >> p.regex(r'[a-zA-Z]\w*')).desc("label")
-topology_keyword = lexeme(p.regex(r'grid|square|squaregrid|king|kinggrid|triangle|trianglegrid|hex|hexgrid')).desc("topology name")
+topology_keyword = lexeme(p.regex(r'line|grid|square|squaregrid|king|kinggrid|triangle|trianglegrid|hex|hexgrid')).desc("topology name")
 
 # Optional argument / setter; value is a signed number or label
 # Type checking is not done at parse time

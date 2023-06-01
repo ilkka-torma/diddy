@@ -289,51 +289,59 @@ class SFT:
         return False
 
     def deduce(self, known_values, domain):
-        raise Exception("sft.deduce is currently broken")
-        #print(domain, known_values)
+        #raise Exception("sft.deduce is currently broken")
+        print("deducing", domain, known_values)
         #if len(self.alph) != 2:
         #    raise Exception("Only binary alphabets supported in deduce")
+
+        print(self.circuit)
         
         circuits = {}
     
         for v in domain:
             circuits[v] = self.circuit.copy()
-            for var in self.circuit.get_variables():
+            #for var in self.circuit.get_variables():
                 # translate and add 0 at end so that we don't replace twice
-                rel_pos = vadd(v, var[:-2]) + (var[-2], var[-1], 0) 
-                substitute(circuits[v], var, V(rel_pos))
-            #print(circuits[v])
+
+                #rel_pos = vadd(v, var[:-2]) + (var[-2], var[-1], 0) 
+                #substitute(circuits[v], var, V(rel_pos))
+
+            transform(circuits[v], lambda var: nvadd(var[:-1], v) + var[-1:])
+            #print(v, circuits[v])
 
         #print("that was circuits")
         forceds = set()
         for v in known_values:
-            if known_values[v] == self.alph[0]:
-                for a in self.alph[1:]:
-                    forceds.add(NOT(V(v + (a, 0))))
+            if known_values[v] == self.alph[v[-1]][0]:
+                for a in self.alph[v[-1]][1:]:
+                    forceds.add(NOT(V(v + (a,))))
                 #forceds.add(V(v + (1, 0)))
             else:
-                forceds.add(V(v + (known_values[v], 0)))
+                forceds.add(V(v + (known_values[v],)))
         #for f in forceds:
         #    print(f)
         #print("was forced")
 
+        circuits = list(circuits.values())
+        add_uniqueness_constraints(self.alph, circuits, [d + (n,) for n in self.nodes for d in domain])
+
         #print("no22")
-        m = SAT(AND(*(list(circuits.values()) + list(forceds))), True)
+        m = SAT(AND(*(list(circuits) + list(forceds))), True)
         if m == False:
             print("nope")
             return None
 
-        #print("limimisad", m)
+        print("limimisad", m)
         
         mm = {}
         for v in domain:
             for n in self.nodes:
-                for a in self.alph[1:]:
-                    if v + (n, a, 0) in m and m[v + (n, a, 0)]:
+                for a in self.alph[n][1:]:
+                    if v + (n, a) in m and m[v + (n, a)]:
                         mm[v + (n,)] = a
                         break
                 else:
-                    mm[v + (n,)] = self.alph[0]
+                    mm[v + (n,)] = self.alph[n][0]
                 """    
                     #print()
                     if m[v + (n, 1, 0)]:
@@ -383,6 +391,16 @@ class SFT:
                 else:
                     pat[nvec] = self.alph[nvec[-1]][0]
             yield pat
+
+    # for one-dimensional sfts, the language can be requested as strings
+    # TODO: replace extra_rad with exact calculation
+    def language_as_words(self, n):
+        assert self.dim == 1
+        for p in self.all_patterns(list(range(n)), extra_rad = 10):
+            s = []
+            for q in sorted(p):
+                s.append(p[q])
+            yield tuple(s)
             
     # domain is a collection of nodevectors
     def all_periodic_points(self, dims, existing=None):
@@ -528,6 +546,7 @@ class SFT:
         "Test containment using forced allowed patterns or special configurations"
         r = 1
         while limit is None or r <= limit:
+            print(r)
             if other.ball_forces_allowed(self, r):
                 if return_radius_and_sep:
                     return True, r, None

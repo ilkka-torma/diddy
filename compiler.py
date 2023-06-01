@@ -1,6 +1,6 @@
 #from circuit import *
 import circuit
-from circuit import NOT, V, AND, OR, T, F, IMP, IFF, tech_simp
+from circuit import NOT, V, AND, OR, T, F, IMP, IFF, tech_simp, Circuit
 from general import *
 
 """
@@ -18,57 +18,84 @@ from general import *
 circuit_variables are aa little tricky... they should be functions
 """
 
-def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_var, all_vars):
+def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_var, all_vars, externals):
     #print("nodes", nodes)
     #print("variables", variables)
     # print ("aux vars", aux_var)
     # print ("alls", all_vars)
     op = formula[0]
-    #print("op", op)
+    #print("op", op, "dim", dim)
     if op == "BOOL":
         ret = variables[formula[1]]
     elif op == "CALL":
         var = formula[1]
         args = formula[2:]
-        #print(var, "being called with", args, "in", formula)
-        #varvar = variables[var]
-        arg_names, code, closure = variables[var]
-        variables_new = {}
-        if len(args) != len(arg_names):
-            raise Exception("Wrong number of parameters in call %s." % (str(var) + " " + str(args)))
-        #print("rgs", args)
-        #print("nems", arg_names)
-        for a in closure:
-            variables_new[a] = closure[a]
-        for i,a in enumerate(arg_names):
-            if type(args[i]) != tuple:
-                #variables_new[a] = args[i]
-                try:
+        #print("function %s called" % var)
+        # calling a macro
+        if var in variables:
+            #print(var, "being called with", args, "in", formula)
+            #varvar = variables[var]
+            arg_names, code, closure = variables[var]
+            variables_new = {}
+            if len(args) != len(arg_names):
+                raise Exception("Wrong number of parameters in call %s." % (str(var) + " " + str(args)))
+            #print("rgs", args)
+            #print("nems", arg_names)
+            for a in closure:
+                variables_new[a] = closure[a]
+            for i,a in enumerate(arg_names):
+                if type(args[i]) != tuple:
+                    #variables_new[a] = args[i]
+                    try:
+                        pos = eval_to_position(dim, topology, args[i], variables, nodes)
+                    except KeyError:
+                        pos = args[i] # it's actually a value... hopefully!
+                    variables_new[a] = pos
+                elif args[i][0] == "ADDR":
                     pos = eval_to_position(dim, topology, args[i], variables, nodes)
-                except KeyError:
-                    pos = args[i] # it's actually a value... hopefully!
-                variables_new[a] = pos
-            elif args[i][0] == "ADDR":
-                pos = eval_to_position(dim, topology, args[i], variables, nodes)
-                variables_new[a] = pos
-            # if argument is a formula, we will evaluate it
-            else:
-                circ = formula_to_circuit_(nodes, dim, topology, alphabet, args[i], variables, aux_var, all_vars)
-                variables_new[a] = circ
-        """
-        for i in args:
-            if type(i) == tuple:
-                #col = collect_unbound_vars(i)
-                col = []
-            elif type(i) == list:
-                col = [var_of_pos_expr(i)]
-            else:
-                col = [i]
-            for j in col:
-                if j in variables:
-                    variables_new[j] = variables[j]
-        """
-        ret = formula_to_circuit_(nodes, dim, topology, alphabet, code, variables_new, aux_var, all_vars)
+                    variables_new[a] = pos
+                # if argument is a formula, we will evaluate it
+                else:
+                    circ = formula_to_circuit_(nodes, dim, topology, alphabet, args[i], variables, aux_var, all_vars, externals)
+                    variables_new[a] = circ
+            """
+            for i in args:
+                if type(i) == tuple:
+                    #col = collect_unbound_vars(i)
+                    col = []
+                elif type(i) == list:
+                    col = [var_of_pos_expr(i)]
+                else:
+                    col = [i]
+                for j in col:
+                    if j in variables:
+                        variables_new[j] = variables[j]
+            """
+            ret = formula_to_circuit_(nodes, dim, topology, alphabet, code, variables_new, aux_var, all_vars, externals)
+        # call a Python function
+        elif var in externals:
+            func = externals[var]
+            cxt = nodes, dim, topology, alphabet, formula, variables, aux_var, all_vars
+            ret = func(cxt, *args)
+            # convert Python truth values to truth values
+            if ret == True:
+                ret = T
+            elif ret == False:
+                ret = F
+            # if returns a circuit, in case V(pos + (sym,)) we must fix alphabet[0]
+            # because we are using the space efficient coding
+            if type(ret) == Circuit:
+                def eliminate_zero(v):
+                    pos = v[:-2]
+                    node = v[-2]
+                    sym = v[-1]
+                    if sym != alphabet[node][0]:
+                        return v
+                    return AND(*(NOT(V(pos + (node, a))) for a in alphabet[node][1:]))
+                #print("before elimination", ret)
+                circuit.transform(ret, eliminate_zero)
+                #print("after elimination", ret)
+            
     elif op in ["CELLFORALL", "CELLEXISTS", "NODEFORALL", "NODEEXISTS"]:
         var = formula[1]
         bound = formula[2]
@@ -83,7 +110,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
             #print(var, typ, q)
             variables_new = dict(variables)
             variables_new[var] = q
-            pos_formulas.append(formula_to_circuit_(nodes, dim, topology, alphabet, rem_formula, variables_new, aux_var, all_vars))
+            pos_formulas.append(formula_to_circuit_(nodes, dim, topology, alphabet, rem_formula, variables_new, aux_var, all_vars, externals))
                                     
             #print(q)
         #print(a = bbb)
@@ -100,7 +127,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         for a in variables:
             variables_new = dict(variables)
             variables_new[valvar] = a
-            val_formulas.append(formula_to_circuit_(nodes, dim, topology, alphabet, rem_formula, variables_new, aux_var, all_vars))
+            val_formulas.append(formula_to_circuit_(nodes, dim, topology, alphabet, rem_formula, variables_new, aux_var, all_vars, externals))
         if op == "FORALL":
             ret = AND(*pos_formulas)
         elif op == "EXISTS":
@@ -116,7 +143,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         args = formula[1:]
         arg_formulas = []
         for arg in args:
-            arg_formulas.append(formula_to_circuit_(nodes, dim, topology, alphabet, arg, variables, aux_var, all_vars))
+            arg_formulas.append(formula_to_circuit_(nodes, dim, topology, alphabet, arg, variables, aux_var, all_vars, externals))
         if op == "OR":
             ret = OR(*arg_formulas)
         elif op == "AND":
@@ -133,10 +160,10 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         #new_var = aux_var[0]
         #aux_var[0] += 1
         var = formula[1]
-        form = formula_to_circuit_(nodes, dim, topology, alphabet, formula[2], variables, aux_var, all_vars)
+        form = formula_to_circuit_(nodes, dim, topology, alphabet, formula[2], variables, aux_var, all_vars, externals)
         variables_new = dict(variables)
         variables_new[var] = form
-        ret = formula_to_circuit_(nodes, dim, topology, alphabet, formula[3], variables_new, aux_var, all_vars)
+        ret = formula_to_circuit_(nodes, dim, topology, alphabet, formula[3], variables_new, aux_var, all_vars, externals)
     # cvn[var] should be just the code, and a closure
     elif op == "LET":
         var = formula[1][0]
@@ -156,7 +183,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         variables_new = dict(variables)
         variables_new[var] = (arg_names, circuit_code, closure)
         
-        ret = formula_to_circuit_(nodes, dim, topology, alphabet, ret_code, variables_new, aux_var, all_vars)
+        ret = formula_to_circuit_(nodes, dim, topology, alphabet, ret_code, variables_new, aux_var, all_vars, externals)
     elif op == "POSEQ":
         """
         if formula[1] == ["o", "up"]:
@@ -373,11 +400,11 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
     #print("ret", ret)
     return ret
 
-def formula_to_circuit(nodes, dim, topology, alphabet, formula):
+def formula_to_circuit(nodes, dim, topology, alphabet, formula, externals):
     variables = {} 
-    aux_var = [0] # da fuck is this?
+    aux_var = [0] # what dis?
     all_vars = set()
-    form = formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_var, all_vars)
+    form = formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_var, all_vars, externals)
     return tech_simp(form)
 
 def collect_unbound_vars(formula, bound = None):

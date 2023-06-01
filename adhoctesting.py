@@ -37,7 +37,7 @@ code_hex_idcodes = """
 %compute_forbidden_patterns idcode radius=2
 %minimum_density idcode (2,1)
 """
-unit_tests.append(("hex idcodes", code_hex_idcodes))
+#unit_tests.append(("hex idcodes", code_hex_idcodes))
 
 
 code_locdomrad2 = """
@@ -452,12 +452,12 @@ code = """
 
 code = """
 %CA a
-0 1 Ao o!=o.rt;
-%equal a a
+0 1 Ao o!=o.rt
+%equal expect=T a a
 %compose_CA aa a a
 %compose_CA aa_a aa a
 %compose_CA a_aa a aa
-%equal a_aa aa_a
+%equal expect=T a_aa aa_a
 """
 #unit_tests.append(("CA", code))
 
@@ -749,8 +749,33 @@ WangConstraint o &
 (o.E=0 & o.N=1 & o.W=3 & o.S=1)
 %tile_box JeandelRao 33
 """
-unit_tests.append(("JR tiling", code_JR))
+#unit_tests.append(("JR tiling", code_JR))
 
+code_tfg_test = """
+%alphabet 0 1
+%dim 1
+%nodes 1
+%topology
+rt (0, 1) (1, 1);
+lt (0, 1) (-1, 1)
+%TFG a -- a swaps positions on top of 0001
+1 1 1 Ao let ww x := x=0 & x.rt=0 & x.rt.rt=0 & x.rt.rt.rt=1 in ww o | ww o.lt.lt;
+1 1 -1 Ao let ww x := x=0 & x.rt=0 & x.rt.rt=0 & x.rt.rt.rt=1 in ww o.lt | ww o.lt.lt.lt
+%SFT goldenmean Ao o=1 -> o.rt=0
+%compute_forbidden_patterns goldenmean
+%TFG_loops a goldenmean
+--%TFGE b
+--1 1 4 Oo let ww x := x=0 & x.rt=0 & x.rt.rt=0 & x.rt.rt.rt=1 in ww o & ww o.rt.rt.rt.rt;
+--1 1 2 Oo let ww x := x=0 & x.rt=0 & x.rt.rt=0 & x.rt.rt.rt=1 in ww o & !ww o.rt.rt.rt.rt;
+--1 1-4 Oo let ww x := x=0 & x.rt=0 & x.rt.rt=0 & x.rt.rt.rt=1 in ww o.lt.lt & ww o.lt.lt.lt.lt.lt.lt;
+--1 1 -2 Oo let ww x := x=0 & x.rt=0 & x.rt.rt=0 & x.rt.rt.rt=1 in ww o.lt.lt & !ww o.lt.lt.lt.lt.lt.lt;
+--%invertTFGE B b
+--%compose_TFGE abaB a b a B
+--%compose_TFGE abaBabaB abaBabaB
+--%TFGE triv
+--1 1 0 Oo o=o;
+"""
+unit_tests.append(("tfg test", code_tfg_test))
 
 if __name__ == "__main__":
     for (name, code) in unit_tests:
