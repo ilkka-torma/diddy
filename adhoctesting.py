@@ -384,46 +384,6 @@ let sep s a b := (s~a & s!~b) | (s~b & s!~a) in -- s separates a from b, assumes
 """
 #unit_tests.append(("redu", redundant_id))
 
-# jeandel-rao
-code_JR = """
-%nodes N E S W
-%alphabet 0 1 2 3 4
-%topology
-up (0,0,N) (0,1,S)
-dn (0,0,S) (0,-1,N)
-rt (0,0,E) (1,0,W)
-lt (0,0,W) (-1,0,E)
-%SFT JeandelRao ACo
-let WangConstraint o := o.N = o.up.S & o.E = o.rt.W in
-WangConstraint o &
--- 1131
-(o.E=1 & o.N=1 & o.W=3 & o.S=1) |
--- 1232
-(o.E=1 & o.N=2 & o.W=3 & o.S=2) |
--- 3133
-(o.E=3 & o.N=1 & o.W=3 & o.S=3) |
--- 2421
-(o.E=2 & o.N=4 & o.W=2 & o.S=1) |
--- 2220
-(o.E=2 & o.N=2 & o.W=2 & o.S=0) |
--- 0001
-(o.E=0 & o.N=0 & o.W=0 & o.S=1) |
--- 3102
-(o.E=3 & o.N=1 & o.W=0 & o.S=2) |
--- 0212
-(o.E=0 & o.N=2 & o.W=1 & o.S=2) |
--- 1214
-(o.E=1 & o.N=2 & o.W=1 & o.S=4) |
--- 3312
-(o.E=3 & o.N=3 & o.W=1 & o.S=2) |
--- 0131
-(o.E=0 & o.N=1 & o.W=3 & o.S=1)
-%SFT empty Ao 0=1
-%contains empty JeandelRao
-"""
-#unit_tests.append(("JR",code_JR))
-
-
 # this actually became a wang tile test...
 default_parse = """
 %topology hex

@@ -23,7 +23,7 @@ def dgeq(cxt, a, b, distbound):
 # for 0...7 got up to 157
 d.add_external("dgeq", dgeq)
 d.run("""
-%alphabet 0 1 2 3 4 5 6 7
+%alphabet 0 1 2 3 4 5 6  7
 %topology line
 --%SFT all_e Ao o=e
 %SFT empty Ao 0=1
