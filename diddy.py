@@ -34,9 +34,9 @@ class Diddy:
         self.externals = {}
 
     def run(self, code, mode="report"):
-        print(code)
+        #print(code)
         parsed = dparser.parse_diddy(code)
-        print (parsed)
+        #print (parsed)
         #a = bbb
         for parsed_line in parsed:
             cmd, args, kwds, flags = parsed_line
@@ -123,7 +123,7 @@ class Diddy:
                     self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, circuit=circ, formula=defn, onesided=onesided)
                 else:
                     raise Exception("Unknown SFT definition: {}".format(defn))
-                print("CIRCUIT", circ)
+                #print("CIRCUIT", circ)
 
             elif cmd == "clopen":
                 raise NotImplementedError("Clopen sets not implemented")
@@ -449,7 +449,7 @@ class Diddy:
             elif cmd == "entropy_upper_bound":
                 name = args[0]
                 the_sft = self.SFTs[name]
-                dimensions = args[1]
+                dimensions= args[1]
                 rad = kwds.get("radius", 0)
                 
                 rect = set([tuple()])

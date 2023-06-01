@@ -366,9 +366,25 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
                     drawcolor = (SET, 0)
                 if event.key == pygame.K_2:
                     drawcolor = (SET, 1)
+                if event.key == pygame.K_3:
+                    drawcolor = (SET, 2)
+                if event.key == pygame.K_4:
+                    drawcolor = (SET, 3)
+                if event.key == pygame.K_5:
+                    drawcolor = (SET, 4)
+                if event.key == pygame.K_6:
+                    drawcolor = (SET, 5)
+                if event.key == pygame.K_7:
+                    drawcolor = (SET, 6)
+                if event.key == pygame.K_8:
+                    drawcolor = (SET, 7)
                 if event.key == pygame.K_9:
-                    drawcolor = UNKNOWN # means unused
+                    drawcolor = (SET, 8)
                 if event.key == pygame.K_0:
+                    drawcolor = (SET, 9)
+                if event.key == pygame.K_u:
+                    drawcolor = UNKNOWN # means unused
+                if event.key == pygame.K_BACKSPACE:
                     drawcolor = EMPTY
                 
                 if event.key == pygame.K_ESCAPE:
@@ -525,7 +541,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
                         #else:
                         #    print(grid[(x,y,n)], "!=", UNKNOWN)
                         elif grid[(x,y,n)][0] == DEDUCED:
-                            print(alphabets[nodes[n]])
+                            #print(alphabets[nodes[n]])
                             sym = alphabets[nodes[n]][grid[(x,y,n)][1]]
                             color = colors[grid[(x,y,n)][1]] #deduced_colors[sym]
                         elif grid[(x,y,n)][0] == SET:

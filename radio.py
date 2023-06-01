@@ -23,7 +23,7 @@ def dgeq(cxt, a, b, distbound):
 # for 0...7 got up to 157
 d.add_external("dgeq", dgeq)
 d.run("""
-%alphabet 0 1 2 3 4 5 6 e -- n lett34s
+%alphabet 0 1 2 3 4 5 6 7 e -- n lett34s
 %topology line
 %SFT all_e Ao o=e
 --%SFT fullshift Ao 0=0
@@ -34,9 +34,11 @@ d.run("""
   (o ~^3 p -> dgeq o p 1) &
   (o = e -> o.lt = e & o.rt = e)
 
-%equal radio all_e
+--%equal radio all_e
+--%entropy_lower_bound radio [1] [1]
+--%entropy_upper_bound radio [14]
 """)
-# d.run("%tiler radio")
+d.run("%tiler radio")
 
 
 """
