@@ -26,12 +26,12 @@ class BlockMap:
                 if (n, a) in self.circuits:
                     circs[a] = self.circuits[(n, a)]
             # check if we should add default case
-            if len(circs) < len(to_alphabet):
+            if len(circs) < len(to_alphabet[n]):
                 default_found = False
                 for a in to_alphabet[n]:
                     if a not in circs:
                         if not default_found:
-                            self.circuits[(n, a)] = AND(*(map(lambda b:NOT(b), circs.values())))
+                            self.circuits[(n, a)] = AND(*(NOT(b) for b in circs.values()))
                         else:
                             self.circuits[(n, a)] = F
 
@@ -153,13 +153,63 @@ class BlockMap:
             if not self.injective_on_periodics(r):
                 return False
             r += 1
-        
-class CA(BlockMap):
-    def __init__(self, alphabet, nodes, dimension, circuits):
-        super().__init__(alphabet, alphabet, nodes, nodes, dimension, circuits)
+
+    # assume the environments match
+    def preimage(self, the_sft):
+        sft_circ = the_sft.circuit.copy()
+        for var in sft_circ.get_variables():
+            substitute(sft_circ, var, V(var+(None,))) # prevent accidental repeated substitutions
+        for var in sft_circ.get_variables():
+            vec, node, sym = var[:-3], var[-3], var[-2]
+            bm_circ = self.circuits[node, sym].copy()
+            transform(bm_circ, lambda var2: vadd(vec, var2[:-2]) + var2[-2:])
+            substitute(sft_circ, var, bm_circ)
+        return SFT(self.dimension, self.from_nodes, self.from_alphabet, circuit=sft_circ)
+
+    def relation(self, tracks=(0,1)):
+        "The relation defining this block map (as an SFT), i.e. its graph"
+        dom_alph = self.from_alphabet
+        dom_nodes = self.from_nodes
+        cod_alph = self.to_alphabet
+        cod_nodes = self.to_nodes
+        dim = self.dimension
+        nodes = Nodes({tr:nodes for (tr, nodes) in zip(tracks, (dom_nodes, cod_nodes))})
+        alph = {add_track(tr,node) : alph[node]
+                for (tr, nodes, alph) in zip(tracks, (dom_nodes, cod_nodes), (dom_alph, cod_alph))
+                for node in nodes}
+        anded = []
+        for ((node, sym), circ) in self.circuits.items():
+            new_circ = circ.copy()
+            transform(new_circ, lambda var: var[:-2] + (add_track(tracks[0], var[-2]),) + var[-1:])
+            if sym != cod_alph[node][0]:
+                anded.append(IFF(V((0,)*dim + (add_track(tracks[1],node), sym)), new_circ))
+            else:
+                not_others = AND(*(NOT(V((0,)*dim + (add_track(tracks[1],node), sym2))) for sym2 in cod_alph[node][1:]))
+                anded.append(IFF(not_others, new_circ))
+        return SFT(dim, nodes, alph, circuit=AND(*anded))
+
+    def is_CA(self):
+        return self.to_alphabet == self.from_alphabet and self.to_nodes == self.from_nodes
+
+    def fixed_points(self):
+        "The SFT of fixed points of this CA"
+        assert self.is_CA()
+        alph = self.from_alphabet
+        nodes = self.from_nodes
+        dim = self.dimension
+        anded = []
+        for ((node, sym), circ) in self.circuits.items():
+            new_circ = circ.copy()
+            if sym != alph[node][0]:
+                anded.append(IMP(V((0,)*dim + (node, sym)), new_circ))
+            else:
+                not_others = AND(*(NOT(V((0,)*dim + (node, sym2))) for sym2 in alph[node][1:]))
+                anded.append(IMP(not_others, new_circ))
+        return SFT(dim, nodes, alph, circuit=AND(*anded))
 
     def spacetime_diagram(self, onesided=True, time_axis=None):
         "The SFT of spacetime diagrams of this CA"
+        assert self.is_CA()
         alph = self.from_alphabet
         nodes = self.from_nodes
         dim = self.dimension
@@ -192,23 +242,23 @@ def find_relations(CAs, rad):
     dimension = firstCA.dimension
     indices = []
     for n in nodes:
-        for a in alphabet:
+        for a in alphabet[n]:
             indices.append((n, a))
     mod = mocircuits.MOCircuitDict(indices)
     identityrule = {}
     for n in nodes:
-        for a in alphabet[1:]:
+        for a in alphabet[n][1:]:
             identityrule[(n, a)] = V((0,)*dimension + (n, a))
-    idca = CA(alphabet, nodes, dimension, identityrule)
+    idca = BlockMap(alphabet, alphabet, nodes, nodes, dimension, identityrule)
     #assert idca.then(idca) == idca
     mod[idca.tomocircuit()] = (idca, ())
-    #print(idca.circuits)
-    #print(CAs[0].circuits)
-
+    #print("idcirc", idca.circuits)
+    #print("cacirc", CAs[0].circuits)
+    
 
     #print(CAs[0])
 
-    assert CAs[0].tomocircuit() in mod
+    #assert CAs[0].tomocircuit() in mod
     
     #a = bbb
     frontier = [(idca, ())]

@@ -225,9 +225,9 @@ code = """
 %CA a
 0 1 Ao o!=o.rt
 %equal expect=T a a
-%compose_CA aa a a
-%compose_CA aa_a aa a
-%compose_CA a_aa a aa
+%compose aa a a
+%compose aa_a aa a
+%compose a_aa a aa
 %equal expect=T a_aa aa_a
 """
 unit_tests.append(("trivial CA associativity", code))
@@ -312,7 +312,7 @@ e5 (0,0,t2.t21.0) (0,0,t1.a);
 e6 (0,0,t2.t21.1) (0,0,t1.a);
 e7 (0,0,t2.t22.a) (0,0,t1.a);
 e8 (0,0,t2.t22.b) (0,0,t1.a)
-%SFT a0 Ao o..t1.a=0 <-> o=0
+%SFT a0 Ao o._.t1.a=0 <-> o=0
 %SFT a1 Ao Ax[o1] o=x
 %SFT a2
 (0,0,t1.a):0 (0,0,t2.t21.0):1;
@@ -350,6 +350,88 @@ code = """
 %equal expect=T empty nontriv_empty
 """
 unit_tests.append(("emptiness", code))
+
+code = """
+%CA a
+0 0 Ao o=o.rt=0
+%CA b
+0 0 Ao o=o.up=0
+%calculate_CA_ball 3 a b
+"""
+unit_tests.append(("CA ball", code))
+
+code = """
+%nodes a b
+%topology
+sw (0,0,a) (0,0,b);
+sw (0,0,b) (0,0,a)
+%alphabet X Y
+%save_environment env
+%topology grid
+%alphabet 0 1
+%block_map domain=env b1
+0 0 Ao o=o.sw
+%block_map domain=env b2
+0 0 ACo o.a=o.b
+%equal expect=T b1 b2
+"""
+unit_tests.append(("environments and block maps", code))
+
+code = """
+%CA f
+0 0 Ao o=o.up=0
+%SFT domino Ao o!=o.rt
+%preimage f domino preim
+%SFT alternative Ao o=o.up=0 <-> (o.rt=1 | o.rt.up=1)
+%equal expect=T preim alternative
+"""
+unit_tests.append(("preimage", code))
+
+code = """
+%SFT test Ao [o o.rt o.up] != [0 0 0]
+%SFT test2 Ao o=1 | o.rt=1 | o.up=1
+%SFT test3 Ao [o o.rt o.up] = [0 1 1] | o=1
+%SFT test4 Ao o=0 -> o.rt=o.up!=0
+%equal expect=T test test2
+%equal expect=F test2 test3
+%equal expect=T test3 test4
+"""
+unit_tests.append(("node lists", code))
+
+code = """
+%CA xor
+0 0 Ao o=o.up=o.rt=0 | o=o.up!=o.rt=0 | 0=o!=o.up=o.rt | o=o.rt!=o.up=0
+%fixed_points xor fps
+%SFT diag Ao o.up=o.rt
+%equal expect=T fps diag
+"""
+unit_tests.append(("fixed points", code))
+
+code = """
+%SFT a1 Ao o=o.rt
+%SFT a2 Ao o=o.up
+%intersection a3 a1 a2
+%SFT b1 Ao o=o.rt=o.up
+%equal expect=T a3 b1
+%product tracks=[a b] a4 a1 a2
+%nodes {a:[0] b:[0]}
+%SFT b2 ACo o.a.0=o.(1,0).a.0 & o.b.0=o.(0,1).b.0
+%equal expect=T a4 b2
+"""
+unit_tests.append(("intersection and product", code))
+
+code = """
+%save_environment bin
+%alphabet a b c
+%block_map codomain=bin f
+0 1 Ao o=o.rt=a | o=o.up=b
+%relation tracks=[D C] f rel
+%nodes {D:[0] C:[0]}
+%alphabet {D:[a b c] C:[0 1]}
+%SFT a ACo o.C.0=1 <-> (o.D.0=o.(1,0).D.0=a | o.D.0=o.(0,1).D.0=b)
+%equal expect=T rel a
+"""
+unit_tests.append(("relation", code))
 
 
 if __name__ == "__main__":

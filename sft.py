@@ -2,6 +2,12 @@ from general import *
 from circuit import *
 from itertools import chain
 
+def add_track(track, node):
+    if type(node) == tuple:
+        return (track,) + node
+    else:
+        return (track, node)
+
 class Nodes:
     "A hierarchical set of nodes"
 
@@ -9,7 +15,10 @@ class Nodes:
     # or a recursive dict from labels
     # in symbols: nodes = list(label) | dict(label : nodes)
     def __init__(self, nodes):
-        if type(nodes) == list:
+        if type(nodes) == Nodes:
+            self.flat = nodes.flat
+            self.nodes = nodes.nodes
+        elif type(nodes) == list:
             self.nodes = nodes
             self.flat = True
         else:
@@ -546,7 +555,6 @@ class SFT:
         "Test containment using forced allowed patterns or special configurations"
         r = 1
         while limit is None or r <= limit:
-            #print(r) -- would be nice to be able to see this on demand
             if other.ball_forces_allowed(self, r):
                 if return_radius_and_sep:
                     return True, r, None
@@ -676,4 +684,20 @@ class SFT:
         m = SAT(AND(*circuits))
         return not (m == False)
 
-            
+def intersection(*sfts):
+    circuit = AND(*(sft.circuit.copy() for sft in sfts))
+    return SFT(sfts[0].dim, sfts[0].nodes, sfts[0].alph, circuit=circuit, onesided=sfts[0].onesided)
+
+def product(*sfts, track_names=None):
+    if track_names is None:
+        track_names = list(range(len(sfts)))
+    nodes = Nodes({tr:sft.nodes for (tr, sft) in zip(track_names, sfts)})
+    alph = {add_track(tr,node) : sft.alph[node]
+            for (tr, sft) in zip(track_names, sfts)
+            for node in sft.nodes}
+    anded = []
+    for (tr, sft) in zip(track_names, sfts):
+        circ = sft.circuit.copy()
+        transform(circ, lambda var: var[:-2] + (add_track(tr,var[-2]),) + var[-1:])
+        anded.append(circ)
+    return SFT(sfts[0].dim, nodes, alph, circuit=AND(*anded), onesided=sfts[0].onesided)

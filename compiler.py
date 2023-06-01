@@ -510,7 +510,7 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes, top=True):
     #print(topology)
     for i in expr[2:]:
         # empty string means go to cell level
-        if i == "":
+        if i == '_':
             pos = pos[:-1] + (None,)
             continue
         for t in topology:

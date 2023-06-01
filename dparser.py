@@ -126,6 +126,10 @@ commands = [
             aliases = ["vertices"]),
     Command("set_weights",
             [ArgType.MAPPING]),
+    Command("save_environment",
+            [ArgType.LABEL]),
+    Command("load_environment",
+            [ArgType.LABEL]),
 
     # Defining objects
     Command("sft",
@@ -140,11 +144,24 @@ commands = [
             opts = ["inverses"],
             flags = ["topology", "use_topology", "custom_topology"],
             aliases = ["Wang"]),
-    Command("CA",
-            [ArgType.LABEL, ArgType.NESTED_LIST],
-            aliases = ["cellular_automaton"]), 
-    Command("compose_CA",
+    Command("intersection",
             [ArgType.LABEL, ArgType.SIMPLE_LIST]),
+    Command("product",
+            [ArgType.LABEL, ArgType.SIMPLE_LIST],
+            opts = ["tracks"]),
+    Command("block_map",
+            [ArgType.LABEL, ArgType.NESTED_LIST],
+            opts = ["domain", "codomain"],
+            aliases = ["blockmap", "CA"]),
+    Command("compose",
+            [ArgType.LABEL, ArgType.SIMPLE_LIST]),
+    Command("relation",
+            [ArgType.LABEL, ArgType.LABEL],
+            opts = ["tracks"]),
+    Command("preimage",
+            [ArgType.LABEL, ArgType.LABEL, ArgType.LABEL]),
+    Command("fixed_points",
+            [ArgType.LABEL, ArgType.LABEL]),
     Command("spacetime_diagram",
             [ArgType.LABEL, ArgType.LABEL],
             opts = ["time_axis"],
@@ -167,10 +184,12 @@ commands = [
     # Comparing objects
     Command("equal",
             [ArgType.LABEL, ArgType.LABEL],
-            opts = ["method", "expect"]),
+            opts = ["method", "expect"],
+            aliases = ["equals"]),
     Command("contains",
             [ArgType.LABEL, ArgType.LABEL],
-            opts = ["method", "expect"]),
+            opts = ["method", "expect"],
+            aliases = ["contain"]),
     Command("compare_sft_pairs", [],
             opts = ["method"],
             aliases = ["compare_SFT_pairs"]),
@@ -564,7 +583,10 @@ strict_label = lexeme((keyword | p.regex(r'[AEO].*')).should_fail("keyword") >> 
 
 # Positional expression
 pos_expr = p.seq(strict_label | integer.desc("integer"),
-                 (lexeme(p.string('.')) >> (label | integer | vector | p.string('')).desc("address")).many()).combine(lambda var, addrs: ("ADDR", var, *addrs) if addrs else var)
+                 (lexeme(p.string('.')) >> (label | integer | vector | p.string('_')).desc("address")).many()).combine(lambda var, addrs: ("ADDR", var, *addrs) if addrs else var)
+
+# List of positional expressions
+pos_expr_list = lbracket >> pos_expr.many() << rbracket
 
 # Distance operator: specify allowed distances between two nodes
 @p.generate
@@ -573,24 +595,33 @@ def dist_operation():
     yield lexeme(p.string('~^'))
     dist_ranges = yield natural_set
     if neg:
-        return lambda x, y: ("NOT", ("HASDIST", dist_ranges, x, y))
+        return lambda x, y: ("NOT", vectorize(lambda a, b: ("HASDIST", dist_ranges, a, b))(x, y))
     else:
-        return lambda x, y: ("HASDIST", dist_ranges, x, y)
+        return vectorize(lambda x, y: ("HASDIST", dist_ranges, x, y))
 
+# Vectorize binary proposition over lists of equal length
+def vectorize(op):
+    def vect_op(x, y):
+        if type(x) == list and type(y) == list:
+            return ("AND", *(op(a, b) for (a, b) in zip(x, y)))
+        else:
+            return op(x, y)
+    return vect_op
+    
 # Chainable comparison operators
 comp_table = [("node comparison", Assoc.STRICT_CHAIN,
-               [lexeme(p.string('~~')) >> p.success(lambda x, y: ("ISPROPERNEIGHBOR", x, y)),
+               [lexeme(p.string('~~')) >> p.success(vectorize(lambda x, y: ("ISPROPERNEIGHBOR", x, y))),
                 dist_operation,
-                lexeme(p.string('~')) >> p.success(lambda x, y: ("ISNEIGHBOR", x, y)),
-                lexeme(p.string('=')) >> p.success(lambda x, y: ("VALEQ", x, y)),
-                lexeme(p.string('@')) >> p.success(lambda x, y: ("POSEQ", x, y)),
-                lexeme(p.string('!~~')) >> p.success(lambda x, y: ("NOT", ("ISPROPERNEIGHBOR", x, y))),
-                lexeme(p.string('!~')) >> p.success(lambda x, y: ("NOT", ("ISNEIGHBOR", x, y))),
-                lexeme(p.string('!=')) >> p.success(lambda x, y: ("NOT", ("VALEQ", x, y))),
-                lexeme(p.string('!@')) >> p.success(lambda x, y: ("NOT", ("POSEQ", x, y)))])]
+                lexeme(p.string('~')) >> p.success(vectorize(lambda x, y: ("ISNEIGHBOR", x, y))),
+                lexeme(p.string('=')) >> p.success(vectorize(lambda x, y: ("VALEQ", x, y))),
+                lexeme(p.string('@')) >> p.success(vectorize(lambda x, y: ("POSEQ", x, y))),
+                lexeme(p.string('!~~')) >> p.success(lambda x, y: ("NOT", vectorize(lambda a, b: ("ISPROPERNEIGHBOR", a, b))(x, y))),
+                lexeme(p.string('!~')) >> p.success(lambda x, y: ("NOT", vectorize(lambda a, b: ("ISNEIGHBOR", a, b))(x, y))),
+                lexeme(p.string('!=')) >> p.success(lambda x, y: ("NOT", vectorize(lambda a, b: ("VALEQ", a, b))(x, y))),
+                lexeme(p.string('!@')) >> p.success(lambda x, y: ("NOT", vectorize(lambda a, b: ("POSEQ", a, b))(x, y)))])]
 
-# Atomic proposition that compares nodes
-node_expr = expr_with_ops(comp_table, pos_expr)
+# Atomic proposition that compares nodes or lists of nodes
+node_expr = expr_with_ops(comp_table, pos_expr) | expr_with_ops(comp_table, pos_expr_list)
 
 # Function call
 @p.generate("boolean variable or function call")
