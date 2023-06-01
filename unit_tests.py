@@ -312,7 +312,7 @@ e5 (0,0,t2.t21.0) (0,0,t1.a);
 e6 (0,0,t2.t21.1) (0,0,t1.a);
 e7 (0,0,t2.t22.a) (0,0,t1.a);
 e8 (0,0,t2.t22.b) (0,0,t1.a)
-%SFT a0 Ao o..t1.a=0 <-> o=0
+%SFT a0 Ao o._.t1.a=0 <-> o=0
 %SFT a1 Ao Ax[o1] o=x
 %SFT a2
 (0,0,t1.a):0 (0,0,t2.t21.0):1;
@@ -397,6 +397,41 @@ code = """
 %equal expect=T test3 test4
 """
 unit_tests.append(("node lists", code))
+
+code = """
+%CA xor
+0 0 Ao o=o.up=o.rt=0 | o=o.up!=o.rt=0 | 0=o!=o.up=o.rt | o=o.rt!=o.up=0
+%fixed_points xor fps
+%SFT diag Ao o.up=o.rt
+%equal expect=T fps diag
+"""
+unit_tests.append(("fixed points", code))
+
+code = """
+%SFT a1 Ao o=o.rt
+%SFT a2 Ao o=o.up
+%intersection a3 a1 a2
+%SFT b1 Ao o=o.rt=o.up
+%equal expect=T a3 b1
+%product tracks=[a b] a4 a1 a2
+%nodes {a:[0] b:[0]}
+%SFT b2 ACo o.a.0=o.(1,0).a.0 & o.b.0=o.(0,1).b.0
+%equal expect=T a4 b2
+"""
+unit_tests.append(("intersection and product", code))
+
+code = """
+%save_environment bin
+%alphabet a b c
+%block_map codomain=bin f
+0 1 Ao o=o.rt=a | o=o.up=b
+%relation tracks=[D C] f rel
+%nodes {D:[0] C:[0]}
+%alphabet {D:[a b c] C:[0 1]}
+%SFT a ACo o.C.0=1 <-> (o.D.0=o.(1,0).D.0=a | o.D.0=o.(0,1).D.0=b)
+%equal expect=T rel a
+"""
+unit_tests.append(("relation", code))
 
 
 if __name__ == "__main__":

@@ -144,10 +144,51 @@ class Diddy:
                     raise Exception("Unknown SFT definition: {}".format(defn))
                 #print("CIRCUIT", circ)
 
+            elif cmd == "intersection":
+                isect_name = args[0]
+                names = args[1]
+                if not names:
+                    raise Exception("Empty intersection")
+                sfts = []
+                for name in names:
+                    try:
+                        sfts.append(self.SFTs[name])
+                    except KeyError:
+                        raise Exception("{} is not an SFT".format(name))
+                if any((sft.dim, sft.nodes, sft.alph, sft.onesided) != (sfts[0].dim, sfts[0].nodes, sfts[0].alph, sfts[0].onesided) for sft in sfts[1:]):
+                    raise Exception("Incompatible SFTs")
+                self.SFTs[isect_name] = sft.intersection(*sfts)
+
+            elif cmd == "product":
+                prod_name = args[0]
+                names = args[1]
+                if not names:
+                    raise Exception("Empty product")
+                sfts = []
+                for name in names:
+                    try:
+                        sfts.append(self.SFTs[name])
+                    except KeyError:
+                        raise Exception("{} is not an SFT".format(name))
+                if any((sft.dim, sft.onesided) != (sfts[0].dim, sfts[0].onesided) for sft in sfts[1:]):
+                    raise Exception("Incompatible SFTs")
+                track_names = kwds.get("tracks", None)
+                self.SFTs[prod_name] = sft.product(*sfts, track_names=track_names)
+
             elif cmd == "clopen":
                 raise NotImplementedError("Clopen sets not implemented")
                 #compiled = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, i[2])
                 #self.clopens[i[1]] = i[2]
+
+            elif cmd == "relation":
+                blockmap_name = args[0]
+                try:
+                    block_map = self.blockmaps[blockmap_name]
+                except KeyError:
+                    raise Exception("{} is not a block map".format(blockmap_name))
+                sft_name = args[1]
+                tracks = kwds.get("tracks", None)
+                self.SFTs[sft_name] = block_map.relation(tracks=tracks)
 
             elif cmd == "spacetime_diagram":
                 ca_name = args[0]
@@ -178,6 +219,17 @@ class Diddy:
                     raise Exception("SFT {} is incompatible with codomain of {}".format(sft_name, blockmap_name))
                 preim_name = args[2]
                 self.SFTs[preim_name] = block_map.preimage(the_sft)
+
+            elif cmd == "fixed_points":
+                ca_name = args[0]
+                try:
+                    the_ca = self.blockmaps[ca_name]
+                except KeyError:
+                    raise Exception("{} is not a CA".format(ca_name))
+                if not the_ca.is_CA():
+                    raise Exception("{} is not a CA".format(ca_name))
+                sft_name = args[1]
+                self.SFTs[sft_name] = the_ca.fixed_points()
                 
             elif cmd == "minimum_density":
                 verbose_here = False

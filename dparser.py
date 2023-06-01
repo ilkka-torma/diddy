@@ -144,14 +144,24 @@ commands = [
             opts = ["inverses"],
             flags = ["topology", "use_topology", "custom_topology"],
             aliases = ["Wang"]),
+    Command("intersection",
+            [ArgType.LABEL, ArgType.SIMPLE_LIST]),
+    Command("product",
+            [ArgType.LABEL, ArgType.SIMPLE_LIST],
+            opts = ["tracks"]),
     Command("block_map",
             [ArgType.LABEL, ArgType.NESTED_LIST],
             opts = ["domain", "codomain"],
             aliases = ["blockmap", "CA"]),
     Command("compose",
             [ArgType.LABEL, ArgType.SIMPLE_LIST]),
+    Command("relation",
+            [ArgType.LABEL, ArgType.LABEL],
+            opts = ["tracks"]),
     Command("preimage",
             [ArgType.LABEL, ArgType.LABEL, ArgType.LABEL]),
+    Command("fixed_points",
+            [ArgType.LABEL, ArgType.LABEL]),
     Command("spacetime_diagram",
             [ArgType.LABEL, ArgType.LABEL],
             opts = ["time_axis"],
@@ -573,7 +583,7 @@ strict_label = lexeme((keyword | p.regex(r'[AEO].*')).should_fail("keyword") >> 
 
 # Positional expression
 pos_expr = p.seq(strict_label | integer.desc("integer"),
-                 (lexeme(p.string('.')) >> (label | integer | vector | p.string('')).desc("address")).many()).combine(lambda var, addrs: ("ADDR", var, *addrs) if addrs else var)
+                 (lexeme(p.string('.')) >> (label | integer | vector | p.string('_')).desc("address")).many()).combine(lambda var, addrs: ("ADDR", var, *addrs) if addrs else var)
 
 # List of positional expressions
 pos_expr_list = lbracket >> pos_expr.many() << rbracket

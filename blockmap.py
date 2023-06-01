@@ -166,8 +166,46 @@ class BlockMap:
             substitute(sft_circ, var, bm_circ)
         return SFT(self.dimension, self.from_nodes, self.from_alphabet, circuit=sft_circ)
 
+    def relation(self, tracks=(0,1)):
+        "The relation defining this block map (as an SFT), i.e. its graph"
+        dom_alph = self.from_alphabet
+        dom_nodes = self.from_nodes
+        cod_alph = self.to_alphabet
+        cod_nodes = self.to_nodes
+        dim = self.dimension
+        nodes = Nodes({tr:nodes for (tr, nodes) in zip(tracks, (dom_nodes, cod_nodes))})
+        alph = {add_track(tr,node) : alph[node]
+                for (tr, nodes, alph) in zip(tracks, (dom_nodes, cod_nodes), (dom_alph, cod_alph))
+                for node in nodes}
+        anded = []
+        for ((node, sym), circ) in self.circuits.items():
+            new_circ = circ.copy()
+            transform(new_circ, lambda var: var[:-2] + (add_track(tracks[0], var[-2]),) + var[-1:])
+            if sym != cod_alph[node][0]:
+                anded.append(IFF(V((0,)*dim + (add_track(tracks[1],node), sym)), new_circ))
+            else:
+                not_others = AND(*(NOT(V((0,)*dim + (add_track(tracks[1],node), sym2))) for sym2 in cod_alph[node][1:]))
+                anded.append(IFF(not_others, new_circ))
+        return SFT(dim, nodes, alph, circuit=AND(*anded))
+
     def is_CA(self):
         return self.to_alphabet == self.from_alphabet and self.to_nodes == self.from_nodes
+
+    def fixed_points(self):
+        "The SFT of fixed points of this CA"
+        assert self.is_CA()
+        alph = self.from_alphabet
+        nodes = self.from_nodes
+        dim = self.dimension
+        anded = []
+        for ((node, sym), circ) in self.circuits.items():
+            new_circ = circ.copy()
+            if sym != alph[node][0]:
+                anded.append(IMP(V((0,)*dim + (node, sym)), new_circ))
+            else:
+                not_others = AND(*(NOT(V((0,)*dim + (node, sym2))) for sym2 in alph[node][1:]))
+                anded.append(IMP(not_others, new_circ))
+        return SFT(dim, nodes, alph, circuit=AND(*anded))
 
     def spacetime_diagram(self, onesided=True, time_axis=None):
         "The SFT of spacetime diagrams of this CA"
