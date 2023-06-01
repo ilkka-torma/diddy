@@ -181,54 +181,54 @@ class Diddy:
                 #self.clopens[i[1]] = i[2]
 
             elif cmd == "relation":
-                blockmap_name = args[0]
+                sft_name = args[0]
+                blockmap_name = args[1]
                 try:
                     block_map = self.blockmaps[blockmap_name]
                 except KeyError:
                     raise Exception("{} is not a block map".format(blockmap_name))
-                sft_name = args[1]
                 tracks = kwds.get("tracks", None)
                 self.SFTs[sft_name] = block_map.relation(tracks=tracks)
 
             elif cmd == "spacetime_diagram":
-                ca_name = args[0]
+                sft_name = args[0]
+                ca_name = args[1]
                 try:
                     the_ca = self.blockmaps[ca_name]
                 except KeyError:
                     raise Exception("{} is not a CA".format(ca_name))
                 if not the_ca.is_CA():
                     raise Exception("{} is not a CA".format(ca_name))
-                sft_name = args[1]
                 time_axis = kwds.get("time_axis", None)
                 twosided = "twosided" in flags
                 #print("Computing the spacetime diagram of {} into {}".format(ca_name, sft_name))
                 self.SFTs[sft_name] = the_ca.spacetime_diagram(onesided=not twosided, time_axis=time_axis)
 
             elif cmd == "preimage":
-                blockmap_name = args[0]
+                preim_name = args[0]
+                blockmap_name = args[1]
                 try:
                     block_map = self.blockmaps[blockmap_name]
                 except KeyError:
                     raise Exception("No block map named {}".format(blockmap_name))
-                sft_name = args[1]
+                sft_name = args[2]
                 try:
                     the_sft = self.SFTs[sft_name]
                 except KeyError:
                     raise Exception("No SFT named {}".format(sft_name))
                 if (the_sft.dim, the_sft.nodes, the_sft.alph) != (block_map.dimension, block_map.to_nodes, block_map.to_alphabet):
                     raise Exception("SFT {} is incompatible with codomain of {}".format(sft_name, blockmap_name))
-                preim_name = args[2]
                 self.SFTs[preim_name] = block_map.preimage(the_sft)
 
             elif cmd == "fixed_points":
-                ca_name = args[0]
+                sft_name = args[0]
+                ca_name = args[1]
                 try:
                     the_ca = self.blockmaps[ca_name]
                 except KeyError:
                     raise Exception("{} is not a CA".format(ca_name))
                 if not the_ca.is_CA():
                     raise Exception("{} is not a CA".format(ca_name))
-                sft_name = args[1]
                 self.SFTs[sft_name] = the_ca.fixed_points()
                 
             elif cmd == "minimum_density":
