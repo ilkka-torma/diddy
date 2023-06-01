@@ -387,6 +387,17 @@ code = """
 """
 unit_tests.append(("preimage", code))
 
+code = """
+%SFT test Ao [o o.rt o.up] != [0 0 0]
+%SFT test2 Ao o=1 | o.rt=1 | o.up=1
+%SFT test3 Ao [o o.rt o.up] = [0 1 1] | o=1
+%SFT test4 Ao o=0 -> o.rt=o.up!=0
+%equal expect=T test test2
+%equal expect=F test2 test3
+%equal expect=T test3 test4
+"""
+unit_tests.append(("node lists", code))
+
 
 if __name__ == "__main__":
 
