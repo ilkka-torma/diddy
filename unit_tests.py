@@ -280,7 +280,7 @@ code = """
 %topology succ (0,0) (1,0)
 %CA xor
 0 1 Ao o!=o.succ
-%spacetime_diagram xor diagram
+%spacetime_diagram diagram xor
 %dim 2
 %topology grid
 %SFT var onesided=[1] Ao o!=o.rt <-> o.up=1
@@ -381,7 +381,7 @@ code = """
 %CA f
 0 0 Ao o=o.up=0
 %SFT domino Ao o!=o.rt
-%preimage f domino preim
+%preimage preim f domino
 %SFT alternative Ao o=o.up=0 <-> (o.rt=1 | o.rt.up=1)
 %equal expect=T preim alternative
 """
@@ -401,7 +401,7 @@ unit_tests.append(("node lists", code))
 code = """
 %CA xor
 0 0 Ao o=o.up=o.rt=0 | o=o.up!=o.rt=0 | 0=o!=o.up=o.rt | o=o.rt!=o.up=0
-%fixed_points xor fps
+%fixed_points fps xor
 %SFT diag Ao o.up=o.rt
 %equal expect=T fps diag
 """
@@ -425,7 +425,7 @@ code = """
 %alphabet a b c
 %block_map codomain=bin f
 0 1 Ao o=o.rt=a | o=o.up=b
-%relation tracks=[D C] f rel
+%relation tracks=[D C] rel f
 %nodes {D:[0] C:[0]}
 %alphabet {D:[a b c] C:[0 1]}
 %SFT a ACo o.C.0=1 <-> (o.D.0=o.(1,0).D.0=a | o.D.0=o.(0,1).D.0=b)
