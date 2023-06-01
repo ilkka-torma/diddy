@@ -20,9 +20,10 @@ import tfg
 class Diddy:
     def __init__(self):
         self.SFTs = {}
-        self.CAs = {}
+        self.blockmaps = {}
         self.TFGs = {}
         self.clopens = {}
+        self.environments = {}
         self.nodes = sft.Nodes([0])
         self.alphabet = {node : [0, 1] for node in self.nodes}
         self.dim = 2
@@ -40,9 +41,11 @@ class Diddy:
         except parsy.ParseError as e:
             print("Parse error: {}".format(e))
             linenum, lineindex = parsy.line_info_at(e.stream, e.index)
-            line = e.stream.splitlines()[linenum]
-            print(line)
+            the_line = e.stream.splitlines()[linenum]
+            print(the_line)
             print(" "*lineindex + "^")
+            if mode == "assert":
+                raise Exception("Parse error")
             return None
         #print (parsed)
         #a = bbb
@@ -118,6 +121,14 @@ class Diddy:
                     if all(alph == alph0 for alph in self.alphabet.values()):
                         self.alphabet = {node : alph0 for node in self.nodes}
                 #print(topology)
+
+            elif cmd == "save_environment":
+                name = args[0]
+                self.environments[name] = (self.dim, self.nodes, self.topology, self.alphabet)
+
+            elif cmd == "load_environment":
+                name = args[0]
+                self.dim, self.nodes, self.topology, self.alphabet = self.environments[name]
                     
             elif cmd == "sft":
                 name = args[0]
@@ -141,14 +152,32 @@ class Diddy:
             elif cmd == "spacetime_diagram":
                 ca_name = args[0]
                 try:
-                    the_ca = self.CAs[ca_name]
+                    the_ca = self.blockmaps[ca_name]
                 except KeyError:
+                    raise Exception("{} is not a CA".format(ca_name))
+                if not the_ca.is_CA():
                     raise Exception("{} is not a CA".format(ca_name))
                 sft_name = args[1]
                 time_axis = kwds.get("time_axis", None)
                 twosided = "twosided" in flags
-                print("Computing the spacetime diagram of {} into {}".format(ca_name, sft_name))
+                #print("Computing the spacetime diagram of {} into {}".format(ca_name, sft_name))
                 self.SFTs[sft_name] = the_ca.spacetime_diagram(onesided=not twosided, time_axis=time_axis)
+
+            elif cmd == "preimage":
+                blockmap_name = args[0]
+                try:
+                    block_map = self.blockmaps[blockmap_name]
+                except KeyError:
+                    raise Exception("No block map named {}".format(blockmap_name))
+                sft_name = args[1]
+                try:
+                    the_sft = self.SFTs[sft_name]
+                except KeyError:
+                    raise Exception("No SFT named {}".format(sft_name))
+                if (the_sft.dim, the_sft.nodes, the_sft.alph) != (block_map.dimension, block_map.to_nodes, block_map.to_alphabet):
+                    raise Exception("SFT {} is incompatible with codomain of {}".format(sft_name, blockmap_name))
+                preim_name = args[2]
+                self.SFTs[preim_name] = block_map.preimage(the_sft)
                 
             elif cmd == "minimum_density":
                 verbose_here = False
@@ -282,13 +311,13 @@ class Diddy:
                     SFT2 = self.SFTs[name2]
                     report_SFT_equal((name1, SFT1), (name2, SFT2), mode=mode, truth=expect, method=method)
 
-                elif name1 in self.CAs and name2 in self.CAs:
-                    CA1 = self.CAs[name1]
-                    CA2 = self.CAs[name2]
-                    report_CA_equal((name1, CA1), (name2, CA2), mode=mode, truth=expect)
+                elif name1 in self.blockmaps and name2 in self.blockmaps:
+                    CA1 = self.blockmaps[name1]
+                    CA2 = self.blockmaps[name2]
+                    report_blockmap_equal((name1, CA1), (name2, CA2), mode=mode, truth=expect)
                 
                 else:
-                    raise Exception("%s or %s is not an SFT or CA." % (name1, name2))
+                    raise Exception("%s or %s is not an SFT or block map." % (name1, name2))
                 
                     #if i[1] not in clopens or i[2] not in clopens:
                     #    raise Exception("%s not a clopen set"i[1] )                
@@ -380,17 +409,27 @@ class Diddy:
             elif cmd == "end_cache":
                 compiler.end_cache()
 
-            elif cmd == "CA":
-                #print(args)
+            elif cmd == "block_map":
                 name = args[0]
                 rules = args[1]
-                #print("parsed ca rules", rules)
-                circuits = {}
-                for r in rules:
-                    circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, r[2], self.externals)
-                    circuits[(r[0], r[1])] = circ
+                domain_name = kwds.get("domain", None)
+                if domain_name is None:
+                    dom_dim, dom_nodes, dom_top, dom_alph = self.dim, self.nodes, self.topology, self.alphabet
+                else:
+                    dom_dim, dom_nodes, dom_top, dom_alph = self.environments[domain_name]
+                codomain_name = kwds.get("codomain", None)
+                if codomain_name is None:
+                    cod_dim, cod_nodes, cod_top, cod_alph = self.dim, self.nodes, self.topology, self.alphabet
+                else:
+                    cod_dim, cod_nodes, cod_top, cod_alph = self.environments[codomain_name]
+                if dom_dim != cod_dim:
+                    raise Exception("Dimension mismatch: {} is not {}".format(dom_dim, cod_dim))
+                circuits = dict()
+                for (node, sym, formula) in rules:
+                    circ = compiler.formula_to_circuit(dom_nodes, dom_dim, dom_top, dom_alph, formula, self.externals)
+                    circuits[(node, sym)] = circ
                 #print(circuits)
-                self.CAs[name] = blockmap.CA(self.alphabet, self.nodes, self.dim, circuits)
+                self.blockmaps[name] = blockmap.BlockMap(dom_alph, cod_alph, dom_nodes, cod_nodes, dom_dim, circuits)
 
             elif cmd == "TFG":
                 name = args[0]
@@ -409,22 +448,22 @@ class Diddy:
                 #actual_sft = self.SFTs[SFT_name]
                 #print (self.TFGs[TFG_name].loops(actual_sft))
 
-            elif cmd == "compose_CA":
+            elif cmd == "compose":
                 name = args[0]
                 composands = args[1]
-                print("Composing CA %s." % composands)#, self.CAs)
+                print("Composing block maps %s." % composands)#, self.CAs)
                 """
                 result_CA = self.CAs[composands[1]]
                 for name in composands[2:]:
                     result_CA = result_CA.then(self.CAs[name])
                 """
                 composands = composands[1:]
-                result_CA = self.CAs[composands[-1]]
+                result = self.blockmaps[composands[-1]]
                 for comp_name in reversed(composands[:-1]):
-                    result_CA = self.CAs[comp_name].then(result_CA)
-                self.CAs[name] = result_CA
+                    result = self.blockmaps[comp_name].then(result)
+                self.blockmaps[name] = result
 
-            elif cmd == "calculate_CA_ball":
+            elif cmd == "compute_CA_ball":
                 t = time.time()
                 radius = args[0]
                 gen_names = args[1]
@@ -433,7 +472,8 @@ class Diddy:
                 else:
                     filename = None
                 print("Computing length-{} relations for CA {}{}.".format(radius, str(gen_names), "" if filename is None else " into file "+filename))
-                generators = [self.CAs[j] for j in gen_names]
+                generators = [self.blockmaps[j] for j in gen_names]
+                assert all(gen.is_CA() for gen in generators)
                 if filename is not None:
                     with open(filename, "w") as outfile:
                         for output in blockmap.find_relations(generators, radius):
@@ -445,7 +485,8 @@ class Diddy:
                                 outfile.write("New CA at %s." % (zz(output[2]),) + "\n")
                             outfile.flush()
                 else:
-                    blockmap.find_relations(generators, radius)
+                    for _ in blockmap.find_relations(generators, radius):
+                        pass
                 print("Time to calculate ball: %s seconds." % (time.time() - t))
                 
             elif cmd == "tiler":
@@ -740,12 +781,12 @@ def report_SFT_equal(a, b, mode="report", truth=True, method=None):
         print(res, truth)
         assert res == (truth == "T")
 
-def report_CA_equal(a, b, mode="report", truth=True):
-    aname, aCA = a
-    bname, bCA = b
-    print("Testing whether CA %s and %s are equal." % (aname, bname))
+def report_blockmap_equal(a, b, mode="report", truth=True):
+    aname, amap = a
+    bname, bmap = b
+    print("Testing whether block maps %s and %s are equal." % (aname, bname))
     tim = time.time()
-    res = aCA == bCA
+    res = amap == bmap
     tim = time.time() - tim
     if res: 
         print("They are EQUAL (time %s)." % (tim))

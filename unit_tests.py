@@ -225,9 +225,9 @@ code = """
 %CA a
 0 1 Ao o!=o.rt
 %equal expect=T a a
-%compose_CA aa a a
-%compose_CA aa_a aa a
-%compose_CA a_aa a aa
+%compose aa a a
+%compose aa_a aa a
+%compose a_aa a aa
 %equal expect=T a_aa aa_a
 """
 unit_tests.append(("trivial CA associativity", code))
@@ -350,6 +350,42 @@ code = """
 %equal expect=T empty nontriv_empty
 """
 unit_tests.append(("emptiness", code))
+
+code = """
+%CA a
+0 0 Ao o=o.rt=0
+%CA b
+0 0 Ao o=o.up=0
+%calculate_CA_ball 3 a b
+"""
+unit_tests.append(("CA ball", code))
+
+code = """
+%nodes a b
+%topology
+sw (0,0,a) (0,0,b);
+sw (0,0,b) (0,0,a)
+%alphabet X Y
+%save_environment env
+%topology grid
+%alphabet 0 1
+%block_map domain=env b1
+0 0 Ao o=o.sw
+%block_map domain=env b2
+0 0 ACo o.a=o.b
+%equal expect=T b1 b2
+"""
+unit_tests.append(("environments and block maps", code))
+
+code = """
+%CA f
+0 0 Ao o=o.up=0
+%SFT domino Ao o!=o.rt
+%preimage f domino preim
+%SFT alternative Ao o=o.up=0 <-> (o.rt=1 | o.rt.up=1)
+%equal expect=T preim alternative
+"""
+unit_tests.append(("preimage", code))
 
 
 if __name__ == "__main__":
