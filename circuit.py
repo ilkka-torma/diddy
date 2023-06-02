@@ -876,6 +876,7 @@ def equivalent(C1, C2, return_sep = False):
 def V(inputs):
     return Circuit("V", inputs)
 def AND(*inputs):
+    #print("ahem", inputs)
     if len(inputs) == 1:
         #print(type(inputs[0]))
         assert type(inputs[0]) == Circuit
