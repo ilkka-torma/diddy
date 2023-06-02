@@ -127,8 +127,11 @@ def deduce_a_tiling(grid, the_SFT):
     #print("domain", domain)
     #print("known", known_values)        
 
+    #print("deducing model")
+
     model = the_SFT.deduce(known_values, domain)
-    print(model)
+
+    #print("model found")
 
     if model == None:
         currentstate = TILING_BAD
@@ -249,7 +252,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1):
      
     # our grid is now just all initial_state
     grid = {}
-    r = 10
+    r = 1
     for x in range(-r, r+1):
         for y in list(range(-r, r+1)):
             # EMPTY means we'll try to deduce a color here

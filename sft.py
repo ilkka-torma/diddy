@@ -84,11 +84,6 @@ class Nodes:
             for node in self:
                 yield '.'.join(str(part) for part in node)
 
-    def __eq__(self, other):
-        if type(other) != Nodes:
-            return False
-        return self.flat == other.flat and self.nodes == other.nodes
-
 # check that circuit is forced to be true when variable set
 def forced_by(circuit, vals_as_list):
     andeds = []
@@ -180,6 +175,7 @@ class SFT:
             self.deduce_circuit()
         else:
             self.circuit = nonnegative_circuit(self.dim, self.onesided, circuit)
+        print(self.circuit.complexity)
 
     def __str__(self):
         return "SFT(dim={}, nodes={}, alph={}{})".format(self.dim, self.nodes, self.alph, (", onesided="+str(self.onesided)) if self.onesided else "")
@@ -340,8 +336,9 @@ class SFT:
         circuits = list(circuits.values())
         add_uniqueness_constraints(self.alph, circuits, [d + (n,) for n in self.nodes for d in domain])
 
-        #print("no22")
-        m = SAT(AND(*(list(circuits) + list(forceds))), True)
+        instance = AND(*(list(circuits) + list(forceds)))
+        #print("Instance size", len(instance), sum(len(i) for i in instance))
+        m = SAT(instance, True)
         if m == False:
             #print("No solution.")
             return None

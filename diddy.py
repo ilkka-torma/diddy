@@ -39,6 +39,7 @@ class Diddy:
         #print(code)
         try:
             parsed = dparser.parse_diddy(code)
+            print(parsed)
         except parsy.ParseError as e:
             print("Parse error: {}".format(e))
             linenum, lineindex = parsy.line_info_at(e.stream, e.index)
@@ -162,18 +163,8 @@ class Diddy:
                         sfts.append(self.SFTs[name])
                     except KeyError:
                         raise Exception("{} is not an SFT".format(name))
-                first = sfts[0]
-                for other in sfts[1:]:
-                    if first.dim != other.dim:
-                        raise Exception("Incompatible dimensions: {} and {}".format(first.dim, other.dim))
-                    if first.nodes != other.nodes:
-                        raise Exception("Incompatible nodes: {} and {}".format(first.nodes, other.nodes))
-                    if first.alph != other.alph:
-                        raise Exception("Incompatible alphabets: {} and {}".format(first.alph, other.alph))
-                    if first.onesided != other.onesided:
-                        raise Exception("Incompatible onesided dimensions: {} and {}".format(first.onesided, other.onesided))
-                    if first.topology != other.topology:
-                        raise Exception("Incompatible topologies: {} and {}".format(first.topology, other.topology))
+                if any((sft.dim, sft.nodes, sft.alph, sft.onesided, sft.topology) != (sfts[0].dim, sfts[0].nodes, sfts[0].alph, sfts[0].onesided, sfts[0].topology) for sft in sfts[1:]):
+                    raise Exception("Incompatible SFTs")
                 self.SFTs[isect_name] = sft.intersection(*sfts)
 
             elif cmd == "product":
@@ -297,9 +288,6 @@ class Diddy:
                 if verbose_here: print("popula")
                 nfa.minimize(verbose=verb)
                 comps = list(nfa.strong_components())
-                if not comps:
-                    print("No configurations with the given periods")
-                    continue
                 if verbose_here: print("strng com")
                 del nfa
                 min_data = (math.inf,)
