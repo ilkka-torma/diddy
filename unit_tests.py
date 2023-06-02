@@ -247,7 +247,7 @@ code = """
 %alphabet a b
 %SFT goldenmean Ao o=a -> o.rt=b & o.up=b
 %set_weights a:0 b:2
-%density_lower_bound expect=1 goldenmean (0,0,0) (1,0,0) (-1,0,0) (0,1,0) (0,-1,0); (0,1) (1,0)
+%density_lower_bound expect=1 goldenmean (0,1) (1,0); (0,0,0) (1,0,0) (-1,0,0) (0,1,0) (0,-1,0)
 """
 unit_tests.append(("golden mean lower density", code))
 
