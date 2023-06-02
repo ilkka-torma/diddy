@@ -10,12 +10,14 @@ for each node exactly one should say yes or this is nondeterministic
 variables in circuits are (vector, node, symbol) encodeed
 """
 class BlockMap:
-    def __init__(self, from_alphabet, to_alphabet, from_nodes, to_nodes, dimension, circuits):
+    def __init__(self, from_alphabet, to_alphabet, from_nodes, to_nodes, dimension, circuits, from_topology, to_topology):
         self.from_alphabet = from_alphabet
         self.to_alphabet = to_alphabet
         self.from_nodes = from_nodes
         self.to_nodes = to_nodes
         self.dimension = dimension
+        self.from_topology = from_topology
+        self.to_topology = to_topology
 
         assert type(circuits) == dict
             
@@ -78,7 +80,7 @@ class BlockMap:
             transform(ret_circuit, lambda a:circuits[a])
             ret_circuits[ns] = ret_circuit
 
-        ret = BlockMap(self.from_alphabet, other.to_alphabet, self.from_nodes, other.to_nodes, self.dimension, ret_circuits)
+        ret = BlockMap(self.from_alphabet, other.to_alphabet, self.from_nodes, other.to_nodes, self.dimension, ret_circuits, self.from_topology, other.to_topology)
         return ret
 
     def after(self, other):
@@ -164,7 +166,7 @@ class BlockMap:
             bm_circ = self.circuits[node, sym].copy()
             transform(bm_circ, lambda var2: vadd(vec, var2[:-2]) + var2[-2:])
             substitute(sft_circ, var, bm_circ)
-        return SFT(self.dimension, self.from_nodes, self.from_alphabet, circuit=sft_circ)
+        return SFT(self.dimension, self.from_nodes, self.from_alphabet, self.from_topology, circuit=sft_circ)
 
     def relation(self, tracks=None):
         "The relation defining this block map (as an SFT), i.e. its graph"
@@ -188,10 +190,26 @@ class BlockMap:
             else:
                 not_others = AND(*(NOT(V((0,)*dim + (add_track(tracks[1],node), sym2))) for sym2 in cod_alph[node][1:]))
                 anded.append(IFF(not_others, new_circ))
-        return SFT(dim, nodes, alph, circuit=AND(*anded))
+                
+        #for sft in sfts:
+        #    print(sft)
+        #    print("topo", sft.topology)
+        #    print()
+        topology = []
+        for tr in tracks:
+            if tr == tracks[0]:
+                topo = self.from_topology
+            else:
+                topo = self.to_topology
+            for t in topo:
+                # t[:1] is the name of an edge. We make a copy with track added.
+                topology.append(t[:1] + tuple(vec[:-1] + (add_track(tr, vec[-1]),) for vec in t[1:]))
+        #print(topology)
+        
+        return SFT(dim, nodes, alph, topology, circuit=AND(*anded))
 
     def is_CA(self):
-        return self.to_alphabet == self.from_alphabet and self.to_nodes == self.from_nodes
+        return self.to_alphabet == self.from_alphabet and self.to_nodes == self.from_nodes # and self.to_topology == self.from_topology
 
     def fixed_points(self):
         "The SFT of fixed points of this CA"
@@ -207,7 +225,7 @@ class BlockMap:
             else:
                 not_others = AND(*(NOT(V((0,)*dim + (node, sym2))) for sym2 in alph[node][1:]))
                 anded.append(IMP(not_others, new_circ))
-        return SFT(dim, nodes, alph, circuit=AND(*anded))
+        return SFT(dim, nodes, alph, self.from_topology, circuit=AND(*anded))
 
     def spacetime_diagram(self, onesided=True, time_axis=None):
         "The SFT of spacetime diagrams of this CA"
@@ -230,8 +248,16 @@ class BlockMap:
             else:
                 is_val = V(val_vec + (sym,))
             anded.append(IFF(new_circ, is_val))
+
+        topology = []
+        for t in self.from_topology:
+            # append the new dimension in the edges
+            topology.append(t[:1] + t[:time_axis] + [0] + t[time_axis:])
+            # add the time direction, default name is "fut"
+        for  n in nodes:
+            topology.append(("fut", (0,)*(dim+1) + (n,), (0,)*time_axis + (1,) + (0,)*(dim-time_axis) + (n,)))
             
-        return SFT(dim+1, nodes, alph, circuit=AND(*anded), onesided=[time_axis] if onesided else [])
+        return SFT(dim+1, nodes, alph, topology, circuit=AND(*anded), onesided=[time_axis] if onesided else [])
         
 
 # given a list of cellular automata, compute relations
@@ -251,7 +277,8 @@ def find_relations(CAs, rad):
     for n in nodes:
         for a in alphabet[n][1:]:
             identityrule[(n, a)] = V((0,)*dimension + (n, a))
-    idca = BlockMap(alphabet, alphabet, nodes, nodes, dimension, identityrule)
+    # topology None because it really does not matter
+    idca = BlockMap(alphabet, alphabet, nodes, nodes, dimension, identityrule, None, None)
     #assert idca.then(idca) == idca
     mod[idca.tomocircuit()] = (idca, ())
     #print("idcirc", idca.circuits)

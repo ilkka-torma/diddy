@@ -41,7 +41,7 @@ d.run("""
 --%entropy_lower_bound radio [1] [1]
 --%entropy_upper_bound radio [14]
 """)
-# d.run("%tiler radio")
+d.run("%tiler radio")
 
 
 """

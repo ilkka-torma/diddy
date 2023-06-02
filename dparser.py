@@ -148,7 +148,7 @@ commands = [
             [ArgType.LABEL, ArgType.SIMPLE_LIST]),
     Command("product",
             [ArgType.LABEL, ArgType.SIMPLE_LIST],
-            opts = ["tracks"]),
+            opts = ["tracks", "env"]),
     Command("block_map",
             [ArgType.LABEL, ArgType.NESTED_LIST],
             opts = ["domain", "codomain"],

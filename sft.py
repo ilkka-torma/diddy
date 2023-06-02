@@ -161,10 +161,11 @@ class SFT:
 
     # Onesided is a list of dimensions
     # In a onesided SFT, the set of forbidden patterns and the circuit are translated so that the onesided coordinates are nonnegative and start at 0
-    def __init__(self, dim, nodes, alph, forbs=None, circuit=None, formula=None, onesided=None):
+    def __init__(self, dim, nodes, alph, topology, forbs=None, circuit=None, formula=None, onesided=None):
         self.dim = dim
         self.nodes = nodes
         self.alph = alph
+        self.topology = topology
         if onesided is None:
             onesided = []
         self.onesided = onesided
@@ -304,11 +305,11 @@ class SFT:
 
     def deduce(self, known_values, domain):
         #raise Exception("sft.deduce is currently broken")
-        print("deducing", domain, known_values)
+        #print("deducing", domain, known_values)
         #if len(self.alph) != 2:
         #    raise Exception("Only binary alphabets supported in deduce")
 
-        print(self.circuit)
+        #print(self.circuit)
         
         circuits = {}
     
@@ -342,10 +343,10 @@ class SFT:
         #print("no22")
         m = SAT(AND(*(list(circuits) + list(forceds))), True)
         if m == False:
-            print("nope")
+            #print("No solution.")
             return None
 
-        print("limimisad", m)
+        #print("limimisad", m)
         
         mm = {}
         for v in domain:
@@ -662,6 +663,7 @@ class SFT:
             # compute by brute force
             return sum(1 for _ in self.all_patterns(domain, existing=known_values, extra_rad=extra_rad))
 
+    # A simple method that checks tilability of larger and larger boxes.
     def keep_tiling(self):
         r = 1
         while True:
@@ -691,7 +693,7 @@ class SFT:
 
 def intersection(*sfts):
     circuit = AND(*(sft.circuit.copy() for sft in sfts))
-    return SFT(sfts[0].dim, sfts[0].nodes, sfts[0].alph, circuit=circuit, onesided=sfts[0].onesided)
+    return SFT(sfts[0].dim, sfts[0].nodes, sfts[0].alph, sfts[0].topology, circuit=circuit, onesided=sfts[0].onesided)
 
 def product(*sfts, track_names=None):
     if track_names is None:
@@ -705,4 +707,17 @@ def product(*sfts, track_names=None):
         circ = sft.circuit.copy()
         transform(circ, lambda var: var[:-2] + (add_track(tr,var[-2]),) + var[-1:])
         anded.append(circ)
-    return SFT(sfts[0].dim, nodes, alph, circuit=AND(*anded), onesided=sfts[0].onesided)
+    #for sft in sfts:
+    #    print(sft)
+    #    print("topo", sft.topology)
+    #    print()
+    topology = []
+    for (tr, sft) in zip(track_names, sfts):
+        for t in sft.topology:
+            # t[:1] is the name of an edge. We make a copy with track added.
+            topology.append(t[:1] + tuple(vec[:-1] + (add_track(tr, vec[-1]),) for vec in t[1:]))
+    #print(topology)
+    return SFT(sfts[0].dim, nodes, alph, topology, circuit=AND(*anded), onesided=sfts[0].onesided)
+
+
+

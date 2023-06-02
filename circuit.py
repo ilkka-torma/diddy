@@ -882,6 +882,10 @@ def AND(*inputs):
         return inputs[0]
     if len(inputs) == 0:
         return T
+    if F in inputs:
+        return F
+    if None in inputs:
+        return None
     #print(Circuit.smart_simplify)
     #print("making ADN", list(map(str, inputs)))
     #print("res", Circuit("&", *inputs))
@@ -903,6 +907,10 @@ def OR(*inputs):
         return inputs[0]
     if len(inputs) == 0:
         return F
+    if T in inputs:
+        return T
+    if None in inputs:
+        return None
     oreds = []
     for inp in inputs:
         if inp == T:
@@ -917,6 +925,8 @@ def OR(*inputs):
 def NOT(*inputs):
     #print(inputs)
     assert len(inputs) == 1
+    if inputs[0] == None:
+        return None
     if inputs[0].op == "!":
         return inputs[0].inputs[0]
     return circuit("!", *inputs)
@@ -925,6 +935,13 @@ F = circuit("F")
 def IMP(*inputs):
     assert len(inputs) == 2
     # while
+    #print(inputs)
+    if inputs[0] == None:
+        return None
+    if inputs[0] == F:
+        return T
+    if inputs[1] == None:
+        return None
     return OR(NOT(inputs[0]), inputs[1])
     #return Circuit("->", *inputs)
 def IFF(*inputs):
