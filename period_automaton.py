@@ -167,7 +167,7 @@ class PeriodAutomaton:
         self.all_labels = all_labels
 
         if weights == None:
-            self.weight_numerators = {a:a for a in self.sft.alph}
+            self.weight_numerators = {a:a for sub_alph in self.sft.alph.values() for a in sub_alph}
             self.weight_denominator = 1
             #print("makkel")
         else:
