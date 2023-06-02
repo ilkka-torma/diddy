@@ -155,8 +155,16 @@ class Diddy:
                         sfts.append(self.SFTs[name])
                     except KeyError:
                         raise Exception("{} is not an SFT".format(name))
-                if any((sft.dim, sft.nodes, sft.alph, sft.onesided) != (sfts[0].dim, sfts[0].nodes, sfts[0].alph, sfts[0].onesided) for sft in sfts[1:]):
-                    raise Exception("Incompatible SFTs")
+                first = sfts[0]
+                for other in sfts[1:]:
+                    if first.dim != other.dim:
+                        raise Exception("Incompatible dimensions: {} and {}".format(first.dim, other.dim))
+                    if first.nodes != other.nodes:
+                        raise Exception("Incompatible nodes: {} and {}".format(first.nodes, other.nodes))
+                    if first.alph != other.alph:
+                        raise Exception("Incompatible alphabets: {} and {}".format(first.alph, other.alph))
+                    if first.onesided != other.onesided:
+                        raise Exception("Incompatible onesided dimensions: {} and {}".format(first.onesided, other.onesided))
                 self.SFTs[isect_name] = sft.intersection(*sfts)
 
             elif cmd == "product":
@@ -265,6 +273,9 @@ class Diddy:
                 if verbose_here: print("popula")
                 nfa.minimize(verbose=verb)
                 comps = list(nfa.strong_components())
+                if not comps:
+                    print("No configurations with the given periods")
+                    continue
                 if verbose_here: print("strng com")
                 del nfa
                 min_data = (math.inf,)

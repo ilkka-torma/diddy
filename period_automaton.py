@@ -139,10 +139,11 @@ class PeriodAutomaton:
             self.frontier.add((x,) + vec)
             for forb in sft.forbs:
                 new_forb = dict()
+                good = True
                 for (nvec, c) in forb.items():
                     nvec2 = wrap(pmat, nvadd(nvec, (x,)+vec))
                     if nvec2 in new_forb and new_forb[nvec2] != c:
-                        new_forb = dict()
+                        good = False
                         break
                     else:
                         new_forb[nvec2] = c
@@ -153,7 +154,7 @@ class PeriodAutomaton:
                     while all(nvec[0]+tr > self.border_at(nvec[1:-1]) for nvec in new_forb):
                         tr -= 1
                     new_forb = {(nvec[0]+tr,)+nvec[1:] : c for (nvec, c) in new_forb.items()}
-                if new_forb not in self.border_forbs:
+                if good and new_forb not in self.border_forbs:
                     self.border_forbs.append(new_forb)
         self.node_frontier = set(nvec+(q,) for nvec in self.frontier for q in self.sft.nodes)
         self.states = set([0])
@@ -259,6 +260,13 @@ class PeriodAutomaton:
                 qq = []
         for pr in processes:
             pr.terminate()
+        news = []
+        for sts in self.trans.values():
+            for st in sts:
+                if st not in self.trans:
+                    news.append(st)
+        for st in news:
+            self.trans[st] = dict()
         if verbose:
             print("done with #states", len(self.states))
             
@@ -430,9 +438,12 @@ class PeriodAutomaton:
             nxt = opt_prevs[n*i+cur]
             path.append(nxt)
             cur = nxt
-        
+
         #print("checking path", path)
         # check path length and weight
+        #print(self.trans)
+        #print(self.trans.keys())
+        #print(path)
         assert len(path) == m+1
         assert sum(self.trans[path[k]][path[k+1]] for k in range(m)) == mins[n*m+path[0]]
 
@@ -563,6 +574,7 @@ class PeriodAutomaton:
             
         # check path length and weight
         #print(path)
+        #print(self.trans.keys())
         #print(self.trans)
         assert len(path) == m+1
         assert sum(self.trans[path[k]][path[k+1]] for k in range(m)) == sparse_mins[n*(len(sparse_rows)-1)+path[0]]
@@ -792,13 +804,21 @@ class PeriodAutomaton:
                             aut = PeriodAutomaton(self.sft, self.pmat, self.rotate, self.sym_bound, False, self.immediately_relabel, check_periods=False)
                             aut.weight_numerators = self.weight_numerators
                             aut.weight_denominator = self.weight_denominator
-                            
-                            aut.s2idict = {st:ix for (st, ix) in self.s2idict.items() if ix in comp}
+
+                            idict = {ix:i for (i,ix) in
+                                     enumerate(ix for ix in set(self.s2idict.values()) if ix in comp)}
+                            aut.s2idict = {st:idict[ix] for (st, ix) in self.s2idict.items() if ix in comp}
                             aut.states = set(aut.s2idict)
                             aut.trans = {aut.s2idict[self.i2sdict[st]] : {aut.s2idict[self.i2sdict[st2]] : c
                                                                           for (st2, c) in self.trans[st].items()
                                                                           if st2 in comp}
                                          for st in comp}
+
+                            #print("old s2idict",self.s2idict)
+                            #print("idict",idict)
+                            #print("states",aut.states)
+                            #print("s2idict",aut.s2idict)
+                            #print("trans",aut.trans)
                             yield aut
 
 
@@ -830,11 +850,9 @@ def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_
                 n = n//2
                 i += 1
             for new_front in pats(frontier, alph):
-                #print("front", new_front)
                 new_pairs = []
                 sym_pairs = dict()
                 for pair in shifted:
-                    #print("doing pair", pair)
                     forb, tr = pair
                     over = False
                     for (nvec, c) in forb.items():
@@ -845,18 +863,15 @@ def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_
                             over = True
                         #print("did", x-tr, ys, q, (x-tr,)+ys+(q,))
                         if new_front.get(wrap(pmat, (x-tr,)+ys+(q,)), c) != c:
-                            #print("can discard due to", wrap(pmat, (x-tr,)+ys+(q,)), c)
                             # this forb can be discarded
                             break
                     else:
                         # forb was not discarded
                         if over:
-                            #print("still over")
                             # forb can still be handled later
                             new_pairs.append(pair)
                         else:
                             # forb can't be handled, reject state
-                            #print("rejected")
                             break
                 else:
                     # choose minimal state along rotations
@@ -891,7 +906,6 @@ def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_
         res_queue.put(len(states))
 
 def weighted_sum(weights, summed):
-    #print(weights, summed)
     if weights == None:
         return sum(summed)
     summa = 0

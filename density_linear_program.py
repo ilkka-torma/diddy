@@ -14,11 +14,11 @@ import time
 # yield values are dicts : nvec -> pat
 # they are shared, i.e. should not be modified by the consumer
 def surroundings(the_sft, specs, radius):
-    bigdomain = set(nvsub(nvec, vec) for (domain, vecs) in specs for nvec in domain for vec in vecs+[(0,)*the_sft.dim])
+    bigdomain = set(nvsub(nvec, vec) for (vecs, domain) in specs for nvec in domain for vec in vecs+[(0,)*the_sft.dim])
     for bigpat in the_sft.all_patterns(bigdomain, extra_rad=radius):
         surr = []
         orig_nodes = {node : bigpat[(0,)*the_sft.dim + (node,)] for node in the_sft.nodes}
-        for (domain, vecs) in specs:
+        for (vecs, domain) in specs:
             orig_pat = fd.frozendict({nvec : bigpat[nvec] for nvec in domain})
             for vec in vecs:
                 # away from origin
@@ -34,7 +34,7 @@ def surroundings(the_sft, specs, radius):
 # nodes' weights are averaged together for the purposes of charge sharing
 def optimal_density(the_sft, specs, radius, weights=None, ret_shares=False, verbose=False, print_freq=5000):
     if weights is None:
-        weights = {a:a for a in the_sft.alph}
+        weights = {a:a for alph in the_sft.alph.values() for a in alph}
     if verbose:
         print("Lower-bounding density using specs {}".format(specs))
     # this is how large density can be made, i.e. what we want to compute
@@ -51,7 +51,7 @@ def optimal_density(the_sft, specs, radius, weights=None, ret_shares=False, verb
     all_pats = set()
     send = {}
     
-    for (k, (domain, vectors)) in enumerate(specs):
+    for (k, (vectors, domain)) in enumerate(specs):
         if verbose:
             print("Computing pattern variables in spec {}/{}".format(k+1, len(specs)))
         patterns = set()

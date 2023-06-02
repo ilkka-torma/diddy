@@ -272,7 +272,7 @@ node_name = (label | natural).sep_by(period, min=1).map(lambda items: items[0] i
 @p.generate("vector")
 def vector():
     yield lparen
-    nums = yield integer.sep_by(comma << p.peek(integer))
+    nums = yield integer.sep_by(comma << p.peek(integer >> (comma | rparen)))
     maybe_node = yield (comma >> node_name).optional()
     yield rparen
     if maybe_node is None:
@@ -329,7 +329,7 @@ def command_args(cmd, index, args=None, opts=None, flags=None, mode="normal"):
     if args is None:
         args = []
         opts = dict()
-        flags = set()
+        flags = []
     #print("command", cmd.name, "index", index, "mode", mode, "prev", args)
     
     @p.generate

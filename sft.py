@@ -84,6 +84,11 @@ class Nodes:
             for node in self:
                 yield '.'.join(str(part) for part in node)
 
+    def __eq__(self, other):
+        if type(other) != Nodes:
+            return False
+        return self.flat == other.flat and self.nodes == other.nodes
+
 # check that circuit is forced to be true when variable set
 def forced_by(circuit, vals_as_list):
     andeds = []
