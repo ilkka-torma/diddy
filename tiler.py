@@ -58,7 +58,7 @@ EMPTY = "EMPTY" # cell is not used -- actually we just erase these from grid but
 DEDUCED = "DEDUCED" # not set by user, some value has been deduced
 SET = "SET" # set by user
 
-TILING_OK_GRID_COLOR = BLACK
+TILING_OK_GRID_COLOR = (30,30,30)
 TILING_BAD_GRID_COLOR = (100, 50, 50)
 TILING_UNKNOWN_GRID_COLOR = (50,50,50)
 
@@ -104,18 +104,28 @@ def deduce_a_tiling(grid, the_SFT):
             continue
         if grid[g] != UNKNOWN:
             assert grid[g][0] == SET
-            val = the_SFT.alph[g[-1]][grid[g][1]]
+            try:
+                val = the_SFT.alph[g[-1]][grid[g][1]]
+            except:
+                print(g)
+                print(the_SFT.alph)
+                print(grid[g])
+                a = bbb
             if the_SFT.dim == 1:
                 known_values[(g[0], g[-1])] = val
             else:
+                #known_values[flipy(g)] = val
                 known_values[g] = val
+                
             #print("knowing", val, "at", g)
         if the_SFT.dim == 1:
             domain.add((g[0],))
         else:
+            #domain.add(flipy(g[:-1]))
             domain.add(g[:-1])
-    print("domain", domain)
-    print("known", known_values)        
+            
+    #print("domain", domain)
+    #print("known", known_values)        
 
     model = the_SFT.deduce(known_values, domain)
     print(model)
@@ -129,13 +139,18 @@ def deduce_a_tiling(grid, the_SFT):
             if the_SFT.dim == 1:
                 dd = (d[0], 0, d[-1])
             else:
-                dd = d
+                dd = d #flipy(d)
             #print(d, "in model", grid[dd])
             if grid[dd] == UNKNOWN:
                 val = model[d]
+                #print("model maps", d, "to", val)
                 
                 if val != None:
-                    grid[dd] = (DEDUCED, the_SFT.alph[g[-1]].index(val))
+                    # here b {(0, 0): ['a', 'b', 'c']} (10, 10, (0, 0))
+                    #here c {('D', 0): ['a', 'b', 'c'], ('C', 0): [0, 1]} (10, 10, ('C', 0))
+
+                    #print("here", val, the_SFT.alph, d)
+                    grid[dd] = (DEDUCED, the_SFT.alph[d[-1]].index(val))
                 else:
                     grid[dd] = UNKNOWN
                 #print(d, "in model", grid[dd])
@@ -146,27 +161,36 @@ def vsub(u, v):
     return u[0] - v[0], u[1] - v[1]
 def smul(s, u):
     return s*u[0], s*u[1]
+def vmul(u, v):
+    return u[0]*v[0], u[1]*v[1]
 def distance(u, v):
     w = vsub(u, v)
     return math.sqrt(w[0]*w[0] + w[1]*w[1])
 
+def flipy(t):
+    return (t[0], -t[1]) + t[2:]
 
-
+# coordinate preprocess to screen
+def cp_to_screen(v):
+    return v[0], screenheight-v[1]
+# coordinate preprocess from screen
+def cp_from_screen(v):
+    return v[0], screenheight-v[1]
     
 
-def run(the_SFT, topology, gridmoves, nodeoffsets):
+def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1):
     print(topology)
 
     # check dimension in the first command of topology
     dimension = len(topology[0][1]) - 1
-    print("dimension %s" % dimension)
+    #print("dimension %s" % dimension)
     # we force topology 2-dimensional
     if dimension == 1:
-        print(topology)
+        #print(topology)
         newtopology = []
         for t in topology:
             newtopology.append((t[0],) + tuple(i[:-1] + (0, + i[-1]) for i in t[1:]))
-        print (newtopology)
+        #print (newtopology)
         topology = newtopology
     elif dimension not in [1, 2]:
         raise Exception("Tiler only supports dimensions 1 and 2, not %s." % dimension)
@@ -180,7 +204,14 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
     print(nodeoffsets)
     #print("mus")
     global nodes
-    nodes = the_SFT.nodes
+    nodes = list(the_SFT.nodes) #list(n for n in the_SFT.nodes)
+    runningoffset = 0
+    for n in nodes:
+        if n not in nodeoffsets:
+            # this only makes sense if either all or none are set
+            nodeoffsets[n] = (0, runningoffset)
+            runningoffset += 1/len(nodes)
+    print("nodes and offsets", nodes, nodeoffsets)
     dim = the_SFT.dim
     alphabets = the_SFT.alph
 
@@ -199,7 +230,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
     # Shearing and stuff, i.e. what is x & y movement in grid visually
     #gridmoves = [(1, 0), (0, 1)]
 
-    nodesize = 7
+    nodesize = 12
      
     # This sets the margin between each cell
     #MARGIN = 3
@@ -208,7 +239,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
     #gridwidth = 15
     
     camera = (0, 0) # where we looking; center of screen is here
-    zoom = 30 # how big are cells basically
+    zoom = (40, 40*skew) # how big are cells basically
+    global screenwidth, screenheight
     screenwidth = 700
     screenheight = 500
 
@@ -221,10 +253,10 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
     for x in range(-r, r+1):
         for y in list(range(-r, r+1)):
             # EMPTY means we'll try to deduce a color here
-            for n in nodes:
+            for n in nodes: #range(len(nodes)):
                 grid[(x, y, n)] = UNKNOWN
-    grid[(0, 0, nodes[0])] = (SET, 1)
-    grid[(1, 0, nodes[0])] = (SET, 1)
+    #grid[(0, 0, nodes[0])] = (SET, 1)
+    #grid[(1, 0, nodes[0])] = (SET, 1)
     # print(grid)
 
     nodepositions = {}
@@ -241,7 +273,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
      
     # Loop until the user clicks the close button.
     done = False
-     
+    
     # Used to manage how fast the screen updates
     clock = pygame.time.Clock()
 
@@ -252,9 +284,9 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
 
     def to_screen(x, y):
         if False and dimension == 1:
-            return vadd((screenwidth/2, screenheight/2), smul((x - camera[0])*zoom, gridmoves[0]))
+            return vadd((screenwidth/2, screenheight/2), smul((x - camera[0])*zoom[0], gridmoves[0]))
         else: # dimension == 2:
-            return vadd((screenwidth/2, screenheight/2), vadd(smul((x - camera[0])*zoom, gridmoves[0]), smul((y - camera[1])*zoom, gridmoves[1])))            
+            return vadd((screenwidth/2, screenheight/2), vadd(smul((x - camera[0])*zoom[0], gridmoves[0]), smul((y - camera[1])*zoom[1], gridmoves[1])))            
     
     def to_grid(u, v):
         if False and dimension == 1:
@@ -287,8 +319,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
             #A, B = d, -b
             #C, D = -c, a
             #st = smul(1/zoom, vsub((u, v), (screenwidth/2, screenheight/2)))
-            x = XY[0]/zoom + camera[0]
-            y = XY[1]/zoom + camera[1]
+            x = XY[0]/zoom[0] + camera[0]
+            y = XY[1]/zoom[1] + camera[1]
             #return A*st[0] + B*st[1], C*st[0] + D*st[1]
             return x, y
 
@@ -305,7 +337,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
         for x0 in range(math.floor(x) - rr, math.floor(x) + rr + 1):
             for y0 in list(range(math.floor(y) - rr, math.floor(y) + rr + 1)):
                 for n in range(len(nodes)):
-                    d = distance(vadd(to_screen(x0, y0), smul(zoom, nodeoffsets[nodes[n]])), to_screen(x, y))
+                    d = distance(vadd(to_screen(x0, y0), vmul(zoom, nodeoffsets[nodes[n]])), to_screen(x, y))
                     #if debug_prints:
                     #    print(x0, y0, n, vadd(to_screen(x0, y0), smul(zoom,nodeoffsets[nodes[n]]), d, x, y)
                     if d < dist:
@@ -440,15 +472,15 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
         
         camera = vadd(camera, gridmove)
         if keys[pygame.K_a]:
-            zoom *= 1.01
+            zoom = smul(1.01, zoom)
         if keys[pygame.K_z]:
-            zoom /= 1.01
+            zoom = smul(1/1.01, zoom)
         if keys[pygame.K_s]:
             nodesize += 1
         if keys[pygame.K_x]:
             nodesize -= 1
 
-        pos = pygame.mouse.get_pos()
+        pos = cp_from_screen(pygame.mouse.get_pos())
 
         #print(pos)
         pos = to_grid(*pos)
@@ -471,9 +503,17 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
             if node not in grid or grid[node] != drawcolor:
                 
                 currentstate = TILING_UNKNOWN
-                grid[node] = drawcolor
+                #print(node)
+                node = node[:-1] + (nodes[node[-1]],)
+                
+                
                 if drawcolor == EMPTY:
                     del grid[node]
+
+                if drawcolor[0] == SET and drawcolor[1] < len(alphabets[nodes[node[-1]]]):
+                    #print("set", drawcolor[1], len(alphabets[nodes[node[-1]]])
+                    grid[node] = drawcolor
+                
                 #print(node, drawcolor)
                 if thred != None:
                     thred.terminate()
@@ -505,17 +545,19 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
                 if dimension == 1 and y != 0: # we need not draw in this case
                     continue
                 for n in range(len(nodes)):
-                    if (x, y, n) not in grid:
+                    
+                    if (x, y, nodes[n]) not in grid:
                         continue
                     for t in topology:
                         a, b = t[1], t[2]
-                        if a[-1] == n:
+                        if a[-1] == nodes[n]:
                             xx, yy, nn = vadd((x, y), vsub(b[:-1], a[:-1])) + (b[2],)
                             if (xx, yy, nn) in grid:
-                                p = vadd(to_screen(x, y), smul(zoom, nodeoffsets[n]))
+                                p = vadd(to_screen(x, y), vmul(zoom, nodeoffsets[nodes[n]]))
                                 #pp = to_screen(*vadd((xx, yy), nodeoffsets[nn]))
-                                pp = vadd(to_screen(xx, yy), smul(zoom, nodeoffsets[nn]))
-                                pygame.draw.line(screen, GRAY, p, pp, 1)
+                                pp = vadd(to_screen(xx, yy), vmul(zoom, nodeoffsets[nn]))
+                                pygame.draw.line(screen, GRAY, cp_to_screen(p), cp_to_screen(pp), 1)
+                                
 
 
         #print(gimmel, gimmel in vemmel, vemmel)
@@ -525,8 +567,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
                 if dimension == 1 and y != 0:
                     continue
                 for n in range(len(nodes)):
-                    p = vadd(to_screen(x, y), smul(zoom, nodeoffsets[n]))
-                    if (x,y,n) not in grid:
+                    p = vadd(to_screen(x, y), vmul(zoom, nodeoffsets[nodes[n]]))
+                    if (x,y,nodes[n]) not in grid:
                         continue
                     else:
 
@@ -536,22 +578,22 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
 
                         white_circle = False
                         #print(grid[(x,y,n)] )
-                        if grid[(x,y,n)] == UNKNOWN:
+                        if grid[(x,y,nodes[n])] == UNKNOWN:
                             color = UNKNOWN_COLOR
                         #else:
                         #    print(grid[(x,y,n)], "!=", UNKNOWN)
-                        elif grid[(x,y,n)][0] == DEDUCED:
+                        elif grid[(x,y,nodes[n])][0] == DEDUCED:
                             #print(alphabets[nodes[n]])
-                            sym = alphabets[nodes[n]][grid[(x,y,n)][1]]
-                            color = colors[grid[(x,y,n)][1]] #deduced_colors[sym]
-                        elif grid[(x,y,n)][0] == SET:
-                            sym = alphabets[nodes[n]][grid[(x,y,n)][1]]
+                            sym = alphabets[nodes[n]][grid[(x,y,nodes[n])][1]]
+                            color = colors[grid[(x,y,nodes[n])][1]] #deduced_colors[sym]
+                        elif grid[(x,y,nodes[n])][0] == SET:
+                            sym = alphabets[nodes[n]][grid[(x,y,nodes[n])][1]]
                             #print(sym)
-                            color = colors[grid[(x,y,n)][1]]
+                            color = colors[grid[(x,y,nodes[n])][1]]
                             white_circle = True
 
                         if (x, y, n) in vemmel:
-                            xxxx = int(255- gimmel[(x, y, n)]*3)
+                            xxxx = int(255- gimmel[(x, y, nodes[n])]*3)
                             if xxxx < 0:
                                 xxxx = 0
                             color = (0,0,xxxx)
@@ -561,15 +603,22 @@ def run(the_SFT, topology, gridmoves, nodeoffsets):
                         #print(gimmel, nnn) #time.time())
 
                         if white_circle:
-                            pygame.draw.circle(screen, WHITE, p, nodesize+3)
-                        pygame.draw.circle(screen, color, p, nodesize)
+                            pygame.draw.circle(screen, WHITE, cp_to_screen(p), nodesize+3)
+                        pygame.draw.circle(screen, color, cp_to_screen(p), nodesize)
 
                         if sym != None:
+                            #print(sym, color)
                             col = (255, 255, 255)
-                            if sum(color) > 255*1.5:
-                                col = (0, 0, 0)
+                            if sum(color) > 250:
+                                col = (10, 10, 10)
                             font_surf = my_font.render(str(sym), False, col)
-                            screen.blit(font_surf, p)
+                            #print (p, font_surf.get_width()//2, font_surf.get_height()//2)
+                            #print (vsub(p, (font_surf.get_width()//2, font_surf.get_height()//2)))
+                            #v = (8, 15)
+                            v = (font_surf.get_width()//2, -font_surf.get_height()//2)
+                            screen.blit(font_surf, cp_to_screen(vsub(p, v)))
+                        #else:
+                            #print(sym, "None")
                     
                     #print(vadd(to_screen(x, y), nodeoffsets[n]))
                     

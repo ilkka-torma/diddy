@@ -28,7 +28,8 @@ class Diddy:
         self.alphabet = {node : [0, 1] for node in self.nodes}
         self.dim = 2
         self.topology = grid
-        self.gridmoves = [(1,0), (0,1)]
+        self.tiler_skew = 1 # actually skew is completely useless
+        self.tiler_gridmoves = [(1,0), (0,1)]
         self.nodeoffsets = {0 : (0,0)}
         self.formulae = []
         self.weights = None
@@ -86,36 +87,42 @@ class Diddy:
                     self.topology = line
                     self.nodes = [0]
                     # only the first will be used
-                    self.gridmoves = [(1, 0), (0, 1)]
-                    self.nodeoffsets = {0 : (0,0)}
+                    self.tiler_gridmoves = [(1, 0), (0, 1)]
+                    self.tiler_skew = 1
+                    self.tiler_nodeoffsets = {0 : (0,0)}
                 elif top in ["square", "grid", "squaregrid"]:
                     self.dim = 2
                     self.topology = grid
                     self.nodes = [0]
-                    self.gridmoves = [(1,0), (0,1)]
-                    self.nodeoffsets = {0 : (0,0)}
+                    self.tiler_gridmoves = [(1,0), (0,1)]
+                    self.tiler_skew = 1
+                    self.tiler_nodeoffsets = {0 : (0,0)}
                 elif top in ["hex", "hexgrid"]:
                     self.dim = 2
                     self.topology = hexgrid
                     self.nodes = [0, 1]
-                    self.gridmoves = [(1,0), (-0.5,1)]
-                    self.nodeoffsets = {0 : (0,0), 1 : (0.5,0)}
+                    self.tiler_gridmoves = [(1,0), (-0.5,0.8)]
+                    self.tiler_skew = 1
+                    self.tiler_nodeoffsets = {0 : (0,0.15), 1 : (0.5,-0.15)}
                 elif top in ["king", "kinggrid"]:
                     self.dim = 2
                     self.topology = kinggrid
                     self.nodes = [0]
-                    self.gridmoves = [(1,0), (0,1)]
-                    self.nodeoffsets = {0 : (0,0)}
+                    self.tiler_gridmoves = [(1,0), (0,1)]
+                    self.tiler_skew = 1
+                    self.tiler_nodeoffsets = {0 : (0,0)}
                 elif top in ["triangle", "trianglegrid"]:
                     self.dim = 2
                     self.topology = trianglegrid
                     self.nodes = [0]
-                    self.gridmoves = [(1,0), (0.5,0.6)]
-                    self.nodeoffsets = {0 : (0,0)}
+                    self.tiler_gridmoves = [(1,0), (-0.5,0.6)]
+                    self.tiler_skew = 1
+                    self.tiler_nodeoffsets = {0 : (0,0)}
                 else:
                     self.topology = top
-                    self.gridmoves = [(1,0), (0,1)]
-                    self.nodeoffsets = {node : (2*j/(3*len(self.nodes)), 2*j/(3*len(self.nodes))) for (j,node) in enumerate(self.nodes)}
+                    self.tiler_gridmoves = [(1,0), (0,1)]
+                    self.tiler_skew = 1
+                    self.tiler_nodeoffsets = {node : (2*j/(3*len(self.nodes)), 2*j/(3*len(self.nodes))) for (j,node) in enumerate(self.nodes)}
                 if type(top) == str:
                     alph0 = list(self.alphabet.values())[0]
                     if all(alph == alph0 for alph in self.alphabet.values()):
@@ -136,10 +143,10 @@ class Diddy:
                 onesided = kwds.get("onesided", [])
                 # Definition is either a list of forbidden patterns or a formula
                 if type(defn) == list:
-                    self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, forbs=defn, onesided=onesided)
+                    self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, self.topology, forbs=defn, onesided=onesided)
                 elif type(defn) == tuple:
                     circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, defn, self.externals)
-                    self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, circuit=circ, formula=defn, onesided=onesided)
+                    self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, self.topology, circuit=circ, formula=defn, onesided=onesided)
                 else:
                     raise Exception("Unknown SFT definition: {}".format(defn))
                 #print("CIRCUIT", circ)
@@ -155,7 +162,7 @@ class Diddy:
                         sfts.append(self.SFTs[name])
                     except KeyError:
                         raise Exception("{} is not an SFT".format(name))
-                if any((sft.dim, sft.nodes, sft.alph, sft.onesided) != (sfts[0].dim, sfts[0].nodes, sfts[0].alph, sfts[0].onesided) for sft in sfts[1:]):
+                if any((sft.dim, sft.nodes, sft.alph, sft.onesided, sft.topology) != (sfts[0].dim, sfts[0].nodes, sfts[0].alph, sfts[0].onesided, sfts[0].topology) for sft in sfts[1:]):
                     raise Exception("Incompatible SFTs")
                 self.SFTs[isect_name] = sft.intersection(*sfts)
 
@@ -173,7 +180,22 @@ class Diddy:
                 if any((sft.dim, sft.onesided) != (sfts[0].dim, sfts[0].onesided) for sft in sfts[1:]):
                     raise Exception("Incompatible SFTs")
                 track_names = kwds.get("tracks", None)
-                self.SFTs[prod_name] = sft.product(*sfts, track_names=track_names)
+                # where do we put the environment of the product
+                env = kwds.get("env", None)
+                prod = sft.product(*sfts, track_names=track_names)
+                self.SFTs[prod_name] = prod
+                if env != None:
+                    env_dim = prod.dim
+                    env_nodes = prod.nodes
+                    env_alphabet = prod.alph
+                    env_topology = prod.topology
+                    if env != "env":
+                        self.environments[env] = (env_dim, env_nodes, env_topology, env_alphabet)
+                    else:
+                        self.dim = env_dim
+                        self.nodes = env_nodes
+                        self.topology = env_topology
+                        self.alphabet = env_alphabet
 
             elif cmd == "clopen":
                 raise NotImplementedError("Clopen sets not implemented")
@@ -481,7 +503,7 @@ class Diddy:
                     circ = compiler.formula_to_circuit(dom_nodes, dom_dim, dom_top, dom_alph, formula, self.externals)
                     circuits[(node, sym)] = circ
                 #print(circuits)
-                self.blockmaps[name] = blockmap.BlockMap(dom_alph, cod_alph, dom_nodes, cod_nodes, dom_dim, circuits)
+                self.blockmaps[name] = blockmap.BlockMap(dom_alph, cod_alph, dom_nodes, cod_nodes, dom_dim, circuits, dom_top, cod_top)
 
             elif cmd == "TFG":
                 name = args[0]
@@ -545,7 +567,7 @@ class Diddy:
                 import tiler
                 name = args[0]
                 SFT = self.SFTs[name]
-                tiler.run(SFT, self.topology, self.gridmoves, self.nodeoffsets)
+                tiler.run(SFT, self.topology, self.tiler_gridmoves, self.tiler_nodeoffsets, self.tiler_skew)
             
             elif cmd == "entropy_upper_bound":
                 name = args[0]
@@ -856,12 +878,21 @@ grid = [("up", (0,0,0), (0,1,0)),
         ("dn", (0,0,0), (0,-1,0)),
         ("rt", (0,0,0), (1,0,0)),
         ("lt", (0,0,0), (-1,0,0))]
+"""
 hexgrid = [("up", (0,0,0), (0,1,1)),
            ("dn", (0,0,1), (0,-1,0)),
            ("rt", (0,0,0), (0,0,1)),
            ("lt", (0,0,0), (-1,0,1)),
            ("rt", (0,0,1), (1,0,0)),
            ("lt", (0,0,1), (0,0,0))]
+"""
+hexgrid = [("N", (0,0,0), (0,1,1)),
+           ("S", (0,0,1), (0,-1,0)),
+           ("SE", (0,0,0), (0,0,1)),
+           ("SW", (0,0,0), (-1,0,1)),
+           ("NE", (0,0,1), (1,0,0)),
+           ("NW", (0,0,1), (0,0,0))]
+
 kinggrid = [("E", (0,0,0), (1,0,0)),
             ("NE", (0,0,0), (1,1,0)),
             ("N", (0,0,0), (0,1,0)),
@@ -872,10 +903,10 @@ kinggrid = [("E", (0,0,0), (1,0,0)),
             ("SE", (0,0,0), (1,-1,0))]
 trianglegrid = [("E", (0,0,0), (1,0,0)),
             ("NE", (0,0,0), (1,1,0)),
-            ("N", (0,0,0), (0,1,0)),
+            ("NW", (0,0,0), (0,1,0)),
             ("W", (0,0,0), (-1,0,0)),
             ("SW", (0,0,0), (-1,-1,0)),
-            ("S", (0,0,0), (0,-1,0))]
+            ("SE", (0,0,0), (0,-1,0))]
 
 Wang_nodes = ["E", "N", "W", "S"]
 Wang_topology = [("up", (0,0,"N"), (0,1,"S")),

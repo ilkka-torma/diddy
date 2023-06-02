@@ -1,6 +1,7 @@
 #from circuit import *
 import circuit
 from circuit import NOT, V, AND, OR, T, F, IMP, IFF, tech_simp, Circuit
+import sft
 from general import *
 
 """
@@ -20,6 +21,8 @@ circuit_variables are aa little tricky... they should be functions
 
 def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_var, all_vars, externals):
     #print("nodes", nodes)
+    if type(nodes) == list:
+        nodes = sft.Nodes(nodes)
     #print("variables", variables)
     # print ("aux vars", aux_var)
     # print ("alls", all_vars)
@@ -95,6 +98,24 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
                 #print("before elimination", ret)
                 circuit.transform(ret, eliminate_zero)
                 #print("after elimination", ret)
+        else:
+            # default functions
+            if var == "has":
+                node = args[0]
+                #print("has check", node, eval_to_position(dim, topology, node, variables, nodes))
+                ret = T
+                for step in args[1:]:
+                    #print("try", step)
+                    try:
+                        p = eval_to_position(dim, topology, ("ADDR", node, step), variables, nodes)
+                        #print("eval to", p)
+                        if p == None:
+                            ret = F
+                            break
+                    except:
+                        #print("Seom problem")
+                        ret = F
+                        break
             
     elif op in ["CELLFORALL", "CELLEXISTS", "NODEFORALL", "NODEEXISTS"]:
         var = formula[1]
@@ -142,8 +163,12 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
     elif op in ["OR", "AND", "NOT", "IMP", "IFF"]:
         args = formula[1:]
         arg_formulas = []
+        #print(op, "stepping into")
         for arg in args:
-            arg_formulas.append(formula_to_circuit_(nodes, dim, topology, alphabet, arg, variables, aux_var, all_vars, externals))
+            #print(arg)
+            res = formula_to_circuit_(nodes, dim, topology, alphabet, arg, variables, aux_var, all_vars, externals)
+            arg_formulas.append(res)
+            #print(res)
         if op == "OR":
             ret = OR(*arg_formulas)
         elif op == "AND":
@@ -197,6 +222,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         ##print("kili", p1)
         ret = None
         if p1 == None:
+            #raise Exception("Could)
             ret = F
         all_vars.add(var_of_pos_expr(formula[1]))
         p2 = eval_to_position(dim, topology, formula[2], variables, nodes)
@@ -235,9 +261,10 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         try: # horrible hack
             p1 = eval_to_position(dim, topology, formula[1], variables, nodes)
             if p1 == None:
-                ret = F
+                # return None and not a circuit at all; soft error handling to simulate lazy evaluation
+                return None # = F
             # evaluates to cell
-            if len(p1) != dim+1:
+            elif len(p1) != dim+1:
                 raise Exception("Cannot compare value of cell, only node.")
         except KeyError:
             #print("eval to pos failed")
@@ -253,8 +280,9 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         try: # horrible hack #2
             p2 = eval_to_position(dim, topology, formula[2], variables, nodes)
             if p2 == None:
-                ret = F
-            if len(p2) != dim+1:
+                # return None and not a circuit at all; soft error handling to simulate lazy evaluation
+                return None
+            elif len(p2) != dim+1:
                 raise Exception("Cannot compare value of cell, only node.")
         except KeyError:
             #print("eval to pos failed")
@@ -527,7 +555,7 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes, top=True):
                         pos = vadd(vsub(pos[:-1], a[:-1]), b[:-1]) + (b[dim],)
                     break
         else:
-            #print("not edge")
+            # print("not edge", t, expr)
             if i in nodes: # single thing => change node
                 pos = pos[:-1] + (i,)
                 continue
@@ -537,6 +565,7 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes, top=True):
                 items = pos[-1] + (i,)
             else:
                 items = (pos[-1], i)
+            #print(nodes)
             if nodes.compatible(items):
                 pos = pos[:-1] + (items,)
             elif type(i) == tuple and len(i) == dim: # tuple of len dim => move
@@ -544,7 +573,8 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes, top=True):
             elif type(i) == tuple and len(i) == dim+1: # tuple of len dim+1 => both
                 pos = vadd(pos[:-1], i[:-1]) + (i[-1],)
             else:
-                raise Exception("Could not process transition {} from node {}".format(i, pos))
+                return None
+                # raise Exception("Could not process transition {} from node {}".format(i, pos))
         #print(pos)
     #print ("got 2 pos", pos)
     if top:
