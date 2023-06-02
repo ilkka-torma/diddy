@@ -1,0 +1,34 @@
+-- Define a number-conserving binary 2D CA, and prove that it is number-conserving.
+-- The CA tries to move every 1 one step down.
+-- If there's another 1 in the way, it tries to move it to the left.
+-- If there's also a 1 in the way (or another 1 is already moving in from above), the 1 stays put.
+
+-- Define two disjoint alphabets, one for the domain and another for the codomain.
+%alphabet 0 1
+%save_environment nums
+%alphabet a0 a1
+
+-- The new state is a1 iff the formula is true.
+%block_map domain=nums traffic
+0 a1 Ao (o=0 -> o.rt=1 | [o.rt o.up o.up.lt] = [0 1 1]) & (o=1 -> o.lt=1 & (o.dn=1 | (o.dn=0 & o.dn.rt=1)))
+
+-- Compute the SFT containing the relation of the CA, i.e. pairs (x, traffic(x)).
+%relation tracks=[D C] traffic_rel traffic
+
+-- Compute a lower bound for the asymptotic mean of a configuration pair using weight 1 for a 1 on the domain and weight -1 for an a1 on the codomain.
+%set_weights
+{  0:0  1:1
+  a0:0 a1:-1 }
+%density_lower_bound traffic_rel
+(1,0) (0,1);
+(0,0,D.0) (0,0,C.0) (1,0,D.0) (0,1,D.0) (-1,0,D.0) (0,-1,D.0)
+
+-- Then do the same with inverted weights.
+%set_weights
+{  0:0  1:-1
+  a0:0 a1:1  }
+%density_lower_bound traffic_rel
+(1,0) (0,1);
+(0,0,D.0) (0,0,C.0) (1,0,D.0) (0,1,D.0) (-1,0,D.0) (0,-1,D.0)
+
+-- Both give 0.0, which means that every configuration pair has asymptotic mean weight 0.
