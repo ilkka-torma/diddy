@@ -1,0 +1,32 @@
+-- Define a topology for the following infinite grid:
+--
+--  |   |   |   |
+-- -o-o-o-o-o-o-o-
+--  |   |   |   |
+-- -o-o-o-o-o-o-o-
+--  |   |   |   |
+-- -o-o-o-o-o-o-o-
+--  |   |   |   |
+
+%nodes a b
+%topology
+rt (0,0,a) (0,0,b);
+rt (0,0,b) (1,0,a);
+lt (0,0,a) (-1,0,b);
+lt (0,0,b) (0,0,a);
+up (0,0,b) (0,1,b);
+dn (0,0,b) (0,-1,b)
+
+-- Define identifying codes on this graph.
+%SFT idcode Ao let c p q := p~q=1 in (Ep[o1] p=1) & (Ap[o2] o!@p -> Eq[o1p1] ((c o q & p!~q) | (c p q & o!~q)))
+%compute_forbidden_patterns idcode
+
+-- Compute the minimum density of a periodic point of the given period.
+-- With period (2,1) we get 5/14 ~ 0.35714...
+%minimum_density idcode (2,1)
+
+-- Compute a lower bound for the density using a linear program.
+-- This gives 0.35 = 7/20 in about 6 minutes.
+%density_lower_bound idcode (1,0) (0,1); (0,0,a) (0,0,b) (1,0,a) (-1,0,b) (0,1,b) (0,-1,b) (0,1,a) (0,-1,a) (1,0,b)
+
+-- Hence, the minimum density of an identifying code on this graph is between 7/20 and 5/14.
