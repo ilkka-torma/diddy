@@ -221,7 +221,9 @@ commands = [
 
     # Visualization
     Command("tiler",
-            [ArgType.LABEL]),
+            [ArgType.LABEL],
+            opts = ["x_size", "y_size"],
+            flags = ["x_periodic", "y_periodic"]),
     Command("tile_box",
             [ArgType.LABEL, ArgType.NUMBER]),
     Command("keep_tiling",

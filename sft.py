@@ -175,7 +175,7 @@ class SFT:
             self.deduce_circuit()
         else:
             self.circuit = nonnegative_circuit(self.dim, self.onesided, circuit)
-        print(self.circuit.complexity)
+        #print(self.circuit.complexity)
 
     def __str__(self):
         return "SFT(dim={}, nodes={}, alph={}{})".format(self.dim, self.nodes, self.alph, (", onesided="+str(self.onesided)) if self.onesided else "")
@@ -299,13 +299,16 @@ class SFT:
             return True
         return False
 
-    def deduce(self, known_values, domain):
+    def deduce(self, known_values, domain, periods=None):
         #raise Exception("sft.deduce is currently broken")
         #print("deducing", domain, known_values)
         #if len(self.alph) != 2:
         #    raise Exception("Only binary alphabets supported in deduce")
 
         #print(self.circuit)
+        
+        if periods is None:
+            periods = [None]*self.dim
         
         circuits = {}
     
@@ -317,7 +320,7 @@ class SFT:
                 #rel_pos = vadd(v, var[:-2]) + (var[-2], var[-1], 0) 
                 #substitute(circuits[v], var, V(rel_pos))
 
-            transform(circuits[v], lambda var: nvadd(var[:-1], v) + var[-1:])
+            transform(circuits[v], lambda var: nvmods(periods, nvadd(var[:-1], v)) + var[-1:])
             #print(v, circuits[v])
 
         #print("that was circuits")

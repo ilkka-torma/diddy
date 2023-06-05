@@ -39,7 +39,7 @@ class Diddy:
         #print(code)
         try:
             parsed = dparser.parse_diddy(code)
-            print(parsed)
+            #print(parsed)
         except parsy.ParseError as e:
             print("Parse error: {}".format(e))
             linenum, lineindex = parsy.line_info_at(e.stream, e.index)
@@ -567,8 +567,12 @@ class Diddy:
             elif cmd == "tiler":
                 import tiler
                 name = args[0]
+                x_size = kwds.get("x_size", 10)
+                y_size = kwds.get("y_size", 10)
+                x_periodic = "x_periodic" in flags
+                y_periodic = "y_periodic" in flags
                 SFT = self.SFTs[name]
-                tiler.run(SFT, self.topology, self.tiler_gridmoves, self.tiler_nodeoffsets, self.tiler_skew)
+                tiler.run(SFT, self.topology, self.tiler_gridmoves, self.tiler_nodeoffsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic)
             
             elif cmd == "entropy_upper_bound":
                 name = args[0]

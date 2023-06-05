@@ -252,7 +252,7 @@ class BlockMap:
         topology = []
         for t in self.from_topology:
             # append the new dimension in the edges
-            topology.append(t[:1] + t[:time_axis] + [0] + t[time_axis:])
+            topology.append(t[:1] + t[:time_axis] + (0,) + t[time_axis:])
             # add the time direction, default name is "fut"
         for  n in nodes:
             topology.append(("fut", (0,)*(dim+1) + (n,), (0,)*time_axis + (1,) + (0,)*(dim-time_axis) + (n,)))

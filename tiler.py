@@ -88,7 +88,7 @@ TILING_OK = 1
 TILING_BAD = 2
 
 
-def deduce_a_tiling(grid, the_SFT):
+def deduce_a_tiling(grid, the_SFT, x_period, y_period):
 
     global currentstate
     currentstate = TILING_UNKNOWN
@@ -128,8 +128,9 @@ def deduce_a_tiling(grid, the_SFT):
     #print("known", known_values)        
 
     #print("deducing model")
+    
 
-    model = the_SFT.deduce(known_values, domain)
+    model = the_SFT.deduce(known_values, domain, periods=[x_period, y_period])
 
     #print("model found")
 
@@ -181,7 +182,7 @@ def cp_from_screen(v):
     return v[0], screenheight-v[1]
     
 
-def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1):
+def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10, x_periodic=False, y_periodic=False):
     print(topology)
 
     # check dimension in the first command of topology
@@ -252,9 +253,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1):
      
     # our grid is now just all initial_state
     grid = {}
-    r = 1
-    for x in range(-r, r+1):
-        for y in list(range(-r, r+1)):
+    for x in range(0, x_size):
+        for y in range(0, y_size):
             # EMPTY means we'll try to deduce a color here
             for n in nodes: #range(len(nodes)):
                 grid[(x, y, n)] = UNKNOWN
@@ -436,7 +436,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1):
                     #thred = Process(target=deduce_a_tiling_threaded, args=(que, grid, gridheight, gridwidth))
                     #thred.start()
 
-                    deduce_a_tiling(grid, the_SFT)
+                    deduce_a_tiling(grid, the_SFT, x_period = x_size if x_periodic else None, y_period = y_size if y_periodic else None)
                     print ("deduce_a_tiling returned (debug print)")
                     
             elif event.type == pygame.MOUSEBUTTONDOWN:
