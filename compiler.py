@@ -471,7 +471,7 @@ def collect_unbound_vars(formula, bound = None):
             possibles.add(q)
     elif op in "TF":
         pass
-    elif op in ["OR", "AND", "NOT", "IMP"]:
+    elif op in ["OR", "AND", "NOT", "IMP", "IFF"]:
         args = formula[1:]
         for arg in args:
             possibles.update(collect_unbound_vars(arg, bound))

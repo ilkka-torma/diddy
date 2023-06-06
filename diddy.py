@@ -39,7 +39,7 @@ class Diddy:
         #print(code)
         try:
             parsed = dparser.parse_diddy(code)
-            #print(parsed)
+            print(parsed)
         except parsy.ParseError as e:
             print("Parse error: {}".format(e))
             linenum, lineindex = parsy.line_info_at(e.stream, e.index)
