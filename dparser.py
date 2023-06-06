@@ -46,7 +46,7 @@ def many_strict(parser):
     return many_strict_parser
 
 # Whitespace and comments
-whitespace = p.regex(r'(\s|--.*(\r|\n)+)*')
+whitespace = p.regex(r'(\s|--.*((\r|\n)+|$))*')
 
 def lexeme(p):
     "p followed by whitespace."
@@ -222,7 +222,7 @@ commands = [
     # Visualization
     Command("tiler",
             [ArgType.LABEL],
-            opts = ["x_size", "y_size"],
+            opts = ["x_size", "y_size", "node_offsets"],
             flags = ["x_periodic", "y_periodic"]),
     Command("tile_box",
             [ArgType.LABEL, ArgType.NUMBER]),
@@ -264,7 +264,7 @@ topology_keyword = lexeme(p.regex(r'line|grid|square|squaregrid|king|kinggrid|tr
 def set_arg_value():
     arg_name = yield label
     yield p.string('=')
-    arg_value = yield fraction | label | nested_list
+    arg_value = yield fraction | label | nested_list | nested_mapping(label | integer, flat_value | nested_list)
     return (arg_name, arg_value)
     
 # Node name: period-separated sequence of labels
@@ -310,7 +310,7 @@ pattern = mapping(vector, label|fraction)
 open_pattern = open_mapping(vector, label|fraction)
 
 # Flat value
-flat_value = vector | set_arg_value.desc("setter") | node_name | fraction | pattern
+flat_value = vector | set_arg_value.desc("setter") | fraction | node_name | pattern
 
 # List (possibly nested) of numbers, vectors, labels, setters and patterns
 @p.generate("list")

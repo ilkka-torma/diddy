@@ -1,0 +1,30 @@
+-- Robinson tiling
+%nodes H V N E S W
+%alphabet default=[o l r I L R] {H : [0 1] V : [0 1]}
+%SFT robinson Ao
+let cross n e s w  :=
+  (n = l & e = r & s = o & w = o)
+in
+let rob n e s w :=
+  cross n e s w |
+  (n = I & e = I & s = o & w = I) |
+  (n = L & e = I & s = r & w = I) |
+  (n = R & e = I & s = l & w = I) |
+  (n = I & e = R & s = o & w = L) |
+  (n = L & e = R & s = r & w = L) |
+  (n = R & e = R & s = l & w = L)
+in
+  (rob o.N o.E o.S o.W |
+   rob o.E o.S o.W o.N |
+   rob o.S o.W o.N o.E |
+   rob o.W o.N o.E o.S) &
+  o.H != o.(1,0).H &
+  o.V != o.(0,1).V &
+  o.H = o.V = 1 ->
+  (cross o.N o.E o.S o.W |
+   cross o.E o.S o.W o.N |
+   cross o.S o.W o.N o.E |
+   cross o.W o.N o.E o.S)
+%tiler x_size=20 y_size=20
+  node_offsets={H:[2/5 2/5] V:[3/5 3/5] N:[1/2 4/5] E:[4/5 1/2] S:[1/2 1/5] W:[1/5 1/2]}
+  robinson

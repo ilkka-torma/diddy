@@ -30,7 +30,7 @@ class Diddy:
         self.topology = grid
         self.tiler_skew = 1 # actually skew is completely useless
         self.tiler_gridmoves = [(1,0), (0,1)]
-        self.nodeoffsets = {0 : (0,0)}
+        self.tiler_nodeoffsets = {0 : (0,0)}
         self.formulae = []
         self.weights = None
         self.externals = {}
@@ -60,6 +60,9 @@ class Diddy:
                 alph0 = list(self.alphabet.values())[0]
                 if all(alph == alph0 for alph in self.alphabet.values()):
                     self.alphabet = {node : alph0 for node in self.nodes}
+                self.tiler_gridmoves = [(1,0), (0,1)]
+                self.tiler_skew = 1
+                self.tiler_nodeoffsets = {node : (2*j/(3*len(self.nodes)), 2*j/(3*len(self.nodes))) for (j,node) in enumerate(self.nodes)}
             elif cmd == "dim":
                 self.dim = args[0]
             elif cmd == "alphabet":
@@ -120,10 +123,7 @@ class Diddy:
                     self.tiler_skew = 1
                     self.tiler_nodeoffsets = {0 : (0,0)}
                 else:
-                    self.topology = top
-                    self.tiler_gridmoves = [(1,0), (0,1)]
-                    self.tiler_skew = 1
-                    self.tiler_nodeoffsets = {node : (2*j/(3*len(self.nodes)), 2*j/(3*len(self.nodes))) for (j,node) in enumerate(self.nodes)}
+                    self.topology = [tuple(edge) for edge in top]
                 if type(top) == str:
                     alph0 = list(self.alphabet.values())[0]
                     if all(alph == alph0 for alph in self.alphabet.values()):
@@ -571,8 +571,10 @@ class Diddy:
                 y_size = kwds.get("y_size", 10)
                 x_periodic = "x_periodic" in flags
                 y_periodic = "y_periodic" in flags
+                node_offsets = kwds.get("node_offsets", self.tiler_nodeoffsets)
+                node_offsets = {node: tuple(float(a) for a in vec) for (node, vec) in node_offsets.items()}
                 SFT = self.SFTs[name]
-                tiler.run(SFT, self.topology, self.tiler_gridmoves, self.tiler_nodeoffsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic)
+                tiler.run(SFT, self.topology, self.tiler_gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic)
             
             elif cmd == "entropy_upper_bound":
                 name = args[0]

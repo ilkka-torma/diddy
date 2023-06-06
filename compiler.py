@@ -20,6 +20,7 @@ circuit_variables are aa little tricky... they should be functions
 """
 
 def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_var, all_vars, externals):
+    #print("to_circuit", formula)
     #print("nodes", nodes)
     if type(nodes) == list:
         nodes = sft.Nodes(nodes)
@@ -196,7 +197,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         arg_names = formula[1][1:]
         #print(arg_names)
         circuit_code = formula[2]
-        #print("ccode, ", circuit_code)
+        #print("ccode", circuit_code)
         unbound_vars = collect_unbound_vars(circuit_code, set(arg_names))
         ret_code = formula[3]
         closure = {}
@@ -446,11 +447,15 @@ def collect_unbound_vars(formula, bound = None):
     if op == "BOOL":
         possibles.add(formula[1]) # a boolean variable's value is copied from enclosing
     elif op == "CALL":
-        possibles.add(formula[1][0]) # same for circuit
+        possibles.add(formula[1]) # same for circuit
         # but also collect in args
-        args = formula[1][1:]
+        args = formula[2:]
+        #print("collect args", args)
         for arg in args:
-            possibles.update(collect_unbound_vars(arg, bound))
+            if type(arg) == tuple:
+                possibles.update(collect_unbound_vars(arg, bound))
+            else:
+                possibles.update(arg)
     elif op in ["CELLFORALL", "CELLEXISTSCELL", "NODEFORALL", "NODEEXISTS"]:
         var = formula[1]
         bound.add(var)
