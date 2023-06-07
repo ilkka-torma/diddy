@@ -35,11 +35,12 @@ class Diddy:
         self.weights = None
         self.externals = {}
 
-    def run(self, code, mode="report"):
+    def run(self, code, mode="report", print_parsed=False):
         #print(code)
         try:
             parsed = dparser.parse_diddy(code)
-            print(parsed)
+            if print_parsed:
+                print(parsed)
         except parsy.ParseError as e:
             print("Parse error: {}".format(e))
             linenum, lineindex = parsy.line_info_at(e.stream, e.index)
@@ -123,7 +124,14 @@ class Diddy:
                     self.tiler_skew = 1
                     self.tiler_nodeoffsets = {0 : (0,0)}
                 else:
-                    self.topology = [tuple(edge) for edge in top]
+                    self.topology = []
+                    for edge in top:
+                        if edge:
+                            if len(edge) != 3:
+                                print("Bad topology edge, ignoring: {}".format(edge))
+                            if len(edge) > 3:
+                                print("Maybe you forgot a semicolon?")
+                            self.topology.append(tuple(edge))
                 if type(top) == str:
                     alph0 = list(self.alphabet.values())[0]
                     if all(alph == alph0 for alph in self.alphabet.values()):
@@ -381,15 +389,16 @@ class Diddy:
                 name2 = args[1]
                 expect = kwds.get("expect", None)
                 method = kwds.get("method", "periodic")
+                verb = "verbose" in flags
                 if name1 in self.SFTs and name2 in self.SFTs:
                     SFT1 = self.SFTs[name1]
                     SFT2 = self.SFTs[name2]
-                    report_SFT_equal((name1, SFT1), (name2, SFT2), mode=mode, truth=expect, method=method)
+                    report_SFT_equal((name1, SFT1), (name2, SFT2), mode=mode, truth=expect, method=method, verbose=verb)
 
                 elif name1 in self.blockmaps and name2 in self.blockmaps:
                     CA1 = self.blockmaps[name1]
                     CA2 = self.blockmaps[name2]
-                    report_blockmap_equal((name1, CA1), (name2, CA2), mode=mode, truth=expect)
+                    report_blockmap_equal((name1, CA1), (name2, CA2), mode=mode, truth=expect, verbose=verb)
                 
                 else:
                     raise Exception("%s or %s is not an SFT or block map." % (name1, name2))
@@ -405,10 +414,11 @@ class Diddy:
                 item2 = args[1]
                 expect = kwds.get("expect", None)
                 method = kwds.get("method", "periodic")
+                verb = "verbose" in flags
                 if item1 in self.SFTs:
                     SFT1 = self.SFTs[item1]
                     SFT2 = self.SFTs[item2]
-                    report_SFT_contains((item1, SFT1), (item2, SFT2), mode=mode, truth=expect, method=method)
+                    report_SFT_contains((item1, SFT1), (item2, SFT2), mode=mode, truth=expect, method=method, verbose=verb)
                 else:
                     clopen1 = self.clopens[item1]
                     clopen2 = self.clopens[item2]
@@ -452,6 +462,7 @@ class Diddy:
                         print("It already had forbidden patterns; overwriting them.")
                     print()
                 the_sft.deduce_forbs(rad)
+                print("Found {} patterns.".format(len(the_sft.forbs)))
 
             elif cmd == "set_weights":
                 self.weights = args[0]
@@ -500,9 +511,16 @@ class Diddy:
                 if dom_dim != cod_dim:
                     raise Exception("Dimension mismatch: {} is not {}".format(dom_dim, cod_dim))
                 circuits = dict()
-                for (node, sym, formula) in rules:
-                    circ = compiler.formula_to_circuit(dom_nodes, dom_dim, dom_top, dom_alph, formula, self.externals)
-                    circuits[(node, sym)] = circ
+                for rule in rules:
+                    if rule:
+                        if len(rule) != 3:
+                            print("Bad block map rule, ignoring: {}".format(rule))
+                            if len(rule) > 3:
+                                print("Maybe you forgot a semicolon?")
+                            continue
+                        node, sym, formula = rule
+                        circ = compiler.formula_to_circuit(dom_nodes, dom_dim, dom_top, dom_alph, formula, self.externals)
+                        circuits[(node, sym)] = circ
                 #print(circuits)
                 self.blockmaps[name] = blockmap.BlockMap(dom_alph, cod_alph, dom_nodes, cod_nodes, dom_dim, circuits, dom_top, cod_top)
 
@@ -512,8 +530,14 @@ class Diddy:
                 circuits = {}
                 
                 for r in rules:
-                    circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, r[3], self.externals)
-                    circuits[(r[0], r[1], r[2])] = circ # node node offset circuit
+                    if rule:
+                        if len(rule) != 4:
+                            print("Bad TGF rule, ignoring: {}".format(rule))
+                            if len(rule) > 4:
+                                print("Maybe you forgot a semicolon?")
+                            continue
+                        circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, r[3], self.externals)
+                        circuits[(r[0], r[1], r[2])] = circ # node node offset circuit
                 self.TFGs[name] = tfg.TFG(self.alphabet, self.nodes, self.dim, circuits)
 
             elif cmd == "TFG_loops":
@@ -831,12 +855,12 @@ def forbos_to_formula(fof):
     #print(ret, "MIL")
     return ret
         
-def report_SFT_contains(a, b, mode="report", truth=True, method=None):
+def report_SFT_contains(a, b, mode="report", truth=True, method=None, verbose=False):
     aname, aSFT = a
     bname, bSFT = b
     print("Testing whether %s contains %s." % (aname, bname))
     tim = time.time()
-    res, rad, conf = aSFT.contains(bSFT, return_radius_and_sep = True, method=method)
+    res, rad, conf = aSFT.contains(bSFT, return_radius_and_sep = True, method=method, verbose=verbose)
     tim = time.time() - tim
     if res:
         print("%s CONTAINS %s (radius %s, time %s)" % (aname, bname, rad, tim))
@@ -850,12 +874,12 @@ def report_SFT_contains(a, b, mode="report", truth=True, method=None):
         print(res, truth)
         assert res == (truth == "T")
 
-def report_SFT_equal(a, b, mode="report", truth=True, method=None):
+def report_SFT_equal(a, b, mode="report", truth=True, method=None, verbose=False):
     aname, aSFT = a
     bname, bSFT = b
     print("Testing whether SFTs %s and %s are equal." % (aname, bname))
     tim = time.time()
-    res, rad = aSFT.equals(bSFT, return_radius = True, method=method)
+    res, rad = aSFT.equals(bSFT, return_radius = True, method=method, verbose=verbose)
     tim = time.time() - tim
     if res: 
         print("They are EQUAL (radius %s, time %s)." % (rad, tim))
@@ -866,7 +890,7 @@ def report_SFT_equal(a, b, mode="report", truth=True, method=None):
         print(res, truth)
         assert res == (truth == "T")
 
-def report_blockmap_equal(a, b, mode="report", truth=True):
+def report_blockmap_equal(a, b, mode="report", truth=True, verbose=False): # verbose does nothing here
     aname, amap = a
     bname, bmap = b
     print("Testing whether block maps %s and %s are equal." % (aname, bname))
