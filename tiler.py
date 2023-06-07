@@ -299,7 +299,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
     # Set title of screen
     pygame.display.set_caption("Tiler")
 
-    pictures = {p : [get_picture(q) for q in pictures[p]] for p in pictures}
+    if pictures != None:
+        pictures = {p : [get_picture(q) for q in pictures[p]] for p in pictures}
       
     # Loop until the user clicks the close button.
     done = False
