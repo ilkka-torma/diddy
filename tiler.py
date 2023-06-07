@@ -550,7 +550,9 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                 elif drawcolor == UNKNOWN:
                     grid[node] = UNKNOWN
                 elif drawcolor[0] == SET and drawcolor[1] < len(alphabets[node[-1]]):
-                    print("node", node, "set to", alphabets[node[-1]][drawcolor[1]])
+                    if node in grid and grid[node] != drawcolor:
+                        print("node", node, "set to", alphabets[node[-1]][drawcolor[1]])
+                        
                     grid[node] = drawcolor
 
                 

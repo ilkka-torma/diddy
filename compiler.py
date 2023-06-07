@@ -667,6 +667,10 @@ def get_closed_nbhd(dim, topology, pos):
 def get_nbhd(dim, topology, pos):
     ret = set()
     for t in topology:
+        if len(t) <= 1:
+            raise Exception("Topology has invalid edge %s." % str(t))
+        if len(t) != 3:
+            raise Exception("Topology edge %s has unsupported size." % str(t))
         a, b = t[1], t[2]
         # if pos is a, then we add b
         if pos[dim] == None or t[1][dim] == pos[dim]:
