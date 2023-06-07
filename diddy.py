@@ -122,6 +122,13 @@ class Diddy:
                     self.tiler_gridmoves = [(1,0), (-0.5,0.6)]
                     self.tiler_skew = 1
                     self.tiler_nodeoffsets = {0 : (0,0)}
+                elif top in ["CR"]:
+                    self.dim = 2
+                    self.topology = CR4d8e2_topology
+                    self.nodes = CR4d8e2_nodes
+                    self.tiler_gridmoves = [(1,0), (-0.5,0.5)]
+                    self.tiler_skew = 1
+                    self.tiler_nodeoffsets = {"big" : (0,0), "small" : (0.5,0)}
                 else:
                     self.topology = [tuple(edge) for edge in top]
                 if type(top) == str:
@@ -925,6 +932,21 @@ Wang_topology = [("up", (0,0,"N"), (0,1,"S")),
                  ("rt", (0,0,"E"), (1,0,"W")),
                  ("lt", (0,0,"W"), (-1,0,"E"))]
 
+# Cundy Rollet 4.8^2, see Wikipedia
+# Euclidean tilings by convex regular polygons
+CR4d8e2_nodes = ["big", "small"]
+CR4d8e2_topology = [('N', (0, 0, 'big'), (0, 1, 'small')),
+                    ('NE', (0, 0, 'big'), (1, 1, 'big')),
+                    ('E', (0, 0, 'big'), (0, 0, 'small')),
+                    ('SE', (0, 0, 'big'), (0, -1, 'big')),
+                    ('S', (0, 0, 'big'), (-1, -1, 'small')),
+                    ('SW', (0, 0, 'big'), (-1, -1, 'big')),
+                    ('W', (0, 0, 'big'), (-1, 0, 'small')),
+                    ('NW', (0, 0, 'big'), (0, 1, 'big')),
+                    ('N', (0, 0, 'small'), (1, 1, 'big')),
+                    ('E', (0, 0, 'small'), (1, 0, 'big')),
+                    ('S', (0, 0, 'small'), (0, -1, 'big')),
+                    ('W', (0, 0, 'small'), (0, 0, 'big'))]
 
 
 if __name__ == "__main__":
