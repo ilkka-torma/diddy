@@ -6,6 +6,7 @@ import pygame
 import time
 import numpy as np
 from numpy.linalg import inv
+import os
 
 """
 nodes = [0]
@@ -180,10 +181,32 @@ def cp_to_screen(v):
 # coordinate preprocess from screen
 def cp_from_screen(v):
     return v[0], screenheight-v[1]
-    
 
-def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10, x_periodic=False, y_periodic=False):
-    print(topology)
+def get_picture(p):
+    for typ in ["", ".png", ".jpg", ".gif"]:
+        path = p + typ
+        if os.path.exists(path):
+            return pygame.image.load(path)
+    if "_" not in p:
+        raise Exception("Image %s does not exist." % p)
+    pos = p.rindex("_")
+    if p[pos+1] != "r":
+        raise Exception("Incorrect image transformation syntax in %s, try filename_r90." % p)
+    angle = int(p[pos+2:])
+    filename = p[:pos]
+    pic = get_picture(filename)
+    return pygame.transform.rotate(pic, angle)
+
+"""
+# newer pygame should have scale_by
+def scale_picture(pic, factor):
+    size = pic.get_width(), pic.get_height()
+    # consider dest_surface?
+    return pygame.transform.scale(pic, (max(1, int(size[0]*factor)), max(1, int(size[1]*factor))))
+"""
+
+def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10, x_periodic=False, y_periodic=False, pictures=None):
+    #print(topology)
 
     # check dimension in the first command of topology
     dimension = len(topology[0][1]) - 1
@@ -203,9 +226,11 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
     #y_range = list(range(-r, r+1))
     #else:
     #    dimension_y_range = [0]
+
+    print(pictures)
     
-    print(gridmoves)
-    print(nodeoffsets)
+    #print(gridmoves)
+    #print(nodeoffsets)
     #print("mus")
     global nodes
     nodes = list(the_SFT.nodes) #list(n for n in the_SFT.nodes)
@@ -215,11 +240,11 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
             # this only makes sense if either all or none are set
             nodeoffsets[n] = (0, runningoffset)
             runningoffset += 1/len(nodes)
-    print("nodes and offsets", nodes, nodeoffsets)
+    #print("nodes and offsets", nodes, nodeoffsets)
     dim = the_SFT.dim
     alphabets = the_SFT.alph
 
-    print(alphabets)
+    #print("alph", alphabets)
 
     origin = (0,)*dimension + (nodes[0],)
 
@@ -273,7 +298,9 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
      
     # Set title of screen
     pygame.display.set_caption("Tiler")
-     
+
+    pictures = {p : [get_picture(q) for q in pictures[p]] for p in pictures}
+      
     # Loop until the user clicks the close button.
     done = False
     
@@ -465,9 +492,9 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
         if keys[pygame.K_RIGHT]:
             screenmove = (1, 0)
         if keys[pygame.K_UP]:
-            screenmove = (0, -1)
-        if keys[pygame.K_DOWN]:
             screenmove = (0, 1)
+        if keys[pygame.K_DOWN]:
+            screenmove = (0, -1)
             
         #screenmove = smul(zoom*0.01, screenmove)
         screenmove = smul(4, screenmove)
@@ -504,18 +531,22 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
         #print(node, mouseisdown)
         if node != None and mouseisdown and drawcolor != None:
             if node not in grid or grid[node] != drawcolor:
-                
+
+
+                #print(drawcolor)
                 currentstate = TILING_UNKNOWN
                 #print(node)
                 node = node[:-1] + (nodes[node[-1]],)
                 
-                
                 if drawcolor == EMPTY:
                     del grid[node]
-
-                if drawcolor[0] == SET and drawcolor[1] < len(alphabets[nodes[node[-1]]]):
-                    #print("set", drawcolor[1], len(alphabets[nodes[node[-1]]])
+                elif drawcolor == UNKNOWN:
+                    grid[node] = UNKNOWN
+                elif drawcolor[0] == SET and drawcolor[1] < len(alphabets[node[-1]]):
+                    print("node", node, "set to", alphabets[node[-1]][drawcolor[1]])
                     grid[node] = drawcolor
+
+                
                 
                 #print(node, drawcolor)
                 if thred != None:
@@ -587,10 +618,12 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                         #    print(grid[(x,y,n)], "!=", UNKNOWN)
                         elif grid[(x,y,nodes[n])][0] == DEDUCED:
                             #print(alphabets[nodes[n]])
-                            sym = alphabets[nodes[n]][grid[(x,y,nodes[n])][1]]
+                            symidx = grid[(x,y,nodes[n])][1]
+                            sym = alphabets[nodes[n]][symidx]
                             color = colors[grid[(x,y,nodes[n])][1]] #deduced_colors[sym]
                         elif grid[(x,y,nodes[n])][0] == SET:
-                            sym = alphabets[nodes[n]][grid[(x,y,nodes[n])][1]]
+                            symidx = grid[(x,y,nodes[n])][1]
+                            sym = alphabets[nodes[n]][symidx]
                             #print(sym)
                             color = colors[grid[(x,y,nodes[n])][1]]
                             white_circle = True
@@ -606,20 +639,33 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                         #print(gimmel, nnn) #time.time())
 
                         if white_circle:
-                            pygame.draw.circle(screen, WHITE, cp_to_screen(p), nodesize+3)
-                        pygame.draw.circle(screen, color, cp_to_screen(p), nodesize)
+                            pygame.draw.circle(screen, WHITE, cp_to_screen(p), nodesize+4)
+                            pygame.draw.circle(screen, BLACK, cp_to_screen(p), nodesize+2)
 
-                        if sym != None:
+                        drawing_picture = False
+                        if pictures != None and nodes[n] in pictures:
+                            drawing_picture = True
+
+                        if not drawing_picture or True: # actually I like the circles
+                            pygame.draw.circle(screen, color, cp_to_screen(p), nodesize)
+
+                        if not drawing_picture and sym != None:
                             #print(sym, color)
                             col = (255, 255, 255)
                             if sum(color) > 250:
                                 col = (10, 10, 10)
-                            font_surf = my_font.render(str(sym), False, col)
-                            #print (p, font_surf.get_width()//2, font_surf.get_height()//2)
-                            #print (vsub(p, (font_surf.get_width()//2, font_surf.get_height()//2)))
-                            #v = (8, 15)
-                            v = (font_surf.get_width()//2, -font_surf.get_height()//2)
-                            screen.blit(font_surf, cp_to_screen(vsub(p, v)))
+                            
+                            # write name of node, or draw picture
+                            if pictures == None or nodes[n] not in pictures:
+                                font_surf = my_font.render(str(sym), False, col)
+                                v = (font_surf.get_width()//2, -font_surf.get_height()//2)
+                                screen.blit(font_surf, cp_to_screen(vsub(p, v)))
+                                
+                        if sym != None and drawing_picture:
+                            pic = pictures[nodes[n]][symidx]
+                            pic = pygame.transform.scale(pic, (nodesize*2, nodesize*2))
+                            v = (pic.get_width()//2, -pic.get_height()//2)
+                            screen.blit(pic, cp_to_screen(vsub(p, v)))
                         #else:
                             #print(sym, "None")
                     
