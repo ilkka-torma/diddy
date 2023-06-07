@@ -267,7 +267,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
     #gridheight = 15
     #gridwidth = 15
     
-    camera = (0, 0) # where we looking; center of screen is here
+    camera = (x_size/2, y_size/2) # where we looking; center of screen is here
     zoom = (40, 40*skew) # how big are cells basically
     global screenwidth, screenheight
     screenwidth = 700
@@ -275,6 +275,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
 
     pygame.font.init() 
     my_font = pygame.font.SysFont('Consolas', 30)
+    msg_font = pygame.font.SysFont('Consolas', 15)
      
     # our grid is now just all initial_state
     grid = {}
@@ -398,6 +399,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
     # print(get_node(0,7))
 
     nnn = 0
+    
+    show_help = True
     # -------- Main Program Loop -----------
     while not done:
 
@@ -449,6 +452,9 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                     drawcolor = UNKNOWN # means unused
                 if event.key == pygame.K_BACKSPACE:
                     drawcolor = EMPTY
+                    
+                if event.key == pygame.K_h:
+                    show_help = not show_help
                 
                 if event.key == pygame.K_ESCAPE:
                     if thred != None:
@@ -692,6 +698,25 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                                   (MARGIN + HEIGHT) * row + MARGIN,
                                   WIDTH,
                                   HEIGHT])"""
+                               
+        if show_help:                               
+            # Draw some helper text
+            if type(drawcolor) == tuple and drawcolor[0] == SET:
+                draw_msg = ["Drawing symbol {}".format(drawcolor[1])]
+            else:
+                draw_msg = ["Drawing {}".format(drawcolor)]
+            draw_msg.append("Draw: left mouse button")
+            draw_msg.append("Select symbol: number keys")
+            draw_msg.append("Select unknown symbol: u")
+            draw_msg.append("Pan: arrow keys")
+            draw_msg.append("Zoom: az")
+            draw_msg.append("Node size: sx")
+            draw_msg.append("Deduce pattern: spacebar")
+            draw_msg.append("Cancel deduction: escape")
+            draw_msg.append("Toggle this text: h")
+            for (i, msg) in enumerate(draw_msg):
+                font_surf = msg_font.render(msg, False, GREEN)
+                screen.blit(font_surf, (10, 10+i*15))
      
         # Limit to 60 frames per second
         clock.tick(60)
