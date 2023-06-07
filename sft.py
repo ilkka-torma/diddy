@@ -561,6 +561,7 @@ class SFT:
         "Test containment using forced allowed patterns or special configurations"
         r = 1
         while limit is None or r <= limit:
+            print(r)
             if other.ball_forces_allowed(self, r):
                 if return_radius_and_sep:
                     return True, r, None

@@ -222,7 +222,7 @@ commands = [
     # Visualization
     Command("tiler",
             [ArgType.LABEL],
-            opts = ["x_size", "y_size", "node_offsets"],
+            opts = ["x_size", "y_size", "node_offsets", "pictures"],
             flags = ["x_periodic", "y_periodic"]),
     Command("tile_box",
             [ArgType.LABEL, ArgType.NUMBER]),

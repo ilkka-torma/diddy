@@ -573,8 +573,9 @@ class Diddy:
                 y_periodic = "y_periodic" in flags
                 node_offsets = kwds.get("node_offsets", self.tiler_nodeoffsets)
                 node_offsets = {node: tuple(float(a) for a in vec) for (node, vec) in node_offsets.items()}
+                pictures = kwds.get("pictures", None)
                 SFT = self.SFTs[name]
-                tiler.run(SFT, self.topology, self.tiler_gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic)
+                tiler.run(SFT, self.topology, self.tiler_gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic, pictures)
             
             elif cmd == "entropy_upper_bound":
                 name = args[0]
