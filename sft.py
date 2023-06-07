@@ -84,6 +84,11 @@ class Nodes:
             for node in self:
                 yield '.'.join(str(part) for part in node)
 
+    def __eq__(self, other):
+        if type(other) != Nodes:
+            return False
+        return self.flat == other.flat and self.nodes == other.nodes
+
 # check that circuit is forced to be true when variable set
 def forced_by(circuit, vals_as_list):
     andeds = []
@@ -557,11 +562,12 @@ class SFT:
         
         self.deduce_forbs_(vec_domain)
 
-    def contains(self, other, limit = None, return_radius_and_sep = False, method="periodic"):
+    def contains(self, other, limit = None, return_radius_and_sep = False, method="periodic", verbose=False):
         "Test containment using forced allowed patterns or special configurations"
         r = 1
         while limit is None or r <= limit:
-            print(r)
+            if verbose:
+                print("Trying radius", r)
             if other.ball_forces_allowed(self, r):
                 if return_radius_and_sep:
                     return True, r, None
@@ -579,12 +585,16 @@ class SFT:
             r += 1
         return None
 
-    def equals(self, other, limit = None, return_radius = False, method=None):
+    def equals(self, other, limit = None, return_radius = False, method=None, verbose=False):
+        if verbose:
+            print("Testing containment 1")
         c12, rad, _ = self.contains(other, limit, return_radius_and_sep = True, method=method)
         if c12 == None:
             return None, limit
         elif c12 == False:
             return False, rad
+        if verbose:
+            print("Testing containment 2")
         c21, rad2, _ = other.contains(self, limit, return_radius_and_sep = True, method=method)
         if c21 == None:
             return None, limit
