@@ -453,16 +453,33 @@ class Diddy:
                 name = args[0]
                 the_sft = self.SFTs[name]
                 rad = kwds.get("radius", 0)
+                filename = kwds.get("filename", None)
+                save_msg = " into {}.output".format(filename) if filename is not None else ""
                 if mode == "report":
                     if rad is None:
-                        print("Computing forbidden patterns for %s." % name)
+                        print("Computing forbidden patterns for {}{}.".format(name, save_msg))
                     else:
-                        print("Computing forbidden patterns for %s using radius %s." % (name, rad))
+                        print("Computing forbidden patterns for {}{} using radius {}.".format(name, save_msg, rad))
                     if the_sft.forbs is not None:
                         print("It already had forbidden patterns; overwriting them.")
                     print()
                 the_sft.deduce_forbs(rad)
                 print("Found {} patterns.".format(len(the_sft.forbs)))
+                
+                if filename is not None:
+                    with open(filename+".output", 'w') as f:
+                        f.write(str(the_sft.forbs))
+                        
+            elif cmd == "load_forbidden_patterns":
+                sft_name = args[0]
+                the_sft = self.SFTs[sft_name]
+                filename = args[1]
+                if mode == "report":
+                    print("Loading forbidden patterns of {} from {}.output.".format(sft_name, filename))
+                with open(filename+".output", 'r') as f:
+                    contents = f.read()
+                forbs = eval(contents)
+                the_sft.forbs = forbs
 
             elif cmd == "set_weights":
                 self.weights = args[0]
