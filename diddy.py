@@ -580,7 +580,7 @@ class Diddy:
                 for name in composands[2:]:
                     result_CA = result_CA.then(self.CAs[name])
                 """
-                composands = composands[1:]
+                #composands = composands[1:]
                 result = self.blockmaps[composands[-1]]
                 for comp_name in reversed(composands[:-1]):
                     result = self.blockmaps[comp_name].then(result)

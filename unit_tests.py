@@ -433,6 +433,20 @@ code = """
 """
 unit_tests.append(("relation", code))
 
+code = """
+%CA f
+0 1 Ao o=1 | o.rt=1
+%CA g
+0 1 Ao o=1 | o.up=1
+%compose fg f g
+%compose gf g f
+%equal expect=T fg gf
+%relation rfg fg
+%relation rgf gf
+%equal expect=T rfg rgf
+"""
+unit_tests.append(("nontrivial commutation", code))
+
 
 if __name__ == "__main__":
 

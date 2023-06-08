@@ -100,7 +100,7 @@ class BlockMap:
         #print("he")
         for ns in self.circuits:
             #print(ns)
-            ldac = LDAC(self.from_alphabet) #lambda a: last_diff_and_count(a, len(self.to_alphabet))
+            ldac = LDAC2(self.from_alphabet) #lambda a: last_diff_and_count(a, len(self.to_alphabet))
             if not equivalent_under(self.circuits[ns], other.circuits[ns], ldac):
                 return False
         return True
@@ -131,7 +131,7 @@ class BlockMap:
             for a in self.from_alphabet:
                 differents.append(XOR(V(origin + (n, a, "A")), V(origin + (n, a, "B"))))
         # all iamges must be the same, and some central node has diff preimage
-        ret = UNSAT_under(AND(AND(*eq_circuits), OR(*differents)), LDAC(self.from_alphabet))
+        ret = UNSAT_under(AND(AND(*eq_circuits), OR(*differents)), LDAC2(self.from_alphabet))
 
         return ret
         
