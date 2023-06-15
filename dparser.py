@@ -764,6 +764,13 @@ def count_quantified():
     #print("parsed quantifier part", the_quantifier, var)
     the_formula = yield formula
     return ("NODECOUNT", var, restr, the_formula)
+    
+# Convert symbol of node into number
+@p.generate
+def sym_to_num():
+    yield lexeme(p.string('#'))
+    node = yield pos_expr
+    return ("SYM_TO_NUM", node)
 
 # Distance function for nodes
 @p.generate
@@ -773,7 +780,7 @@ def distance_func():
     node2 = yield pos_expr
     return ("DISTANCE", node1, node2)
 
-num_expr.become(expr_with_ops(numeric_ops, count_list | count_quantified | distance_func | numeric_call | strict_label.map(lambda s: ("NUM_VAR", s)) | integer.map(lambda n: ("CONST_NUM", n)) | lparen >> num_expr << rparen))
+num_expr.become(expr_with_ops(numeric_ops, count_list | count_quantified | sym_to_num | distance_func | numeric_call | strict_label.map(lambda s: ("NUM_VAR", s)) | integer.map(lambda n: ("CONST_NUM", n)) | lparen >> num_expr << rparen))
 
 # A full formula
 formula.become(expr_with_ops(boolean_ops, quantified | let_expr | num_let_expr | num_comparison | node_expr | bool_or_call | (lparen >> formula << rparen)))

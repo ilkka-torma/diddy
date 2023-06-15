@@ -469,6 +469,15 @@ code = """
 """
 unit_tests.append(("counting", code))
 
+code = """
+%alphabet 0 1 3 e
+%SFT x Ao #o <= 2
+%SFT y Ao o=0 | o=1
+%equal expect=T x y
+"""
+unit_tests.append(("numeric symbols", code))
+
+
 
 if __name__ == "__main__":
 
