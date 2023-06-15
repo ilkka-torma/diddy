@@ -134,7 +134,8 @@ commands = [
     # Defining objects
     Command("sft",
             [ArgType.LABEL, ArgType.FORMULA | ArgType.PATTERN_LIST],
-            aliases = ["SFT"]),
+            aliases = ["SFT"],
+            opts = ["onesided"]),
     Command("compute_forbidden_patterns",
             [ArgType.LABEL],
             opts = ["radius", "filename"],
