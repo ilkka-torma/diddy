@@ -660,7 +660,7 @@ def collect_unbound_vars(formula, bound = None):
             if type(arg) == tuple:
                 possibles.update(collect_unbound_vars(arg, bound))
             else:
-                possibles.update(arg)
+                possibles.add(arg)
     elif op in ["CELLFORALL", "CELLEXISTSCELL", "NODEFORALL", "NODEEXISTS", "NODECOUNT"]:
         var = formula[1]
         bound.add(var)
