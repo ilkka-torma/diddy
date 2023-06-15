@@ -455,6 +455,15 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                     
                 if event.key == pygame.K_h:
                     show_help = not show_help
+                    
+                if event.key == pygame.K_e:
+                    if event.mod & pygame.KMOD_SHIFT:
+                        for (nvec, status) in grid.items():
+                            grid[nvec] = UNKNOWN
+                    else:
+                        for (nvec, status) in grid.items():
+                            if status != UNKNOWN and status[0] == DEDUCED:
+                                grid[nvec] = UNKNOWN
                 
                 if event.key == pygame.K_ESCAPE:
                     if thred != None:
@@ -467,11 +476,12 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                         thred = None
                         print ("deduction cancelled")
                     print ("deduction starting")
+                    tim = time.time()
                     #thred = Process(target=deduce_a_tiling_threaded, args=(que, grid, gridheight, gridwidth))
                     #thred.start()
 
                     deduce_a_tiling(grid, the_SFT, x_period = x_size if x_periodic else None, y_period = y_size if y_periodic else None)
-                    print ("deduce_a_tiling returned (debug print)")
+                    print ("deduce_a_tiling returned (debug print) in {} seconds".format(time.time()-tim))
                     
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 mouseisdown = True
@@ -714,7 +724,9 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
             draw_msg.append("Zoom: az")
             draw_msg.append("Node size: sx")
             draw_msg.append("Deduce pattern: spacebar")
-            draw_msg.append("Cancel deduction: escape")
+            draw_msg.append("Clear deduced nodes: e")
+            draw_msg.append("Clear all nodes: shift-e")
+            #draw_msg.append("Cancel deduction: escape")
             draw_msg.append("Toggle this text: h")
             for (i, msg) in enumerate(draw_msg):
                 font_surf = msg_font.render(msg, False, GREEN)
