@@ -447,6 +447,28 @@ code = """
 """
 unit_tests.append(("nontrivial commutation", code))
 
+code = """
+%SFT count1 Ao 1 <= #[o=1 o.rt=1 o.up=1 o.up.rt=1] <= 3
+%SFT man1 Ao !(o=o.rt=o.up=o.up.rt)
+%equal expect=T count1 man1
+%SFT count2 Ao let v a := a=1 in letnum n := 1 in #p[o1] v p <= n
+%SFT man2 Ao !Ex[o1] Ey[o1] y!@x=y=1
+%equal expect=T count2 man2
+%SFT count3 Ao let v a := letnum n := 1 in #p[a1] p=1 <= n in v o
+%equal expect=T count3 man2
+%SFT count4 Ao (#p[o1] p=1 | p.up=0) + 1 <= abs (#q[o1] q=0 | q.rt=1)
+%SFT count5 Ao ((#p[o1] p=1 | p.up=0) + 2)*3 >= ((#q[o1] q=0 | q.rt=1) + 1)*3
+%SFT count6 Ao ((#p[o1] p=1 | p.up=0) + 4)*(-1) == ((#q[o1] q=0 | q.rt=1) + 3)*(-1)
+%intersection count7 count4 count5
+%equal expect=T count6 count7
+%SFT empty Ao 0=1
+%equal expect=F empty count7
+%SFT count8 Ao Ax[o2] dist o x + #[o=0 x=1] <= 3
+%SFT uni_chess Ao (o = o.rt = o.up = o.up.rt) | (o != o.rt = o.up != o.up.rt)
+%equal expect=T count8 uni_chess
+"""
+unit_tests.append(("counting", code))
+
 
 if __name__ == "__main__":
 

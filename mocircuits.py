@@ -13,7 +13,9 @@ class MOCircuit:
             m = cc.equivalent(self.circuits[a], other.circuits[a], True)
             if m != True:
                 return (a, m)
-        return True            
+        return True           
+    def __getitem__(self, index):
+        return self.circuits[index]
 
 class MOCircuitSet:
     def __init__(self, indices):
