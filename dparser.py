@@ -532,7 +532,7 @@ def expr_with_ops(prec_table, atomic, prec_index=0):
         return atomic
         
     else:
-        @p.generate(prec_table[prec_index][0] + " expression")
+        @p.generate
         def parse_the_expr():
             name, assoc, operators = prec_table[prec_index]
             #print("parsing", name, "expression, precedence", prec_index)
@@ -645,7 +645,7 @@ def bool_or_call():
         return ("BOOL", name)
 
 # Restrictions in quantifiers
-@p.generate("restriction part")
+@p.generate
 def restriction():
     name = yield strict_label
     num = yield natural
@@ -654,7 +654,7 @@ def restriction():
 restrictions = lexeme(p.string('[')) >> restriction.many() << lexeme(p.string(']')).desc("variable restriction")
 
 # Logical quantifier, potentially restricted
-@p.generate("quantified formula")
+@p.generate
 def quantified():
     #print("parsing quantified")
     the_quantifier = yield p.alt(p.string("AC") >> p.success("CELLFORALL"),
@@ -662,7 +662,8 @@ def quantified():
                                  p.string("OC") >> p.success("CELLORIGIN"),
                                  p.string("A") >> p.success("NODEFORALL"),
                                  p.string("E") >> p.success("NODEEXISTS"),
-                                 p.string("O") >> p.success("NODEORIGIN"))
+                                 p.string("O") >> p.success("NODEORIGIN")).desc("quantifier")
+    yield whitespace.optional()
     var = yield strict_label
     restr = yield restrictions.map(dict).optional()
     #print("parsed quantifier part", the_quantifier, var)
@@ -685,7 +686,7 @@ boolean_ops = [
     ]
 
 # A let-in definition
-@p.generate("let expression")
+@p.generate
 def let_expr():
     yield lexeme(p.string('let'))
     call = yield strict_label.at_least(1)
@@ -699,7 +700,7 @@ num_expr = p.forward_declaration()
 formula = p.forward_declaration()
 
 # A numeric let-in definition
-@p.generate("numeric let expression")
+@p.generate
 def num_let_expr():
     yield lexeme(p.string('letnum'))
     var = yield strict_label
