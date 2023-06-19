@@ -1,6 +1,7 @@
 #from circuit import *
 import circuit
 from circuit import NOT, V, AND, OR, T, F, IMP, IFF, tech_simp, Circuit
+import mocircuits as moc
 import sft
 from general import *
 
@@ -19,7 +20,8 @@ from general import *
 circuit_variables are aa little tricky... they should be functions
 """
 
-def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_var, all_vars, externals):
+
+def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, externals, global_restr):
     #print("to_circuit", formula)
     #print("nodes", nodes)
     if type(nodes) == list:
@@ -60,7 +62,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
                     variables_new[a] = pos
                 # if argument is a formula, we will evaluate it
                 else:
-                    circ = formula_to_circuit_(nodes, dim, topology, alphabet, args[i], variables, aux_var, all_vars, externals)
+                    circ = formula_to_circuit_(nodes, dim, topology, alphabet, args[i], variables, externals, global_restr)
                     variables_new[a] = circ
             """
             for i in args:
@@ -75,11 +77,11 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
                     if j in variables:
                         variables_new[j] = variables[j]
             """
-            ret = formula_to_circuit_(nodes, dim, topology, alphabet, code, variables_new, aux_var, all_vars, externals)
+            ret = formula_to_circuit_(nodes, dim, topology, alphabet, code, variables_new, externals, global_restr)
         # call a Python function
         elif var in externals:
             func = externals[var]
-            cxt = nodes, dim, topology, alphabet, formula, variables, aux_var, all_vars
+            cxt = nodes, dim, topology, alphabet, formula, variables
             ret = func(cxt, *args)
             # convert Python truth values to truth values
             if ret == True:
@@ -132,7 +134,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
             #print(var, typ, q)
             variables_new = dict(variables)
             variables_new[var] = q
-            pos_formulas.append(formula_to_circuit_(nodes, dim, topology, alphabet, rem_formula, variables_new, aux_var, all_vars, externals))
+            pos_formulas.append(formula_to_circuit_(nodes, dim, topology, alphabet, rem_formula, variables_new, externals, global_restr))
                                     
             #print(q)
         #print(a = bbb)
@@ -149,7 +151,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         for a in variables:
             variables_new = dict(variables)
             variables_new[valvar] = a
-            val_formulas.append(formula_to_circuit_(nodes, dim, topology, alphabet, rem_formula, variables_new, aux_var, all_vars, externals))
+            val_formulas.append(formula_to_circuit_(nodes, dim, topology, alphabet, rem_formula, variables_new, externals, global_restr))
         if op == "FORALL":
             ret = AND(*pos_formulas)
         elif op == "EXISTS":
@@ -167,7 +169,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         #print(op, "stepping into")
         for arg in args:
             #print(arg)
-            res = formula_to_circuit_(nodes, dim, topology, alphabet, arg, variables, aux_var, all_vars, externals)
+            res = formula_to_circuit_(nodes, dim, topology, alphabet, arg, variables, externals, global_restr)
             arg_formulas.append(res)
             #print(res)
         if op == "OR":
@@ -186,10 +188,10 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         #new_var = aux_var[0]
         #aux_var[0] += 1
         var = formula[1]
-        form = formula_to_circuit_(nodes, dim, topology, alphabet, formula[2], variables, aux_var, all_vars, externals)
+        form = formula_to_circuit_(nodes, dim, topology, alphabet, formula[2], variables, externals, global_restr)
         variables_new = dict(variables)
         variables_new[var] = form
-        ret = formula_to_circuit_(nodes, dim, topology, alphabet, formula[3], variables_new, aux_var, all_vars, externals)
+        ret = formula_to_circuit_(nodes, dim, topology, alphabet, formula[3], variables_new, externals, global_restr)
     # cvn[var] should be just the code, and a closure
     elif op == "LET":
         var = formula[1][0]
@@ -209,7 +211,15 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         variables_new = dict(variables)
         variables_new[var] = (arg_names, circuit_code, closure)
         
-        ret = formula_to_circuit_(nodes, dim, topology, alphabet, ret_code, variables_new, aux_var, all_vars, externals)
+        ret = formula_to_circuit_(nodes, dim, topology, alphabet, ret_code, variables_new, externals, global_restr)
+    elif op == "SETNUM":
+        #new_var = aux_var[0]
+        #aux_var[0] += 1
+        var = formula[1]
+        num_circ = numexpr_to_circuit(nodes, dim, topology, alphabet, formula[2], variables, externals, global_restr)
+        variables_new = dict(variables)
+        variables_new[var] = num_circ
+        ret = formula_to_circuit_(nodes, dim, topology, alphabet, formula[3], variables_new, externals, global_restr)
     elif op == "POSEQ":
         """
         if formula[1] == ["o", "up"]:
@@ -225,11 +235,11 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         if p1 == None:
             #raise Exception("Could)
             ret = F
-        all_vars.add(var_of_pos_expr(formula[1]))
+        #all_vars.add(var_of_pos_expr(formula[1]))
         p2 = eval_to_position(dim, topology, formula[2], variables, nodes)
         if p2 == None:
             ret = F
-        all_vars.add(var_of_pos_expr(formula[2]))
+        #all_vars.add(var_of_pos_expr(formula[2]))
         if ret == None and p2 == p1:
             ret = T
         else:
@@ -239,7 +249,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         p1 = eval_to_position(dim, topology, formula[1], variables, nodes)
         if p1 == None:
             ret = F
-        all_vars.add(var_of_pos_expr(formula[1]))
+        #all_vars.add(var_of_pos_expr(formula[1]))
         v = formula[2]
         if ret == None:
             #print("here", p1, v, type(v), alphabet)
@@ -356,12 +366,12 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         if p1 == None:
             ret = F
         #print(formula[1], p1)
-        all_vars.add(var_of_pos_expr(formula[1]))
+        #all_vars.add(var_of_pos_expr(formula[1]))
         p2 = eval_to_position(dim, topology, formula[2], variables, nodes)
         if p2 == None:
             ret = F
         #print(formula[2], p2)
-        all_vars.add(var_of_pos_expr(formula[2]))
+        #all_vars.add(var_of_pos_expr(formula[2]))
         if ret == None:
             if op == "ISNEIGHBOR":
                 nbhd = get_closed_nbhd(dim, topology, p1)
@@ -381,48 +391,66 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
         p1 = eval_to_position(dim, topology, formula[2], variables, nodes)
         if p1 == None:
             ret = F
-        all_vars.add(var_of_pos_expr(formula[2]))
+        #all_vars.add(var_of_pos_expr(formula[2]))
         p2 = eval_to_position(dim, topology, formula[3], variables, nodes)
         if p2 == None:
             ret = F
-        all_vars.add(var_of_pos_expr(formula[3]))
+        #all_vars.add(var_of_pos_expr(formula[3]))
         if ret is None:
-            dist = 0
-            if p1 != p2:
-                # compute distance with bidirectional BFS
-                seen1 = {p1}
-                frontier1 = [p1]
-                seen2 = {p2}
-                frontier2 = [p2]
-                while True:
-                    dist += 1
-                    new_frontier = []
-                    for p in frontier1:
-                        for n in get_open_nbhd(dim, topology, p):
-                            if n in seen2:
-                                # found middle vertex
-                                break
-                            if n not in seen1:
-                                seen1.add(n)
-                                new_frontier.append(n)
-                        else:
-                            # did not find middle vertex
-                            continue
-                        # found middle vertex
-                        break
-                    else:
-                        # did not find any middle vertex
-                        frontier1, frontier2 = frontier2, new_frontier
-                        seen1, seen2 = seen2, seen1
-                        continue
-                    # found middle vertex
-                    break
+            dist = get_distance(dim, topology, nodes, p1, p2)
             for (start, end) in dist_ranges:
                 if start <= dist and (dist <= end or end == "inf"):
                     ret = T
                     break
             else:
                 ret = F
+    elif op in ["NUM_EQ", "NUM_LEQ"]:
+        circ1, range1 = numexpr_to_circuit(nodes, dim, topology, alphabet, formula[1], variables, externals, global_restr)
+        circ2, range2 = numexpr_to_circuit(nodes, dim, topology, alphabet, formula[2], variables, externals, global_restr)
+        if circ1 is None:
+            if circ2 is None:
+                if (op == "NUM_EQ" and range1 == range2) or (op == "NUM_LEQ" and range1 <= range2):
+                    ret = T
+                else:
+                    ret = F
+            elif all(range1 > n for n in range2):
+                ret = F
+            else:
+                (j, val) = min(p for p in enumerate(range2) if range1 <= p[1])
+                if op == "NUM_EQ" and val == range1:
+                    ret = circ2[j]
+                elif op == "NUM_LEQ":
+                    ret = OR(*(circ2[k] for k in range(j, len(range2))))
+                else:
+                    ret = F
+        elif circ2 is None:
+            # Now circ1 is a list and range2 a number; we want n in range1, n OP range2
+            if all(n > range2 for n in range1):
+                ret = F
+            else:
+                (i, val) = max(p for p in enumerate(range1) if p[1] <= range2)
+                if op == "NUM_EQ" and val == range2:
+                    ret = circ1[i]
+                elif op == "NUM_LEQ":
+                    ret = NOT(OR(*(circ1[k] for k in range(i+1, len(range1)))))
+                else:
+                    ret = F
+        else:
+            # Both range1 and range2 are lists
+            anded = []
+            for (j, b) in enumerate(range2):
+                if all(a > b for a in range1):
+                    # A forbidden value for b
+                    anded.append(NOT(circ2[j]))
+                    continue
+                i, a = max(p for p in enumerate(range1) if p[1] <= b)
+                if op == "NUM_EQ" and a != b:
+                    anded.append(NOT(circ2[j]))
+                elif op == "NUM_EQ" and a == b:
+                    anded.append(IFF(circ1[i], circ2[j]))
+                elif op == "NUM_LEQ":
+                    anded.append(IMP(circ2[j], NOT(OR(*(circ1[k] for k in range(i+1, len(range1)))))))
+                ret = AND(*anded)
     else:
         raise Exception("What " + op)
     #print ("from formula", formula)
@@ -430,11 +458,188 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_
     return ret
 
 def formula_to_circuit(nodes, dim, topology, alphabet, formula, externals):
-    variables = {} 
-    aux_var = [0] # what dis?
-    all_vars = set()
-    form = formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, aux_var, all_vars, externals)
-    return tech_simp(form)
+    variables = {}
+    global_restr = []
+    form = formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, externals, global_restr)
+    #return tech_simp(form)
+    return tech_simp(AND(*([form]+global_restr)))
+    
+def sum_circuit(summands, global_restr):
+    # Separate constants
+    const = sum(num for (circ, num) in summands if circ is None)
+    summands = [pair for pair in summands if pair[0] is not None]
+    if not summands:
+        # If we have only constants, return their sum
+        return None, const
+    if len(summands) == 1:
+        # If we have one argument, return it
+        circ, rng = summands[0]
+        return circ, [num + const for num in rng]
+    if len(summands) == 2:
+        # If we have two arguments, do the sum
+        (circ1, range1), (circ2, range2) = summands
+        new_range = list(sorted(set(a1+a2 for a1 in range1 for a2 in range2)))
+        oreds = {num : [] for num in new_range}
+        for (i,a1) in enumerate(range1):
+            for (j,a2) in enumerate(range2):
+                oreds[a1+a2].append(AND(circ1[i], circ2[j]))
+        new_circ = moc.MOCircuit({i : OR(*circs) for (i, (_, circs)) in enumerate(sorted(oreds.items()))})
+        #global_restr.append(OR(*(new_circ[i] for i in range(len(oreds)))))
+        #for i in range(len(oreds)):
+        #    for j in range(i+1, len(oreds)):
+        #        global_restr.append(NOT(AND(new_circ[i], new_circ[j])))
+        return new_circ, [num+const for num in new_range]
+    # Otherwise find a good index to divide and conquer
+    # TODO: this could be smarter
+    split = min((i for i in range(1, len(summands)-1)),
+                key=lambda i: abs(sum(len(s[1])-1 for s in summands[:i]) - sum(len(s[1])-1 for s in summands[i:])))
+    left = sum_circuit(summands[:split], global_restr)
+    right = sum_circuit(summands[split:], global_restr)
+    circ, rng = sum_circuit([left, right], global_restr)
+    return circ, [num+const for num in rng]
+    
+def prod_circuit(factors, global_restr):
+    # Separate constants
+    const = 1
+    for (circ, num) in factors:
+        if circ is None:
+            const *= num
+    if const == 0:
+        return None, 0
+    factors = [pair for pair in factors if pair[0] is not None]
+    if not factors:
+        # If we have only constants, return their product
+        return None, const
+    if len(factors) == 1:
+        # If we have one argument, return it
+        circ, rng = factors[0]
+        if const > 0:
+            return circ, [num * const for num in rng]
+        else:
+            # Reverse the order
+            the_len = len(rng)
+            return moc.MOCircuit({the_len-i-1 : circ for (i, circ) in circ.circuits.items()}), [num * const for num in reversed(rng)]
+    if len(factors) == 2:
+        # If we have two arguments, do the product
+        (circ1, range1), (circ2, range2) = factors
+        new_range = list(sorted(set(a1*a2*const for a1 in range1 for a2 in range2)))
+        oreds = {num : [] for num in new_range}
+        for (i,a1) in enumerate(range1):
+            for (j,a2) in enumerate(range2):
+                oreds[a1*a2].append(AND(circ1[i], circ2[j]))
+        new_circ = moc.MOCircuit({i : OR(*circs) for (i, (_, circs)) in enumerate(sorted(oreds.items()))})
+        #global_restr.append(OR(*(new_circ[i] for i in range(len(oreds)))))
+        #for i in range(len(oreds)):
+        #    for j in range(i+1, len(oreds)):
+        #        global_restr.append(NOT(AND(new_circ[i], new_circ[j])))
+        return new_circ, new_range
+    # Otherwise find a good index to divide and conquer
+    # TODO: this could be smarter
+    split = min((i for i in range(1, len(factors)-1)),
+                key=lambda i: abs(sum(len(s[1])-1 for s in factors[:i]) - sum(len(s[1])-1 for s in factors[i:])))
+    left = prod_circuit(factors[:split], global_restr)
+    right = prod_circuit(factors[split:], global_restr)
+    circ, rng = prod_circuit([left, right], global_restr)
+    if const > 0:
+        return circ, [num*const for num in rng]
+    else:
+        the_len = len(rng)
+        return moc.MOCircuit({the_len-i-1 : circ for (i, circ) in circ.circuits.items()}), [num * const for num in reversed(rng)]
+    
+# Apply a numeric function to a numeric circuit    
+def num_func_circ(func, arg, global_restr):
+    circ, rng = arg
+    new_rng = list(sorted(set(func(num) for num in rng)))
+    oreds = {num : [] for num in new_rng}
+    for (i, num) in enumerate(rng):
+        oreds[func(num)].append(circ[i])
+    new_circ = moc.MOCircuit({i : OR(*circs) for (i, (_, circs)) in enumerate(sorted(oreds.items()))})
+    #global_restr.append(OR(*(new_circ[i] for i in range(len(oreds)))))
+    #for i in range(len(oreds)):
+    #    for j in range(i+1, len(oreds)):
+    #        global_restr.append(NOT(AND(new_circ[i], new_circ[j])))
+    return new_circ, new_rng
+
+# Transform a numeric expression into an MOCircuit.
+# Return the MOCircuit and a list of values that's the range of the numeric expression.
+# Each value has a corresponding output (accessed by its index).
+def numexpr_to_circuit(nodes, dim, topology, alphabet, formula, variables, externals, global_restr):
+    op = formula[0]
+    if op == "NUM_VAR":
+        return variables[formula[1]]
+    elif op == "TRUTH_AS_NUM":
+        cond = formula[1]
+        circ = formula_to_circuit_(nodes, dim, topology, alphabet, cond, variables, externals, global_restr)
+        ret = (moc.MOCircuit({0 : NOT(circ), 1 : circ}), [0,1])
+    elif op == "SUM":
+        args = formula[1:]
+        summands = []
+        for numexpr in args:
+            summands.append(numexpr_to_circuit(nodes, dim, topology, alphabet, numexpr, variables, externals, global_restr))
+        ret = sum_circuit(summands, global_restr)
+    elif op == "PROD":
+        args = formula[1:]
+        factors = []
+        for numexpr in args:
+            factors.append(numexpr_to_circuit(nodes, dim, topology, alphabet, numexpr, variables, externals, global_restr))
+        ret = prod_circuit(factors, global_restr)
+    elif op in ["ABS"]:
+        numcirc = numexpr_to_circuit(nodes, dim, topology, alphabet, formula[1], variables, externals, global_restr)
+        if op == "ABS":
+            func = abs
+        ret = num_func_circ(func, numcirc, global_restr)
+    elif op == "CONST_NUM":
+        ret = (None, formula[1])
+    elif op == "DISTANCE":
+        node1 = eval_to_position(dim, topology, formula[1], variables, nodes)
+        node2 = eval_to_position(dim, topology, formula[2], variables, nodes)
+        ret = (None, get_distance(dim, topology, nodes, node1, node2))
+    elif op == "NODECOUNT":
+        var = formula[1]
+        bound = formula[2]
+        rem_formula = formula[3]
+        summands = []
+        #print(var, typ)
+        for q in get_area(dim, topology, variables, bound, "NODE", nodes):
+            #print(var, typ, q)
+            variables_new = dict(variables)
+            variables_new[var] = q
+            circ = formula_to_circuit_(nodes, dim, topology, alphabet, rem_formula, variables_new, externals, global_restr)
+            summands.append((moc.MOCircuit({0 : NOT(circ), 1 : circ}), [0,1]))
+        ret = sum_circuit(summands, global_restr)
+    elif op == "SYM_TO_NUM":
+        nvec = eval_to_position(dim, topology, formula[1], variables, nodes)
+        ret = sym_to_num(nvec, nodes, alphabet, global_restr)
+    else:
+        raise Exception("what is " + op)
+    #if ret[0] is None:
+    #    print("numexpr_to_circ", formula, ret)
+    #else:
+    #    print("numexpr_to_circ", formula, ret[0].circuits, ret[1])
+    return ret
+    
+# Make a numeric circuit that
+# (a) restricts the node to have a "numeric" symbol (TODO), and
+# (b) evaluates to the corresponding number
+def sym_to_num(nvec, nodes, alphabet, global_restr):
+    node = nvec[-1]
+    node_alph = alphabet[node]
+    nums = list(sorted(sym for sym in node_alph if type(sym) == int))
+    circs = dict()
+    for (i, num) in enumerate(nums):
+        if num == node_alph[0]:
+            circ = AND(*(NOT(V(nvec + (sym,))) for sym in node_alph[1:]))
+        else:
+            circ = V(nvec + (num,))
+        circs[i] = circ
+    for sym in node_alph:
+        if sym not in nums:
+            if sym == node_alph[0]:
+                circ = OR(*(V(nvec + (sym2,)) for sym2 in node_alph[1:]))
+            else:
+                circ = NOT(V(nvec + (sym,)))
+            global_restr.append(circ)
+    return moc.MOCircuit(circs), nums
 
 def collect_unbound_vars(formula, bound = None):
     #print("collecting", formula)
@@ -455,8 +660,8 @@ def collect_unbound_vars(formula, bound = None):
             if type(arg) == tuple:
                 possibles.update(collect_unbound_vars(arg, bound))
             else:
-                possibles.update(arg)
-    elif op in ["CELLFORALL", "CELLEXISTSCELL", "NODEFORALL", "NODEEXISTS"]:
+                possibles.add(arg)
+    elif op in ["CELLFORALL", "CELLEXISTSCELL", "NODEFORALL", "NODEEXISTS", "NODECOUNT"]:
         var = formula[1]
         bound.add(var)
         for q in formula[2]: # collect vars used in bounds
@@ -471,12 +676,12 @@ def collect_unbound_vars(formula, bound = None):
             possibles.add(q)
     elif op in "TF":
         pass
-    elif op in ["OR", "AND", "NOT", "IMP", "IFF"]:
+    elif op in ["OR", "AND", "NOT", "IMP", "IFF", "NUM_EQ", "NUM_LEQ"]:
         args = formula[1:]
         for arg in args:
             possibles.update(collect_unbound_vars(arg, bound))
     # bool behaves like a circuit variable without variables; more efficient maybe since we just calculate a circuit
-    elif op == "SETBOOL":
+    elif op in ["SETBOOL", "SETNUM"]:
         var = formula[1]
         possibles.update(collect_unbound_vars(formula[2], bound)) # variable is not bound in the code to be binded
         bound.add(var)
@@ -491,17 +696,18 @@ def collect_unbound_vars(formula, bound = None):
         possibles.update(collect_unbound_vars(circuit_code, argbound))
         bound.add(var)
         possibles.update(collect_unbound_vars(formula[3], bound))
-    elif op == "POSEQ" or op == "VALEQ":
+    elif op in ["POSEQ", "VALEQ", "ISNEIGHBOR", "DISTANCE"]:
         possibles.add(var_of_pos_expr(formula[1]))
         possibles.add(var_of_pos_expr(formula[2]))
     elif op == "HASVAL":
         possibles.add(var_of_pos_expr(formula[1]))
-    elif op == "ISNEIGHBOR":
-        possibles.add(var_of_pos_expr(formula[1]))
-        possibles.add(var_of_pos_expr(formula[2]))
     elif op == "HASDIST":
         possibles.add(var_of_pos_expr(formula[2]))
         possibles.add(var_of_pos_expr(formula[3]))
+    elif op == "CONST_NUM":
+        pass
+    elif op in ["NUM_VAR", "SYM_TO_NUM"]:
+        possibles.add(formula[1])
     else:
         raise Exception("What " + op)
     ret = set()
@@ -615,6 +821,39 @@ def get_area(dim, topology, pos_variables, bound, typ, nodes):
             area.add(t)
     #print(area)
     return area
+
+def get_distance(dim, topology, nodes, p1, p2):
+    if p1 == p2:
+        return 0
+    dist = 0
+    # compute distance with bidirectional BFS
+    seen1 = {p1}
+    frontier1 = [p1]
+    seen2 = {p2}
+    frontier2 = [p2]
+    while True:
+        dist += 1
+        new_frontier = []
+        for p in frontier1:
+            for n in get_open_nbhd(dim, topology, p):
+                if n in seen2:
+                    # found middle vertex
+                    break
+                if n not in seen1:
+                    seen1.add(n)
+                    new_frontier.append(n)
+            else:
+                # did not find middle vertex
+                continue
+            # found middle vertex
+            break
+        else:
+            # did not find any middle vertex
+            frontier1, frontier2 = frontier2, new_frontier
+            seen1, seen2 = seen2, seen1
+            continue
+        # found middle vertex
+        return dist
 
 def get_ball(dim, topology, pos, radius, nodes):
     # radius 0 of cell is special, and

@@ -66,7 +66,7 @@ colon = lexeme(p.string(':'))
 semicolon = lexeme(p.string(';'))
 
 # Protected keywords
-keyword = p.regex(r'(let|in)(\W|$)')
+keyword = p.regex(r'(let|letnum|in|dist)(\W|$)')
 
 # Range of nonnegative integers; "inf" means no upper bound
 @p.generate
@@ -134,7 +134,8 @@ commands = [
     # Defining objects
     Command("sft",
             [ArgType.LABEL, ArgType.FORMULA | ArgType.PATTERN_LIST],
-            aliases = ["SFT"]),
+            aliases = ["SFT"],
+            opts = ["onesided"]),
     Command("compute_forbidden_patterns",
             [ArgType.LABEL],
             opts = ["radius", "filename"],
@@ -531,7 +532,7 @@ def expr_with_ops(prec_table, atomic, prec_index=0):
         return atomic
         
     else:
-        @p.generate(prec_table[prec_index][0] + " expression")
+        @p.generate
         def parse_the_expr():
             name, assoc, operators = prec_table[prec_index]
             #print("parsing", name, "expression, precedence", prec_index)
@@ -644,7 +645,7 @@ def bool_or_call():
         return ("BOOL", name)
 
 # Restrictions in quantifiers
-@p.generate("restriction part")
+@p.generate
 def restriction():
     name = yield strict_label
     num = yield natural
@@ -653,7 +654,7 @@ def restriction():
 restrictions = lexeme(p.string('[')) >> restriction.many() << lexeme(p.string(']')).desc("variable restriction")
 
 # Logical quantifier, potentially restricted
-@p.generate("quantified formula")
+@p.generate
 def quantified():
     #print("parsing quantified")
     the_quantifier = yield p.alt(p.string("AC") >> p.success("CELLFORALL"),
@@ -661,7 +662,8 @@ def quantified():
                                  p.string("OC") >> p.success("CELLORIGIN"),
                                  p.string("A") >> p.success("NODEFORALL"),
                                  p.string("E") >> p.success("NODEEXISTS"),
-                                 p.string("O") >> p.success("NODEORIGIN"))
+                                 p.string("O") >> p.success("NODEORIGIN")).desc("quantifier")
+    yield whitespace.optional()
     var = yield strict_label
     restr = yield restrictions.map(dict).optional()
     #print("parsed quantifier part", the_quantifier, var)
@@ -684,7 +686,7 @@ boolean_ops = [
     ]
 
 # A let-in definition
-@p.generate("let expression")
+@p.generate
 def let_expr():
     yield lexeme(p.string('let'))
     call = yield strict_label.at_least(1)
@@ -694,9 +696,99 @@ def let_expr():
     rest = yield formula
     return ("LET", tuple(call), result, rest)
 
-# A full formula
+num_expr = p.forward_declaration()
 formula = p.forward_declaration()
-formula.become(expr_with_ops(boolean_ops, quantified | let_expr | node_expr | bool_or_call | (lparen >> formula << rparen)))
+
+# A numeric let-in definition
+@p.generate
+def num_let_expr():
+    yield lexeme(p.string('letnum'))
+    var = yield strict_label
+    yield lexeme(p.string(':='))
+    result = yield num_expr
+    yield lexeme(p.string('in'))
+    rest = yield formula
+    return ("SETNUM", var, result, rest)
+
+num_comp_op = p.alt(lexeme(p.string('==')) >> p.success(lambda a, b: ("NUM_EQ", a, b)),
+                    lexeme(p.string('/=')) >> p.success(lambda a, b: ("NOT", ("NUM_EQ", a, b))),
+                    lexeme(p.string('<=')) >> p.success(lambda a, b: ("NUM_LEQ", a, b)),
+                    lexeme(p.string('<')) >> p.success(lambda a, b: ("NOT", ("NUM_LEQ", b, a))),
+                    lexeme(p.string('>=')) >> p.success(lambda a, b: ("NUM_LEQ", b, a)),
+                    lexeme(p.string('>')) >> p.success(lambda a, b: ("NOT", ("NUM_LEQ", a, b))))
+
+# A numeric comparison
+@p.generate
+def num_comparison():
+    expr = yield num_expr
+    rest = yield p.seq(num_comp_op, num_expr).at_least(1)
+    anded = []
+    for (op, rhs) in rest:
+        anded.append(op(expr, rhs))
+        expr = rhs
+    return ("AND", *anded)
+
+# Binary numeric operations
+# TODO: implement subtraction in a reasonable way
+numeric_ops = [
+    ("addition", Assoc.FLATTEN, (lexeme(p.string('+')), lambda xs: ("SUM",) + tuple(xs))),
+    ("multiplication", Assoc.FLATTEN, (lexeme(p.string('*')), lambda xs: ("PROD",) + tuple(xs)))
+    ]
+    
+# Unary numeric functions
+numeric_funcs = [
+    lexeme(p.string("abs")) >> p.success(lambda n: ("ABS", n))
+    ]
+    
+# Numeric function call
+@p.generate
+def numeric_call():
+    func = yield p.alt(*numeric_funcs)
+    arg = yield num_expr
+    return func(arg)
+
+# Count true values in a list of formulas
+@p.generate
+def count_list():
+    yield lexeme(p.string('#'))
+    yield lbracket
+    formulas = yield formula.at_least(1).map(lambda f: tuple(("TRUTH_AS_NUM", x) for x in f))
+    yield rbracket
+    return ("SUM",) + tuple(formulas)
+    
+# Count true values of a quantified variable
+@p.generate
+def count_quantified():
+    yield lexeme(p.string('#'))
+    var = yield strict_label
+    restr = yield restrictions.map(dict)
+    #print("parsed quantifier part", the_quantifier, var)
+    the_formula = yield formula
+    return ("NODECOUNT", var, restr, the_formula)
+    
+# Convert symbol of node into number
+@p.generate
+def sym_to_num():
+    yield lexeme(p.string('#'))
+    node = yield pos_expr
+    return ("SYM_TO_NUM", node)
+
+# Distance function for nodes
+@p.generate
+def distance_func():
+    yield lexeme(p.string("dist"))
+    node1 = yield pos_expr
+    node2 = yield pos_expr
+    return ("DISTANCE", node1, node2)
+
+num_expr.become(expr_with_ops(numeric_ops, count_list | count_quantified | sym_to_num | distance_func | numeric_call | strict_label.map(lambda s: ("NUM_VAR", s)) | integer.map(lambda n: ("CONST_NUM", n)) | lparen >> num_expr << rparen))
+
+# A full formula
+formula.become(expr_with_ops(boolean_ops, quantified | let_expr | num_let_expr | num_comparison | node_expr | bool_or_call | (lparen >> formula << rparen)))
+
+
+
+
 
 ### Testing
 

@@ -894,6 +894,8 @@ def AND(*inputs):
         return T
     if F in inputs:
         return F
+    if all(x==T for x in inputs):
+        return T
     if None in inputs:
         return None
     #print(Circuit.smart_simplify)
@@ -919,6 +921,8 @@ def OR(*inputs):
         return F
     if T in inputs:
         return T
+    if all(x==F for x in inputs):
+        return F
     if None in inputs:
         return None
     oreds = []

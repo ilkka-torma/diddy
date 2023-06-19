@@ -588,14 +588,14 @@ class SFT:
     def equals(self, other, limit = None, return_radius = False, method=None, verbose=False):
         if verbose:
             print("Testing containment 1")
-        c12, rad, _ = self.contains(other, limit, return_radius_and_sep = True, method=method)
+        c12, rad, _ = self.contains(other, limit, return_radius_and_sep = True, method=method, verbose=verbose)
         if c12 == None:
             return None, limit
         elif c12 == False:
             return False, rad
         if verbose:
             print("Testing containment 2")
-        c21, rad2, _ = other.contains(self, limit, return_radius_and_sep = True, method=method)
+        c21, rad2, _ = other.contains(self, limit, return_radius_and_sep = True, method=method, verbose=verbose)
         if c21 == None:
             return None, limit
         return c21, max(rad, rad2)
