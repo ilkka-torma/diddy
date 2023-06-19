@@ -839,6 +839,15 @@ def UNSAT(C, return_sep = False):
             return True
         else:
             return m
+
+def SAT_under(C, under, return_model = False):
+    if not return_model:
+        return not UNSAT_under(C, under)
+    else:
+        m = UNSAT_under(C, under, True)
+        if m == True:
+            return False
+        return m
         
 def SAT(C, return_model = False):
     if not return_model:

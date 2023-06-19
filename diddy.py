@@ -241,6 +241,7 @@ class Diddy:
                 twosided = "twosided" in flags
                 #print("Computing the spacetime diagram of {} into {}".format(ca_name, sft_name))
                 self.SFTs[sft_name] = the_ca.spacetime_diagram(onesided=not twosided, time_axis=time_axis)
+                print(self.SFTs[sft_name].nodes, self.SFTs[sft_name].topology)
 
             elif cmd == "preimage":
                 preim_name = args[0]
@@ -373,9 +374,11 @@ class Diddy:
                     formula = self.SFTs[name].circuit
                 elif name in self.clopens:
                     formula = self.clopens[name][2]
+                elif name in self.blockmaps:
+                    formula = self.blockmaps[name].circuits
                 else:
                     raise Exception("No set named %s" % name)
-                print("Showing compiled formula for %s." % name)
+                print("Showing compiled formula(s) for %s." % name)
                 print(formula)
                 print()
                 
@@ -534,7 +537,7 @@ class Diddy:
                     cod_dim, cod_nodes, cod_top, cod_alph = self.environments[codomain_name]
                 if dom_dim != cod_dim:
                     raise Exception("Dimension mismatch: {} is not {}".format(dom_dim, cod_dim))
-                circuits = dict()
+                circuits = [] #dict()
                 for rule in rules:
                     if rule:
                         if len(rule) != 3:
@@ -544,7 +547,8 @@ class Diddy:
                             continue
                         node, sym, formula = rule
                         circ = compiler.formula_to_circuit(dom_nodes, dom_dim, dom_top, dom_alph, formula, self.externals)
-                        circuits[(node, sym)] = circ
+                        #circuits[(node, sym)] = circ
+                        circuits.append((node, sym, circ))
                 #print(circuits)
                 self.blockmaps[name] = blockmap.BlockMap(dom_alph, cod_alph, dom_nodes, cod_nodes, dom_dim, circuits, dom_top, cod_top)
 
@@ -626,6 +630,7 @@ class Diddy:
                 print(gridmoves)
                 print(self.tiler_gridmoves)
                 SFT = self.SFTs[name]
+                #tiler.run(SFT, SFT.topology, gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic, pictures)
                 tiler.run(SFT, self.topology, gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic, pictures)
             
             elif cmd == "entropy_upper_bound":
@@ -947,13 +952,13 @@ hexgrid = [("up", (0,0,0), (0,1,1)),
 """
 hexgrid = [("N", (0,0,0), (0,1,1)),
            ("S", (0,0,1), (0,-1,0)),
-           ("SE", (0,0,0), (0,0,1)),
-           ("SW", (0,0,0), (-1,0,1)),
-           ("NE", (0,0,1), (1,0,0)),
-           ("NW", (0,0,1), (0,0,0))]
+           ("sE", (0,0,0), (0,0,1)),
+           ("sW", (0,0,0), (-1,0,1)),
+           ("nE", (0,0,1), (1,0,0)),
+           ("nW", (0,0,1), (0,0,0))]
 
 kinggrid = [("E", (0,0,0), (1,0,0)),
-            ("NE", (0,0,0), (1,1,0)),
+            ("NW", (0,0,0), (1,1,0)),
             ("N", (0,0,0), (0,1,0)),
             ("NW", (0,0,0), (-1,1,0)),
             ("W", (0,0,0), (-1,0,0)),
@@ -961,11 +966,11 @@ kinggrid = [("E", (0,0,0), (1,0,0)),
             ("S", (0,0,0), (0,-1,0)),
             ("SE", (0,0,0), (1,-1,0))]
 trianglegrid = [("E", (0,0,0), (1,0,0)),
-            ("NE", (0,0,0), (1,1,0)),
-            ("NW", (0,0,0), (0,1,0)),
+            ("Ne", (0,0,0), (1,1,0)),
+            ("Nw", (0,0,0), (0,1,0)),
             ("W", (0,0,0), (-1,0,0)),
-            ("SW", (0,0,0), (-1,-1,0)),
-            ("SE", (0,0,0), (0,-1,0))]
+            ("Sw", (0,0,0), (-1,-1,0)),
+            ("Se", (0,0,0), (0,-1,0))]
 
 Wang_nodes = ["E", "N", "W", "S"]
 Wang_topology = [("up", (0,0,"N"), (0,1,"S")),

@@ -3,10 +3,13 @@ import math
 import compiler
 import sft
 import pygame
+#import pygame_textinput
+import pygame_gui
 import time
 import numpy as np
 from numpy.linalg import inv
 import os
+import re
 
 """
 nodes = [0]
@@ -146,6 +149,10 @@ def deduce_a_tiling(grid, the_SFT, x_period, y_period):
             else:
                 dd = d #flipy(d)
             #print(d, "in model", grid[dd])
+                
+            # grid may not contain all nodes of all cells, but deduction uses all in each cell
+            if dd not in grid:
+                continue
             if grid[dd] == UNKNOWN:
                 val = model[d]
                 #print("model maps", d, "to", val)
@@ -205,18 +212,67 @@ def scale_picture(pic, factor):
     return pygame.transform.scale(pic, (max(1, int(size[0]*factor)), max(1, int(size[1]*factor))))
 """
 
+def ok_file(s):
+    return len(s) >= 1 # s[-5:] == ".ptrn" or len(p )
+
+def save(grid, filename):
+    if filename[:-5] != ".ptrn":
+        filename = filename + ".ptrn"
+    with open(filename, "w") as fil:
+        for (x, y, n) in grid:
+            #print((x,y,n), "was", grid[(x,y,n)])
+            # for ease-of-use, we print out an ASCII table
+            fil.write("%s: %s\n" % ((x, y, n), grid[(x, y, n)]))
+
+def load(grid, filename):
+    if filename[:-5] != ".ptrn":
+        filename = filename + ".ptrn"
+    for n in list(grid.keys()):
+        del grid[n]
+    with open(filename, "r") as fil:
+        for line in fil:
+            a, b = line.split(": ")[:2]
+            #print(a, b)
+
+            # for safety, we parse manually
+            a = re.match("\((\-?[0-9]+), (\-?[0-9]+), ([\'a-zA-Z0-9_]+)\)", a)
+            a = int(a[1]), int(a[2]), a[3]
+            
+            if a[2][0] == "'":
+                a = a[0], a[1], a[2][1:-1]
+            else:
+                # for some reason our convention with integer nodes is to use python ints
+                a = a[0], a[1], int(a[2])
+            #print(a)
+
+            if b.strip() == UNKNOWN:
+                grid[a] = UNKNOWN
+            else:
+                b = re.match("\(\'([A-Z]+)\', ([0-9]+)\)", b)
+                set_or_ded, idx = b[1], b[2]
+                grid[a] = set_or_ded, int(idx)
+            #print(b)                
+            #print(a, "now", grid[a])
+
+
+#print(re.match("\((\-?[0-9]+), (\-?[0-9]+), ([\'a-zA-Z0-9_]+)\)", "(29, 9, 'top'))"))
+
+#a = bbb
+
 def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10, x_periodic=False, y_periodic=False, pictures=None):
     #print(topology)
 
     # check dimension in the first command of topology
     dimension = len(topology[0][1]) - 1
+    print("dimension %s" % dimension)
     #print("dimension %s" % dimension)
     # we force topology 2-dimensional
     if dimension == 1:
         #print(topology)
         newtopology = []
         for t in topology:
-            newtopology.append((t[0],) + tuple(i[:-1] + (0, + i[-1]) for i in t[1:]))
+            print(t)
+            newtopology.append((t[0],) + tuple(i[:-1] + (0, i[-1]) for i in t[1:]))
         #print (newtopology)
         topology = newtopology
     elif dimension not in [1, 2]:
@@ -227,7 +283,9 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
     #else:
     #    dimension_y_range = [0]
 
-    print(pictures)
+    #print(pictures)
+
+    
     
     #print(gridmoves)
     #print(nodeoffsets)
@@ -296,6 +354,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
     # Set the HEIGHT and WIDTH of the screen
     WINDOW_SIZE = [screenwidth, screenheight]
     screen = pygame.display.set_mode(WINDOW_SIZE, pygame.RESIZABLE)
+    manager = pygame_gui.UIManager(WINDOW_SIZE)
      
     # Set title of screen
     pygame.display.set_caption("Tiler")
@@ -313,6 +372,31 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
     drawcolor = None
 
     thred = None
+
+    filename_box = pygame_gui.elements.UITextEntryLine(pygame.Rect((10, 160), (100, 50)),
+                                                        manager=manager,
+                                                        object_id="#filename")
+    filename_box.set_text("conf")
+
+    save_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((10, 220), (60, 50)),
+                                             text='save',
+                                             manager=manager)
+    load_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((70, 220), (60, 50)),
+                                             text='load',
+                                             manager=manager)
+
+    ui_things = [filename_box, save_button, load_button]
+
+    """
+    #manager = pygame_textinput.TextInputManager(validator)
+    textinput = pygame_textinput.TextInputVisualizer(font_object = msg_font)
+    textinput.cursor_width = 4
+    textinput.cursor_blink_interval = 399
+    textinput.antialias = True
+    textinput.font_color = (10,10,10)
+    """
+    
+    
 
     def to_screen(x, y):
         if False and dimension == 1:
@@ -375,40 +459,34 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                     if d < dist:
                         dist = d
                         closest = (x0, y0, n)
-                    if debug_prints:
-                        vemmel.add((x0, y0, n))
-                        gimmel[(x0, y0, n)] = d
-        #if debug_prints:
-        #    gimmel[0] = closest
-            #print(closest)
-        """
-        for node in grid:
-            nodex, nodey, nodenode = node
-            realpos = nodepositions[node]
-            #d = distance(to_screen(*vadd((x0, y0), nodeoffsets[n])), to_screen(x, y))
-            d = distance(realpos, x, y)
-            if d < dist:
-                dist = d
-                closest = node
-        """
-        #if y0 != 0:
-            #print(x0, y0, n, "ammma")
-        #    return None
         return closest
         
     # print(get_node(0,7))
 
+    def mouse_on_ui(mpos):
+        for u in ui_things:
+            r = u.relative_rect
+            x, y, w, h = r
+            if mpos[0] >= x and mpos[0] < x+w and mpos[1] >= y and mpos[1] < y+h:
+                return True
+        return False
+
     nnn = 0
+
+    tim = time.time()
     
     show_help = True
     # -------- Main Program Loop -----------
     while not done:
-
+        #print("main looppo")
+        new_tim = time.time()
+        time_delta = new_tim - tim
+        tim = new_tim
+        
         nnn += 1
 
-        vemmel = set()
-        gimmel = {}
-        #print(vemmel)
+        #vemmel = set()
+        #gimmel = {}
 
         """
         if not que.empty():
@@ -422,11 +500,45 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
             thred.join()
             thred = None
         """
+
+
+        events = pygame.event.get()
+        #textinput.update(events)
+
+        focus_set = manager.get_focus_set()
+        # if UI is used, we should not use mouse or key inputs for other things
+        cancel_non_UI = False
+        if focus_set == None:
+            pass
+        else:
+            assert len(focus_set) == 1
+            focused = list(focus_set)[0]
+            # we want some focuses to steal input, let's just use the object type
+            if type(focused) == pygame_gui.elements.ui_text_entry_line.UITextEntryLine:
+                cancel_non_UI = True # TODO: IGNORE THINGS WHEN TRUE, AND DO SAVES
         
-        for event in pygame.event.get():  # User did something
+        for event in events:  # User did something
+
+            manager.process_events(event)
+
+            if event.type == pygame_gui.UI_BUTTON_START_PRESS:
+                cancel_non_UI = True
+                #print("canceling")
+                filename = filename_box.get_text()
+                if not ok_file(filename):
+                    print("Filename %s is not valid; for safety, we require length at least 1." % filename)
+                else:
+                    if event.ui_element == save_button:
+                        save(grid, filename)
+                        print('Configuration saved in %s.' % filename)
+                    if event.ui_element == load_button:
+                        load(grid, filename)
+                        print('Configuration loaded from %s.' % filename)
+            
             if event.type == pygame.QUIT:  # If user clicked close
                 done = True  # Flag that we are done so we exit this loop
-            elif event.type == pygame.KEYDOWN:
+                
+            elif event.type == pygame.KEYDOWN and not cancel_non_UI:
 
                 if event.key == pygame.K_1:
                     drawcolor = (SET, 0)
@@ -466,22 +578,21 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                         thred.terminate()
                         thred = None
                         print ("deduction cancelled")
-                    print ("deduction starting")
+                    print ("Tiling started.")
+                    t = time.time()
                     #thred = Process(target=deduce_a_tiling_threaded, args=(que, grid, gridheight, gridwidth))
                     #thred.start()
 
                     deduce_a_tiling(grid, the_SFT, x_period = x_size if x_periodic else None, y_period = y_size if y_periodic else None)
-                    print ("deduce_a_tiling returned (debug print)")
+                    print ("Tiling process finished in %s seconds." % (time.time() - t)) # deduce_a_tiling returned (debug print)")
                     
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                mouseisdown = True
-                # User clicks the mouse. Get the position
-                # Change the x/y screen coordinates to grid coordinates
-                #x, y = mouse
-                # Set that location to one
-                #get_node(
-                #drawcolor = 1 - grid[mouserow][mousecolumn]
-                #print("Click ", pos, "Grid coordinates: ", row, column)
+
+                # even if using _START_PRESS in _gui, mouse events come one iteration later
+                # than in pygame, so we just do an explicit check...
+                if not mouse_on_ui(mpos):
+                    mouseisdown = True
+                    
             elif event.type == pygame.MOUSEBUTTONUP:
                 mouseisdown = False
                 
@@ -491,34 +602,42 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                 WINDOW_SIZE = [screenwidth, screenheight]
                 
                 screen = pygame.display.set_mode(WINDOW_SIZE, pygame.RESIZABLE)
+                # should probably also tell UI?
+                
+            # end of event loop
 
+        mpos = pygame.mouse.get_pos()
+
+        manager.update(time_delta)
+            
         keys=pygame.key.get_pressed()
         screenmove = (0, 0)
-        if keys[pygame.K_LEFT]:
-            screenmove = (-1, 0)
-        if keys[pygame.K_RIGHT]:
-            screenmove = (1, 0)
-        if keys[pygame.K_UP]:
-            screenmove = (0, 1)
-        if keys[pygame.K_DOWN]:
-            screenmove = (0, -1)
+        if not cancel_non_UI:
+            if keys[pygame.K_LEFT]:
+                screenmove = (-1, 0)
+            if keys[pygame.K_RIGHT]:
+                screenmove = (1, 0)
+            if keys[pygame.K_UP]:
+                screenmove = (0, 1)
+            if keys[pygame.K_DOWN]:
+                screenmove = (0, -1)
             
         #screenmove = smul(zoom*0.01, screenmove)
         screenmove = smul(4, screenmove)
         gridmove = vsub(to_grid(*screenmove), to_grid(0, 0))
         
         camera = vadd(camera, gridmove)
-        if keys[pygame.K_a]:
-            zoom = smul(1.01, zoom)
-        if keys[pygame.K_z]:
-            zoom = smul(1/1.01, zoom)
-        if keys[pygame.K_s]:
-            nodesize += 1
-        if keys[pygame.K_x]:
-            nodesize -= 1
+        if not cancel_non_UI:
+            if keys[pygame.K_a]:
+                zoom = smul(1.01, zoom)
+            if keys[pygame.K_z]:
+                zoom = smul(1/1.01, zoom)
+            if keys[pygame.K_s]:
+                nodesize += 1
+            if keys[pygame.K_x]:
+                nodesize -= 1
 
-        pos = cp_from_screen(pygame.mouse.get_pos())
-
+        pos = cp_from_screen(mpos)
         #print(pos)
         pos = to_grid(*pos)
         #print(pos)
@@ -535,18 +654,25 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
         if mouserow >= gridheight: mouserow = gridheight-1
         """
 
-        #print(node, mouseisdown)
-        if node != None and mouseisdown and drawcolor != None:
-            if node not in grid or grid[node] != drawcolor:
-
-
+        # cases where grid is perhaps clicked
+        if node != None and mouseisdown and drawcolor != None and not cancel_non_UI:
+            period_ok = True
+            if x_periodic:
+                if node[0] < 0 or node[0] >= x_size:
+                    period_ok = False
+            if y_periodic:
+                if node[1] < 0 or node[1] >= y_size:
+                    period_ok = False
+            # cases where we should change
+            if period_ok and (node not in grid or grid[node] != drawcolor):
                 #print(drawcolor)
                 currentstate = TILING_UNKNOWN
                 #print(node)
                 node = node[:-1] + (nodes[node[-1]],)
                 
                 if drawcolor == EMPTY:
-                    del grid[node]
+                    if node in grid:
+                        del grid[node]
                 elif drawcolor == UNKNOWN:
                     grid[node] = UNKNOWN
                 elif drawcolor[0] == SET and drawcolor[1] < len(alphabets[node[-1]]):
@@ -603,7 +729,6 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                                 
 
 
-        #print(gimmel, gimmel in vemmel, vemmel)
         # Draw the grid
         for x in range(xmin, xmax + 1):
             for y in range(ymin, ymax + 1):
@@ -637,11 +762,11 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                             color = colors[grid[(x,y,nodes[n])][1]]
                             white_circle = True
 
-                        if (x, y, n) in vemmel:
-                            xxxx = int(255- gimmel[(x, y, nodes[n])]*3)
-                            if xxxx < 0:
-                                xxxx = 0
-                            color = (0,0,xxxx)
+                        #if (x, y, n) in vemmel:
+                        #    xxxx = int(255- gimmel[(x, y, nodes[n])]*3)
+                        #    if xxxx < 0:
+                        #        xxxx = 0
+                        #    color = (0,0,xxxx)
                         #if (x, y, n) == gimmel[0]:
                             #print("did")
                         #    color = (60,70,80)
@@ -675,31 +800,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                             pic = pygame.transform.scale(pic, (nodesize*2, nodesize*2))
                             v = (pic.get_width()//2, -pic.get_height()//2)
                             screen.blit(pic, cp_to_screen(vsub(p, v)))
-                        #else:
-                            #print(sym, "None")
-                    
-                    #print(vadd(to_screen(x, y), nodeoffsets[n]))
-                    
-                    """
-                if (x, y,grid[row][column] == 0:
-                    color = EMPTY_COLOR
-                elif grid[row][column] == 1:
-                    color = FULL_COLOR
 
-                elif grid[row][column] == 2 or currentstate != TILING_OK:
-                    color = UNKNOWN_COLOR
-
-                elif grid[row][column] == 3:
-                    color = DEDUCED_EMPTY_COLOR
-                elif grid[row][column] == 4:
-                    color = DEDUCED_FULL_COLOR
-                    
-                pygame.draw.rect(screen,
-                                 color,
-                                 [(MARGIN + WIDTH) * column + MARGIN,
-                                  (MARGIN + HEIGHT) * row + MARGIN,
-                                  WIDTH,
-                                  HEIGHT])"""
+        
                                
         if show_help:                               
             # Draw some helper text
@@ -720,6 +822,9 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                 font_surf = msg_font.render(msg, False, GREEN)
                 screen.blit(font_surf, (10, 10+i*15))
      
+        #screen.blit(textinput.surface, (30, 30))
+        manager.draw_ui(screen)
+
         # Limit to 60 frames per second
         clock.tick(60)
      

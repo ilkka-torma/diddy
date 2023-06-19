@@ -489,10 +489,10 @@ x 1 1 1 0 1 1 1 |
 x 0 0 0 1 1 1 1 |
 x 0 1 1 1 1 1 1
 %CA zero
-0 1 0=1
+0 1 Ao 0=1
 --%compose_CA doublezero zero zero
 --%equal_CA doublezero zero
-%calculate_CA_ball 10 outfile A zero
+%calculate_CA_ball filename=outfile 10 A zero
 --%equal_CA K zero
 --%compose_CA K2 K K
 --%equal_CA K2 zero
@@ -735,7 +735,92 @@ lt (0, 1) (-1, 1)
 --%TFGE triv
 --1 1 0 Oo o=o;
 """
-unit_tests.append(("tfg test", code_tfg_test))
+#unit_tests.append(("tfg test", code_tfg_test))
+
+
+code = """
+%alphabet 0 1
+%nodes bot top -- two tracks, top and bottom
+%dim 1
+%topology
+rt (0, top) (1, top);
+rt (0, bot) (1, bot);
+lt (0, top) (-1, top);
+lt (0, bot) (-1, bot)
+%CA R -- partial right shift on the top track
+top 1 ACo o.rt.top=1;
+bot 1 ACo o.bot=1
+%CA L -- partial left shift on the top track
+top 1 ACo o.lt.top=1;
+bot 1 ACo o.bot=1
+%CA A -- add top track to bottom track
+top 1 ACo o.top=1;
+bot 1 ACo (o.bot=1 | o.top=1) & (o.bot=0 | o.top=0)
+%CA id -- identity
+top 1 ACo o.top=1;
+bot 1 ACo o.bot=1
+%compose ARRRALLLLLARR A R R R A L L L L L A R R
+%compose LLARRRRRALLLA L L A R R R R R A L L L A
+%equal expect=T ARRRALLLLLARR LLARRRRRALLLA
+%compose ARRRALLLLAR A R R R A L L L L A R
+%compose LLARRRRALLLA L L A R R R R A L L L A
+%spacetime_diagram st ARRRALLLLAR
+%equal expect=F ARRRALLLLAR LLARRRRALLLA
+%dim 2
+%topology
+rt (0, 0, top) (1, 0, top);
+rt (0, 0, bot) (1, 0, bot);
+lt (0, 0, top) (-1, 0, top);
+lt (0, 0, bot) (-1, 0, bot);
+fut (0, 0, bot) (0, 1, bot);
+fut (0, 0, top) (0, 1, top);
+past (0, 0, bot) (0, -1, bot);
+past (0, 0, top) (0, -1, top);
+%tiler st x_size=3 y_size=3 --@x_periodic
+"""
+#unit_tests.append(("lamplighter", code))
+
+code = """
+%dim 1
+%alphabet 0 1
+%nodes 0
+%topology rt (0,0) (1,0); lt (0,0) (-1,0)
+%CA f
+0 1 Ao let x a b c d e f g :=
+  o=a & o.rt=b & o.rt.rt=c & o.rt.rt.rt=d &
+  o.rt.rt.rt.rt=e & o.rt.rt.rt.rt.rt=f & o.rt.rt.rt.rt.rt.rt=g in
+x 0 1 1 1 0 0 0 | x 1 0 0 0 1 0 0 | [...] | x 0 1 1 1 1 1 1
+%CA zero 0 1 Ao 0=1
+%calculate_CA_ball filename=outfile 10 f zero
+"""
+#unit_tests.append(("ZERO TEST", code))
+
+code = """
+%CA a
+0 1 Ao o!=o.rt
+%equal expect=T a a
+%compose aa a a
+%compose aa_a aa a
+%compose a_aa a aa
+%equal expect=T a_aa aa_a
+"""
+#unit_tests.append(("idcode tiler", code))
+
+code = """
+%topology line
+%CA a
+0 1 Ao o!=o.rt; -- put 1 if xor
+0 0 Ao 0=o.lt; -- put 0 if sames and left = 0
+0 1 Ao o.rt.rt  = 1; -- put 1 if these don't trigger and rt.rt =1
+0 0 Ao 0=0 -- default case 0
+%show_formula a
+%spacetime_diagram b a
+%topology grid
+%tiler b
+"""
+unit_tests.append(("overlapping CA rule", code))
+
+
 
 if __name__ == "__main__":
     for (name, code) in unit_tests:
