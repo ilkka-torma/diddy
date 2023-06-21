@@ -4,7 +4,7 @@ import time
 unit_tests = []
 
 # whether we test the ones that take like 10 seconds
-long_ones_too = False
+#long_ones_too = True <- currently nothing takes long
 
 # just some basic checks
 code_basic_comparisons = """
@@ -214,12 +214,12 @@ o=0 -> (Et[o2] c o t) &
        (Ap[o4] p=0 -> Eq[o2p2] (c o q & !c p q) | (!c o q & c p q))
 
 -- %compare_SFT_pairs
-%equalT locdomrad22 locdomrad24
-%equalT locdomrad22 locdomrad2x
+%equal expect=T locdomrad22 locdomrad24
+%equal expect=T locdomrad22 locdomrad2x
 --%end_cache
 """
-if long_ones_too:
-    unit_tests.append(("loc dom rad 2", code_locdomrad2))
+#if long_ones_too: <- used to take long, but now doesn't seem to
+unit_tests.append(("loc dom rad 2", code_locdomrad2))
 
 code = """
 %CA a
@@ -231,6 +231,37 @@ code = """
 %equal expect=T a_aa aa_a
 """
 unit_tests.append(("trivial CA associativity", code))
+
+code = """
+%alphabet 0 1
+%nodes top bot -- two tracks, top and bottom
+%dim 1
+%topology
+rt (0, top) (1, top);
+rt (0, bot) (1, bot);
+lt (0, top) (-1, top);
+lt (0, bot) (-1, bot)
+%CA R -- partial right shift on the top track
+top 1 ACo o.rt.top=1;
+bot 1 ACo o.bot=1
+%CA L -- partial left shift on the top track
+top 1 ACo o.lt.top=1;
+bot 1 ACo o.bot=1
+%CA A -- add top track to bottom track
+top 1 ACo o.top=1;
+bot 1 ACo (o.bot=1 | o.top=1) & (o.bot=0 | o.top=0)
+%CA id -- identity
+top 1 ACo o.top=1;
+bot 1 ACo o.bot=1
+%compose ARRRALLLLLARR A R R R A L L L L L A R R
+%compose LLARRRRRALLLA L L A R R R R R A L L L A
+%equal expect=T ARRRALLLLLARR LLARRRRRALLLA
+%compose ARRRALLLLARR A R R R A L L L L A R R
+%compose LLARRRRALLLA L L A R R R R A L L L A
+%spacetime_diagram st ARRRALLLLARR
+%equal expect=F ARRRALLLLARR LLARRRRALLLA
+"""
+unit_tests.append(("lamplighter", code))
 
 code = """
 %alphabet a b

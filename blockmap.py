@@ -19,23 +19,63 @@ class BlockMap:
         self.from_topology = from_topology
         self.to_topology = to_topology
 
-        assert type(circuits) == dict
-            
-        self.circuits = circuits
-        for n in to_nodes:
-            circs = {}
-            for a in to_alphabet[n]:
-                if (n, a) in self.circuits:
-                    circs[a] = self.circuits[(n, a)]
-            # check if we should add default case
-            if len(circs) < len(to_alphabet[n]):
-                default_found = False
+        #assert type(circuits) == dict
+
+        #  dict is only used internally, assume disjointness and full specification
+        if type(circuits) == dict:
+            self.circuits = circuits #[(n,a,circuits[(n,a)]) for (n,a) in circuits]
+
+        # inputs can be messier, and we remove intersections and add defaults
+        # by default, default is first missing symbol, or first letter of alphabet
+        # if all appear...
+        if type(circuits) == list:
+            self.circuits = self.circuits_from_list(circuits)
+
+            for n in to_nodes:
+                circs = {}
                 for a in to_alphabet[n]:
-                    if a not in circs:
-                        if not default_found:
-                            self.circuits[(n, a)] = AND(*(NOT(b) for b in circs.values()))
-                        else:
-                            self.circuits[(n, a)] = F
+                    if (n, a) in self.circuits:
+                        circs[a] = self.circuits[(n, a)]
+                # check if we should add default case because one is explicitly missing
+                if len(circs) < len(to_alphabet[n]):
+                    default_found = False
+                    for a in to_alphabet[n]:
+                        if a not in circs:
+                            if not default_found:
+                                self.circuits[(n, a)] = AND(*(NOT(b) for b in circs.values()))
+                            else:
+                                self.circuits[(n, a)] = F
+                # all formulas are there, but we should possibly still add a default case
+                # if it's possible that no formula triggers; default is first letter then
+                else:
+                    ldac = LDAC2(self.from_alphabet)
+                    first_sym = from_alphabet[n][0]
+                    if SAT_under(AND(*(NOT(b) for b in circs.values())), ldac):
+                        self.circuits[(n, first_sym)] = AND(*(NOT(circs[b]) for b in circs if b != first_sym))
+
+    # we get a list of (node, sym, formula), and should refine to disjoints:
+    # if (n, a, C) appears, and (n, b) already has formula,
+    # then, remove simultaneous solutions from C
+    def circuits_from_list(self, circuits):
+        disjoints = []
+        for (node, sym, formula) in circuits:
+            form = formula
+            # go over all previous
+            for (node_, sym_, formula_) in disjoints:
+                if node_ != node:
+                    continue
+                if sym_ != sym:
+                    ldac = LDAC2(self.from_alphabet)
+                    if SAT_under(AND(form, formula_), ldac):
+                        form = AND(form, NOT(formula_))
+            disjoints.append((node, sym, form))
+        ret_circuits = {}
+        for (node, sym, formula) in disjoints:
+            if (node, sym) not in ret_circuits:
+                ret_circuits[(node, sym)] = formula
+            else:
+                ret_circuits[(node, sym)] = OR(ret_circuits[(node, sym)], formula)
+        return ret_circuits
 
     def tomocircuit(self):
         return mocircuits.MOCircuit(self.circuits)
@@ -249,13 +289,16 @@ class BlockMap:
                 is_val = V(val_vec + (sym,))
             anded.append(IFF(new_circ, is_val))
 
+        print(self.from_topology)
+
         topology = []
         for t in self.from_topology:
             # append the new dimension in the edges
-            topology.append(t[:1] + t[:time_axis] + (0,) + t[time_axis:])
+            topology.append(t[:1] + tuple(tt[:time_axis] + (0,) + tt[time_axis:] for tt in t[1:]))
             # add the time direction, default name is "fut"
         for  n in nodes:
             topology.append(("fut", (0,)*(dim+1) + (n,), (0,)*time_axis + (1,) + (0,)*(dim-time_axis) + (n,)))
+            topology.append(("past", (0,)*time_axis + (1,) + (0,)*(dim-time_axis) + (n,), (0,)*(dim+1) + (n,)))
             
         return SFT(dim+1, nodes, alph, topology, circuit=AND(*anded), onesided=[time_axis] if onesided else [])
         
