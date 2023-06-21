@@ -477,6 +477,14 @@ code = """
 """
 unit_tests.append(("numeric symbols", code))
 
+# by P. Guillon
+code = """
+%alphabet d g h b
+%SFT domino Ao (o=d & o.rt=g) | (o=g & o.lt=d) | (o=h & o.up=b) | (o=b & o.dn=h)
+%compute_forbidden_patterns domino
+"""
+unit_tests.append(("domino forbidden patterns", code))
+
 
 
 if __name__ == "__main__":

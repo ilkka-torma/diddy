@@ -101,14 +101,17 @@ def forced_by(circuit, vals_as_list):
 
 # we have a circuit and some values
 # minimize the dict of values so that stays tautology
-def minimize_solution(circuit, vals, necessary_vals = None):
+def minimize_solution(circuit, vals, necessary_vals = None, sort_by_dist=False):
     
     if necessary_vals == None:
         assert evaluate(circuit, vals)
         necessary_vals = []
 
     assert type(vals) == dict
-    vals = list(vals.items())
+    if sort_by_dist:
+        vals = list(sorted(vals.items(), key=lambda v: -sum(abs(i) for i in v[0][:-2])))
+    else:
+        vals = list(vals.items())
     mini = minimize_solution_(circuit, vals, necessary_vals)
     as_dict = {}
     for (var, val) in mini:
@@ -155,6 +158,20 @@ def nonnegative_circuit(dim, tr_dims, circ):
             tr_vec.append(0)
     transform(circ, lambda var: vadd(var[:-2], tr_vec) + var[-2:])
     return circ
+    
+# From dict(nvec : [symbol]), produce patterns
+def product_patterns(prod_pat):
+    if not prod_pat:
+        yield dict()
+    else:
+        nvec = min(prod_pat)
+        partial = dict(p for p in prod_pat.items() if p[0] != nvec)
+        syms = prod_pat[nvec]
+        for pat in product_patterns(partial):
+            for sym in syms:
+                new_pat = pat.copy()
+                new_pat[nvec] = sym
+                yield new_pat
 
 class SFT:
     "dim-dimensional SFT on a gridlike graph"
@@ -496,6 +513,7 @@ class SFT:
 
     # domain_or_rad is a collection of vectors OR an integer
     def deduce_forbs_(self, domain_or_rad=None):
+        #print("alph", self.alph)
         verbose_deb = True
         var_nvecs = [var[:-1] for var in self.circuit.get_variables()]
         if domain_or_rad is None:
@@ -511,6 +529,7 @@ class SFT:
         #vec_domain = set(var[:-2] for var in domain)
         #print("nvec_domain", vec_domain)
         #print("var_nvecs", var_nvecs)
+        #print("all pos", all_positions)
         #assert len(self.alph) == 2
         assert all(nvec in all_positions for nvec in var_nvecs)
 
@@ -518,11 +537,11 @@ class SFT:
         # the circuit fails at the origin
         complemented = NOT(self.circuit.copy())
         #print("complemented", complemented)
-        forb_circuits = []
+        forb_circuits = [complemented]
         # note: every forb is forbidden by the untranslated circuit, so it's safe to place anywhere
-        for forb in self.forbs:
+        for vec in vec_domain:
             #print("implementing forb", forb)
-            for vec in vec_domain:
+            for forb in self.forbs:
                 oreds = []
                 for (forb_nvec, value) in forb.items():
                     local_vec = nvadd(forb_nvec, vec)
@@ -530,35 +549,57 @@ class SFT:
                         oreds.extend(V(local_vec+(sym,)) for sym in self.alph[local_vec[-1]][1:])
                     else:
                         oreds.append(NOT(V(local_vec+(value,))))
+                #print("oreds", oreds)
                 forb_circuits.append(OR(*oreds))
-
-        #print("formulas", forbiddens)
+                
         add_uniqueness_constraints(self.alph, forb_circuits, all_positions)
-        #print("uniq formulas", forbiddens)
 
-        m = SAT(AND(complemented, *forb_circuits), True)
+        final_circ = AND(*forb_circuits)
+        #print("final circ", final_circ)
+        m = SAT(final_circ, True)
         if m == False:
             return None
 
         # we now know that m is a forbidden thingy
         # we then try to minimize it
         minimal = {}
-        for v in complemented.get_variables():
-            minimal[v] = m[v]
+        for nvec in var_nvecs:
+            for sym in self.alph[nvec[-1]][1:]:
+                minimal[nvec+(sym,)] = m[nvec+(sym,)]
         #print("minimizing", minimal)
-        minimal = minimize_solution(complemented, minimal)
+        comp = [complemented]
+        add_uniqueness_constraints(self.alph, comp, var_nvecs)
+        minimal = minimize_solution(complemented, minimal, sort_by_dist=True)
         #a = bbb
         #print("got", minimal)
-        new_forb = dict()
-        for (nvec_sym, val) in minimal.items():
-            if val:
-                new_forb[nvec_sym[:-1]] = nvec_sym[-1]
+        
+        support = set((nvec_sym[:-1]) for nvec_sym in minimal)
+        new_forbs = dict() # a dict of symbol lists
+        for nvec in support:
+            node = nvec[-1]
+            new_forbs[nvec] = []
+            falses = []
+            for sym in self.alph[node][1:]:
+                try:
+                    if minimal[nvec + (sym,)]:
+                        new_forbs[nvec].append(sym)
+                        break
+                    else:
+                        falses.append(sym)
+                except KeyError:
+                    pass
             else:
-                new_forb[nvec_sym[:-1]] = self.alph[nvec_sym[-2]][0]
-
-        #print("new forb", new_forb)
-
-        self.forbs.append(new_forb)
+                new_forbs[nvec].append(self.alph[node][0])
+                for sym in self.alph[node][1:]:
+                    if sym not in falses:
+                        new_forbs[nvec].append(sym)
+                        
+        #print("prod", new_forbs)
+        for new_forb in product_patterns(new_forbs):
+            #print("new forb", new_forb)
+            assert all(forb != new_forb for forb in self.forbs)
+            self.forbs.append(new_forb)
+            #if len(self.forbs) == 2: 1/0
         
         self.deduce_forbs_(vec_domain)
 
