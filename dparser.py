@@ -168,7 +168,8 @@ commands = [
     Command("spacetime_diagram",
             [ArgType.LABEL, ArgType.LABEL],
             opts = ["time_axis"],
-            flags = ["twosided"]),
+            flags = ["twosided"],
+            aliases = ["spacetime"]),
     
     # TFG stuff not implemented yet
     Command("TFG",
@@ -229,7 +230,7 @@ commands = [
     # Visualization / finding individual tilings in SFT
     Command("tiler",
             [ArgType.LABEL],
-            opts = ["x_size", "y_size", "node_offsets", "pictures", "gridmoves"],
+            opts = ["x_size", "y_size", "node_offsets", "pictures", "gridmoves", "topology"],
             flags = ["x_periodic", "y_periodic"]),
     Command("tile_box",
             [ArgType.LABEL, ArgType.NUMBER]),

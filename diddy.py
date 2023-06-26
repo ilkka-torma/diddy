@@ -526,6 +526,18 @@ class Diddy:
                 name = args[0]
                 rules = args[1]
                 domain_name = kwds.get("domain", None)
+                check = "check_overlaps" in flags
+                ignore = "ignore_overlaps" in flags
+                verbose = "verbose" in flags
+                if check and ignore:
+                    raise Exception("Conflicting options: @check_overlaps and @ignore_overlaps")
+                if check:
+                    overlaps = "check"
+                elif ignore:
+                    print("Warning: if a block map definition has overlapping rules, ignoring them can lead to undefined behavior")
+                    overlaps = "ignore"
+                else:
+                    overlaps = "remove"
                 if domain_name is None:
                     dom_dim, dom_nodes, dom_top, dom_alph = self.dim, self.nodes, self.topology, self.alphabet
                 else:
@@ -550,7 +562,7 @@ class Diddy:
                         #circuits[(node, sym)] = circ
                         circuits.append((node, sym, circ))
                 #print(circuits)
-                self.blockmaps[name] = blockmap.BlockMap(dom_alph, cod_alph, dom_nodes, cod_nodes, dom_dim, circuits, dom_top, cod_top)
+                self.blockmaps[name] = blockmap.BlockMap(dom_alph, cod_alph, dom_nodes, cod_nodes, dom_dim, circuits, dom_top, cod_top, overlaps=overlaps, verbose=verbose)
 
             elif cmd == "TFG":
                 name = args[0]
@@ -630,8 +642,13 @@ class Diddy:
                 print(gridmoves)
                 print(self.tiler_gridmoves)
                 SFT = self.SFTs[name]
-                #tiler.run(SFT, SFT.topology, gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic, pictures)
-                tiler.run(SFT, self.topology, gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic, pictures)
+                topo_name = kwds.get("topology", None)
+                if topo_name is None:
+                    topology = SFT.topology
+                else:
+                    topology = self.environments[topo_name][2]
+                tiler.run(SFT, topology, gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic, pictures)
+                #tiler.run(SFT, self.topology, gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic, pictures)
             
             elif cmd == "entropy_upper_bound":
                 name = args[0]

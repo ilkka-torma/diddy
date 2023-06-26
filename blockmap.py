@@ -4,13 +4,15 @@ from sft import *
 import mocircuits
 import time
 
+
 """
 circuits is a dict of circuits : (node, symbol) -> circuit
 for each node exactly one should say yes or this is nondeterministic
 variables in circuits are (vector, node, symbol) encodeed
+overlaps should be "ignore", "check" or "remove"
 """
 class BlockMap:
-    def __init__(self, from_alphabet, to_alphabet, from_nodes, to_nodes, dimension, circuits, from_topology, to_topology):
+    def __init__(self, from_alphabet, to_alphabet, from_nodes, to_nodes, dimension, circuits, from_topology, to_topology, overlaps="remove", verbose=False):
         self.from_alphabet = from_alphabet
         self.to_alphabet = to_alphabet
         self.from_nodes = from_nodes
@@ -29,7 +31,8 @@ class BlockMap:
         # by default, default is first missing symbol, or first letter of alphabet
         # if all appear...
         if type(circuits) == list:
-            self.circuits = self.circuits_from_list(circuits)
+            
+            self.circuits = self.circuits_from_list(circuits, overlaps)
 
             for n in to_nodes:
                 circs = {}
@@ -42,6 +45,8 @@ class BlockMap:
                     for a in to_alphabet[n]:
                         if a not in circs:
                             if not default_found:
+                                if verbose:
+                                    print("Using {} as default symbol for node {} in block map".format(a, n))
                                 self.circuits[(n, a)] = AND(*(NOT(b) for b in circs.values()))
                             else:
                                 self.circuits[(n, a)] = F
@@ -51,24 +56,34 @@ class BlockMap:
                     ldac = LDAC2(self.from_alphabet)
                     first_sym = from_alphabet[n][0]
                     if SAT_under(AND(*(NOT(b) for b in circs.values())), ldac):
+                        if verbose:
+                            print("Using {} as default symbol for node {} in block map".format(first_sym, n))
                         self.circuits[(n, first_sym)] = AND(*(NOT(circs[b]) for b in circs if b != first_sym))
 
-    # we get a list of (node, sym, formula), and should refine to disjoints:
+    # we get a list of (node, sym, formula)
+    # if overlaps is "remove", we should refine to disjoints:
     # if (n, a, C) appears, and (n, b) already has formula,
     # then, remove simultaneous solutions from C
-    def circuits_from_list(self, circuits):
-        disjoints = []
-        for (node, sym, formula) in circuits:
-            form = formula
-            # go over all previous
-            for (node_, sym_, formula_) in disjoints:
-                if node_ != node:
-                    continue
-                if sym_ != sym:
-                    ldac = LDAC2(self.from_alphabet)
-                    if SAT_under(AND(form, formula_), ldac):
-                        form = AND(form, NOT(formula_))
-            disjoints.append((node, sym, form))
+    # if overlaps is "check", we should raise an exception if the rules are not disjoint
+    # if overlaps if "ignore", assume the rules are disjoint
+    def circuits_from_list(self, circuits, overlaps):
+        if overlaps == "ignore":
+            disjoints = circuits
+        else:
+            disjoints = []
+            for (node, sym, formula) in circuits:
+                form = formula
+                # go over all previous
+                for (node_, sym_, formula_) in disjoints:
+                    if node_ != node:
+                        continue
+                    if sym_ != sym:
+                        ldac = LDAC2(self.from_alphabet)
+                        if SAT_under(AND(form, formula_), ldac):
+                            if overlaps == "check":
+                                raise Exception("Overlapping rules for node {}, symbols {} and {}".format(node_, sym_, sym))
+                            form = AND(form, NOT(formula_))
+                disjoints.append((node, sym, form))
         ret_circuits = {}
         for (node, sym, formula) in disjoints:
             if (node, sym) not in ret_circuits:
