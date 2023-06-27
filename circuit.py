@@ -557,7 +557,7 @@ def LDAC2(alphabet_func):
         if type(a) == int:
             return a
         return len(a)
-    af = (lambda aff:(lambda a:leng(aff(a))))(alphabet_func)
+    af = lambda a:leng(alphabet_func(a))
     return lambda a: last_diff_and_count2(a, af)
 
 # given a circuit whose variables are tuples,
@@ -567,6 +567,7 @@ def LDAC2(alphabet_func):
 # of course very specific to our coding of 
 def last_diff_and_count2(circs, count):
     #print(count, list(map(str, circs)))
+    # lasts is a dict of nvec -> set(var)
     lasts = {}
     for c in circs:
         #print(type(c))
@@ -581,6 +582,7 @@ def last_diff_and_count2(circs, count):
     newlasts = {} # change to variables
     for l in lasts:
         newlasts[l] = list(map(lambda a : V(a), lasts[l]))
+    # lasts is now a dict of nvec -> set(V(var))
     lasts = newlasts
     andeds = []
     for l in lasts:

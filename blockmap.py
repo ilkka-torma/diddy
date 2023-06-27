@@ -78,7 +78,8 @@ class BlockMap:
                     if node_ != node:
                         continue
                     if sym_ != sym:
-                        ldac = LDAC2(self.from_alphabet)
+                        #print("from_alphabet", self.from_alphabet)
+                        ldac = LDAC2(lambda nvec: self.from_alphabet[nvec[-1]])
                         if SAT_under(AND(form, formula_), ldac):
                             if overlaps == "check":
                                 raise Exception("Overlapping rules for node {}, symbols {} and {}".format(node_, sym_, sym))
@@ -304,7 +305,7 @@ class BlockMap:
                 is_val = V(val_vec + (sym,))
             anded.append(IFF(new_circ, is_val))
 
-        print(self.from_topology)
+        #print(self.from_topology)
 
         topology = []
         for t in self.from_topology:

@@ -66,14 +66,6 @@ TILING_OK_GRID_COLOR = (30,30,30)
 TILING_BAD_GRID_COLOR = (100, 50, 50)
 TILING_UNKNOWN_GRID_COLOR = (50,50,50)
 
-# colors used for alphabet symbols, and tinted versions for deduced ones
-colors = {0 : WHITE, 1 : (255,0,0), 2 : (0,255,0), 3 :(0,0,255),
-          4 : (255,255,0), 5 : (255,0,255), 6 : (0,255,255),
-          7 : (255, 80, 80), 8 : (80, 255, 80), 9 : (80, 80, 255)}
-deduced_colors = {}
-for c in colors:
-    deduced_colors[c] = tuple(map(lambda a:a//2, colors[c]))
-
 #deduced_colors = {0 : (150, 150, 150), 1 : (50, 130, 50),
 #                  2 : (16,56,190), 3: (85, 111, 222),
 #                  4: (190, 180, 170)}
@@ -259,7 +251,7 @@ def load(grid, filename):
 
 #a = bbb
 
-def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10, x_periodic=False, y_periodic=False, pictures=None):
+def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10, x_periodic=False, y_periodic=False, pictures=None, the_colors=None):
     #print(topology)
 
     # check dimension in the first command of topology
@@ -301,6 +293,29 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
     #print("nodes and offsets", nodes, nodeoffsets)
     dim = the_SFT.dim
     alphabets = the_SFT.alph
+    
+    # make colors
+    if the_colors is not None:
+        colors = {}
+        for node in nodes:
+            for sym in alphabets[node]:
+                colors[node, sym] = the_colors[sym]
+    else:
+        # colors used for alphabet symbols, and tinted versions for deduced ones
+        ix_colors = {
+          0 : WHITE, 1 : (255,0,0), 2 : (0,255,0), 3 :(0,0,255),
+          4 : (255,255,0), 5 : (255,0,255), 6 : (0,255,255),
+          7 : (255, 80, 80), 8 : (80, 255, 80), 9 : (80, 80, 255),
+          10 : (255, 160, 160), 11 : (160, 255, 160), 12 : (160, 160, 255),
+          13 : (80, 160, 255), 14 : (160, 255, 80), 15 : (255, 80, 160)
+          }
+        colors = {}
+        for node in nodes:
+            for (i, sym) in enumerate(alphabets[node]):
+                colors[node, sym] = ix_colors[i]
+    deduced_colors = {}
+    for c in colors:
+        deduced_colors[c] = tuple(map(lambda a:a//2, colors[c]))
 
     #print("alph", alphabets)
 
@@ -476,6 +491,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
     tim = time.time()
     
     show_help = True
+    show_labels = True
     # -------- Main Program Loop -----------
     while not done:
         #print("main looppo")
@@ -567,6 +583,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                     
                 if event.key == pygame.K_h:
                     show_help = not show_help
+                if event.key == pygame.K_l:
+                    show_labels = not show_labels
                     
                 if event.key == pygame.K_e:
                     if event.mod & pygame.KMOD_SHIFT:
@@ -765,12 +783,14 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                             #print(alphabets[nodes[n]])
                             symidx = grid[(x,y,nodes[n])][1]
                             sym = alphabets[nodes[n]][symidx]
-                            color = colors[grid[(x,y,nodes[n])][1]] #deduced_colors[sym]
+                            #color = colors[grid[(x,y,nodes[n])][1]] #deduced_colors[sym]
+                            color = colors[nodes[n], sym]
                         elif grid[(x,y,nodes[n])][0] == SET:
                             symidx = grid[(x,y,nodes[n])][1]
                             sym = alphabets[nodes[n]][symidx]
                             #print(sym)
-                            color = colors[grid[(x,y,nodes[n])][1]]
+                            #color = colors[grid[(x,y,nodes[n])][1]]
+                            color = colors[nodes[n], sym]
                             white_circle = True
 
                         #if (x, y, n) in vemmel:
@@ -794,7 +814,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                         if not drawing_picture or True: # actually I like the circles
                             pygame.draw.circle(screen, color, cp_to_screen(p), nodesize)
 
-                        if not drawing_picture and sym != None:
+                        if show_labels and not drawing_picture and sym != None:
                             #print(sym, color)
                             col = (255, 255, 255)
                             if sum(color) > 250:
@@ -830,6 +850,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
             draw_msg.append("Clear deduced nodes: e")
             draw_msg.append("Clear all nodes: shift-e")
             #draw_msg.append("Cancel deduction: escape")
+            draw_msg.append("Toggle symbol labels: l")
             draw_msg.append("Toggle this text: h")
             for (i, msg) in enumerate(draw_msg):
                 font_surf = msg_font.render(msg, False, GREEN)

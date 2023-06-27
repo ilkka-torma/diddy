@@ -241,7 +241,7 @@ class Diddy:
                 twosided = "twosided" in flags
                 #print("Computing the spacetime diagram of {} into {}".format(ca_name, sft_name))
                 self.SFTs[sft_name] = the_ca.spacetime_diagram(onesided=not twosided, time_axis=time_axis)
-                print(self.SFTs[sft_name].nodes, self.SFTs[sft_name].topology)
+                #print(self.SFTs[sft_name].nodes, self.SFTs[sft_name].topology)
 
             elif cmd == "preimage":
                 preim_name = args[0]
@@ -647,7 +647,8 @@ class Diddy:
                     topology = SFT.topology
                 else:
                     topology = self.environments[topo_name][2]
-                tiler.run(SFT, topology, gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic, pictures)
+                colors = kwds.get("colors", None)
+                tiler.run(SFT, topology, gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic, pictures, colors)
                 #tiler.run(SFT, self.topology, gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic, pictures)
             
             elif cmd == "entropy_upper_bound":
