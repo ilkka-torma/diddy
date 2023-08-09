@@ -19,10 +19,16 @@ code_basic_comparisons = """
 %SFT golden_mean_shift      Ao o = 1 -> o.up = 0 & o.rt = 0
 %SFT hor_golden_mean_shift2
 (0,0,0):1 (1,0,0):1
-%contains expect=F ver_golden_mean_shift hor_golden_mean_shift
-%contains expect=F golden_mean_shift hor_golden_mean_shift
+%contains conf_name=c1 expect=F ver_golden_mean_shift hor_golden_mean_shift
+%contains expect=T hor_golden_mean_shift c1
+%contains expect=F ver_golden_mean_shift c1
+%contains conf_name=c2 expect=F golden_mean_shift hor_golden_mean_shift
+%contains expect=T hor_golden_mean_shift c2
+%contains expect=F golden_mean_shift c2
 %contains expect=T ver_golden_mean_shift golden_mean_shift
-%contains expect=F ver_golden_mean_shift full_shift
+%contains conf_name=c3 expect=F ver_golden_mean_shift full_shift
+%contains expect=T full_shift c3
+%contains expect=F ver_golden_mean_shift c3
 %contains expect=T full_shift hor_golden_mean_shift
 %equal expect=T hor_golden_mean_shift2 hor_golden_mean_shift
 %equal expect=T ver_golden_mean_shift ver_golden_mean_shift2
@@ -268,9 +274,12 @@ code = """
 %SFT goldenmean Ao o=a -> o.rt=b & o.up=b
 %compute_forbidden_patterns radius=2 goldenmean
 %set_weights a:0 b:2
-%minimum_density expect=2 goldenmean (0,1)
-%minimum_density expect=1 goldenmean (0,2)
-%minimum_density expect=6/5 goldenmean (2,3)
+%minimum_density conf_name=c1 expect=2 goldenmean (0,1)
+%minimum_density conf_name=c2 expect=1 goldenmean (0,2)
+%minimum_density conf_name=c3 expect=6/5 goldenmean (2,3)
+%contains expect=T goldenmean c1
+%contains expect=T goldenmean c2
+%contains expect=T goldenmean c3
 """
 unit_tests.append(("golden mean upper density", code))
 
@@ -288,9 +297,15 @@ code = """
 %SFT two Ao o=o.up=o.rt
 %contains expect=T quarter half
 %contains expect=T half two
-%contains expect=F method=recognizable two half
-%contains expect=F method=recognizable two quarter
-%contains expect=F method=recognizable half quarter
+%contains conf_name=c1 expect=F method=recognizable two half
+%contains expect=T half c1
+%contains expect=F two c1
+%contains conf_name=c2 expect=F method=recognizable two quarter
+%contains expect=T quarter c2
+%contains expect=F two c2
+%contains conf_name=c3 expect=F method=recognizable half quarter
+%contains expect=T quarter c3
+%contains expect=F half c3
 """
 unit_tests.append(("recog comparison", code))
 
@@ -301,7 +316,9 @@ code = """
 %SFT onezero1 onesided=[1] Ao (o=0 -> o.up=0) & (o=1 -> o.dn.dn=0)
 %SFT zero1 onesided=[1] Ao o=0
 %contains expect=T onezero1 zero1
-%contains expect=F zero1 onezero1
+%contains conf_name=c1 expect=F zero1 onezero1
+%contains expect=T onezero1 c1
+%contains expect=F zero1 c1
 """
 unit_tests.append(("onesided comparison", code))
 
@@ -365,7 +382,8 @@ code = """
 %SFT test ACo o.0!=1 -> (o.up.1=1 & o.3=2 & o.rt.0=1) | o.2=X
 %compute_forbidden_patterns test
 %set_weights 0:1 1:3 2:2 X:4
-%minimum_density test (0,3)
+%minimum_density conf_name=c test (0,3)
+%contains expect=T test c
 """
 unit_tests.append(("node-specific alphabets", code))
 

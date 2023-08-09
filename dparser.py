@@ -177,6 +177,10 @@ commands = [
             aliases = ["topological_full_group_element"]),
 
     # Printing objects' basic properties
+    Command("show_conf",
+            [ArgType.LABEL],
+            flags = ["hide_contents"],
+            aliases = ["print_conf"]),
     Command("show_formula",
             [ArgType.LABEL],
             aliases = ["print_formula"]),
@@ -195,7 +199,7 @@ commands = [
             aliases = ["equals"]),
     Command("contains",
             [ArgType.LABEL, ArgType.LABEL],
-            opts = ["method", "expect"],
+            opts = ["method", "expect", "conf_name"],
             flags = ["verbose"],
             aliases = ["contain"]),
     Command("compare_sft_pairs", [],
@@ -230,7 +234,7 @@ commands = [
     # Visualization / finding individual tilings in SFT
     Command("tiler",
             [ArgType.LABEL],
-            opts = ["x_size", "y_size", "node_offsets", "pictures", "gridmoves", "topology"],
+            opts = ["x_size", "y_size", "node_offsets", "pictures", "gridmoves", "topology", "initial"],
             flags = ["x_periodic", "y_periodic"]),
     Command("tile_box",
             [ArgType.LABEL, ArgType.NUMBER]),

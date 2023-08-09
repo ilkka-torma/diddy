@@ -251,7 +251,7 @@ def load(grid, filename):
 
 #a = bbb
 
-def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10, x_periodic=False, y_periodic=False, pictures=None, the_colors=None):
+def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10, x_periodic=False, y_periodic=False, pictures=None, the_colors=None, initial=None):
     #print(topology)
 
     # check dimension in the first command of topology
@@ -269,6 +269,9 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
         topology = newtopology
     elif dimension not in [1, 2]:
         raise Exception("Tiler only supports dimensions 1 and 2, not %s." % dimension)
+
+    if initial is not None and dimension != initial.dim:
+        raise Exception("Dimension mismatch between tiler and initial configuration: {} vs {}".format(dimension, initial.dim))
 
     #if dimension == 2:
     #y_range = list(range(-r, r+1))
@@ -356,7 +359,12 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
         for y in range(0, y_size):
             # EMPTY means we'll try to deduce a color here
             for n in nodes: #range(len(nodes)):
-                grid[(x, y, n)] = UNKNOWN
+                if initial is None:
+                    grid[(x, y, n)] = UNKNOWN
+                elif initial.dim == 1:
+                    grid[(x, y, n)] = (SET, initial[x, n])
+                else:
+                    grid[(x, y, n)] = (SET, initial[x, y, n])
     #grid[(0, 0, nodes[0])] = (SET, 1)
     #grid[(1, 0, nodes[0])] = (SET, 1)
     # print(grid)
@@ -781,13 +789,14 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                         #    print(grid[(x,y,n)], "!=", UNKNOWN)
                         elif grid[(x,y,nodes[n])][0] == DEDUCED:
                             #print(alphabets[nodes[n]])
-                            symidx = grid[(x,y,nodes[n])][1]
-                            sym = alphabets[nodes[n]][symidx]
+                            sym = grid[(x,y,nodes[n])]
+                            #sym = alphabets[nodes[n]][symidx]
                             #color = colors[grid[(x,y,nodes[n])][1]] #deduced_colors[sym]
                             color = colors[nodes[n], sym]
                         elif grid[(x,y,nodes[n])][0] == SET:
-                            symidx = grid[(x,y,nodes[n])][1]
-                            sym = alphabets[nodes[n]][symidx]
+                            sym = grid[(x,y,nodes[n])][1]
+                            #print(alphabets, nodes[n], sym, colors)
+                            #sym = alphabets[nodes[n]][symidx]
                             #print(sym)
                             #color = colors[grid[(x,y,nodes[n])][1]]
                             color = colors[nodes[n], sym]

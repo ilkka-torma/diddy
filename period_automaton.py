@@ -98,13 +98,14 @@ def normalize_periods(pmat):
     return pmat
 
 def wrap(pmat, nvec):
+    "Wrap a vector into the (essentially one-dimensional) fundamental domain of the period matrix"
     vec = list(nvec[:-1])
     for (i, pvec) in enumerate(pmat, start=1):
         q = vec[i] // pvec[i]
-        vec[0] += q*pvec[0]
+        vec[0] -= q*pvec[0]
         vec[i] = vec[i] % pvec[i]
         for j in range(i+1,len(vec)):
-            vec[j] += q*pvec[j]
+            vec[j] -= q*pvec[j]
     return tuple(vec)+(nvec[-1],)
     
 def nvadd(nvec, vec):
@@ -287,20 +288,20 @@ class PeriodAutomaton:
         #for tr in self.trans.values():
         #    print(tr)
         #    break
-        alph = list(set(sym for tr in self.trans.values() for syms in tr.values() for sym in syms))
-        #print("alph", alph)
-
-        coloring = {st : 1 for st in self.trans}
-        colors = set([1])
-        num_colors = 1
+        
         trans = self.trans
         s2idict = self.s2idict
+        alph = list(set(sym for tr in self.trans.values() for syms in tr.values() for sym in syms))
+        #print("alph", alph)
 
         r = 1
         while True:
             if verbose:
                 print("minimizing (round {})".format(r))
             r += 1
+            coloring = {st : 1 for st in trans}
+            colors = set([1])
+            num_colors = 1
             # Iteratively update coloring based on the colors of successors
             i = 0
             while True:
@@ -344,6 +345,7 @@ class PeriodAutomaton:
                         new_trans[col][col2] = set()
                     new_trans[col][col2].add(min(sym for sym in syms))
 
+            # If [some condition], then we are done; otherwise minimize again
             if all(len(syms) == 1 for tr in new_trans.values() for syms in tr.values()):
                 for tr in new_trans.values():
                     for st in tr:

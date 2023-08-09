@@ -1,5 +1,6 @@
 from general import *
 from circuit import *
+from configuration import *
 from itertools import chain
 
 def add_track(track, node):
@@ -202,6 +203,51 @@ class SFT:
     def __str__(self):
         return "SFT(dim={}, nodes={}, alph={}{})".format(self.dim, self.nodes, self.alph, (", onesided="+str(self.onesided)) if self.onesided else "")
 
+    def __contains__(self, conf):
+        if not isinstance(conf, Conf):
+            raise TypeError("Expected Conf, not {}".format(type(conf)))
+        if isinstance(conf, PeriodicConf):
+            if conf.dim != self.dim or conf.onesided != self.onesided:
+                return False
+            for vec in hyperrect([(0,p) for p in conf.periods]):
+                circ = self.circuit.copy()
+                def tr(var):
+                    if var[-1] == conf[nvadd(var[:-1], vec)]:
+                        return T
+                    else:
+                        return F
+                transform(circ, tr)
+                if not SAT(circ):
+                    return False
+            return True
+        if isinstance(conf, RecognizableConf):
+            if conf.dim != self.dim or conf.onesided != self.onesided:
+                return False
+            conf_vecs = set(hyperrect([(-pre,trans+post) for (pre, trans, post) in conf.geometry]))
+            my_vecs = set(var[:-2] for var in self.circuit.get_variables())
+            if not my_vecs:
+                my_vecs.add((0,)*self.dim)
+            tr_bounds = []
+            for (i, (pre, trans, post)) in enumerate(conf.geometry):
+                if i in self.onesided:
+                    min_bound = 0
+                else:
+                    min_bound = -pre - max(vec[i] for vec in my_vecs)
+                max_bound = trans + post - min(vec[i] for vec in my_vecs)
+                tr_bounds.append((min_bound, max_bound))
+            #print(var_vecs, all_vecs)
+            for vec in hyperrect(tr_bounds):
+                circ = self.circuit.copy()
+                def tr(var):
+                    if var[-1] == conf[nvadd(var[:-1], vec)]:
+                        return T
+                    else:
+                        return F
+                transform(circ, tr)
+                if not SAT(circ):
+                    return False
+            return True
+
     # Find recognizable configuration (i.e. uniformly eventually periodic in each orthogonal direction) in self which is not in other
     # The semilinear structure is a periodic rectangular tiling, and the contents of a rectangle depend on which axes its lowest corner lies
     # We could also have the sizes of the rectangles depend on this, but this is simpler for now
@@ -282,16 +328,22 @@ class SFT:
                 return False
         #print("model", m)
         if return_conf:
-            conf = dict()
+            pat = dict()
             for vec in hyperrect(conf_bounds):
                 for node in self.nodes:
                     for sym in self.alph[node][1:]:
                         var = vec + (node, sym)
                         if m.get(var, False):
-                            conf[vec + (node,)] = sym
+                            pat[vec + (node,)] = sym
                             break
                     else:
-                        conf[vec + (node,)] = self.alph[node][0]
+                        pat[vec + (node,)] = self.alph[node][0]
+            #print("making conf from", pat, radii, periodics, self.onesided)
+            if periodics == list(range(self.dim)):
+                # totally periodic configuration
+                conf = PeriodicConf(pat, onesided=self.onesided)
+            else:
+                conf = RecognizableConf(radii, pat, periodics=periodics, onesided=self.onesided)
             return True, conf
         return True
 
@@ -538,6 +590,7 @@ class SFT:
         complemented = NOT(self.circuit.copy())
         #print("complemented", complemented)
         forb_circuits = [complemented]
+        forb_here_circuits = [complemented]
         # note: every forb is forbidden by the untranslated circuit, so it's safe to place anywhere
         for vec in vec_domain:
             #print("implementing forb", forb)
@@ -551,8 +604,11 @@ class SFT:
                         oreds.append(NOT(V(local_vec+(value,))))
                 #print("oreds", oreds)
                 forb_circuits.append(OR(*oreds))
+                if all(c == 0 for c in vec):
+                    forb_here_circuits.append(OR(*oreds))
                 
         add_uniqueness_constraints(self.alph, forb_circuits, all_positions)
+        add_uniqueness_constraints(self.alph, forb_here_circuits, all_positions)
 
         final_circ = AND(*forb_circuits)
         #print("final circ", final_circ)
@@ -597,9 +653,8 @@ class SFT:
         #print("prod", new_forbs)
         for new_forb in product_patterns(new_forbs):
             #print("new forb", new_forb)
-            assert all(forb != new_forb for forb in self.forbs)
-            self.forbs.append(new_forb)
-            #if len(self.forbs) == 2: 1/0
+            if all(forb != new_forb for forb in self.forbs):
+                self.forbs.append(new_forb)
         
         self.deduce_forbs_(vec_domain)
 

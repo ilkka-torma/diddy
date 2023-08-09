@@ -1,9 +1,10 @@
-import general
+from general import *
 import dparser
 import parsy
 
 import compiler
 import sft
+import configuration
 
 import period_automaton
 import density_linear_program
@@ -23,6 +24,7 @@ class Diddy:
         self.blockmaps = {}
         self.TFGs = {}
         self.clopens = {}
+        self.confs = {}
         self.environments = {}
         self.nodes = sft.Nodes([0])
         self.alphabet = {node : [0, 1] for node in self.nodes}
@@ -151,7 +153,14 @@ class Diddy:
 
             elif cmd == "load_environment":
                 name = args[0]
-                self.dim, self.nodes, self.topology, self.alphabet = self.environments[name]
+                if name in self.environments:
+                    self.dim, self.nodes, self.topology, self.alphabet = self.environments[name]
+                elif name in self.SFTs:
+                    the_sft = self.SFTs[name]
+                    self.dim = the_sft.dim
+                    self.nodes = the_sft.nodes
+                    self.topology = the_sft.topology
+                    self.alphabey = the_sft.alph
                     
             elif cmd == "sft":
                 name = args[0]
@@ -178,8 +187,16 @@ class Diddy:
                         sfts.append(self.SFTs[name])
                     except KeyError:
                         raise Exception("{} is not an SFT".format(name))
-                if any((sft.dim, sft.nodes, sft.alph, sft.onesided, sft.topology) != (sfts[0].dim, sfts[0].nodes, sfts[0].alph, sfts[0].onesided, sfts[0].topology) for sft in sfts[1:]):
-                    raise Exception("Incompatible SFTs")
+                first = sfts[0]
+                for other in sfts[1:]:
+                    if first.dim != other.dim:
+                        raise Exception("Incompatible dimensions: {} and {}".format(first.dim, other.dim))
+                    if first.nodes != other.nodes:
+                        raise Exception("Incompatible node sets: {} and {}".format(first.nodes, other.nodes))
+                    if first.alph != other.alph:
+                        raise Exception("Incompatible alphabets: {} and {}".format(first.alph, other.alph))
+                    if first.onesided != other.onesided:
+                        raise Exception("Cannot intersect onesided and twosided SFT")
                 self.SFTs[isect_name] = sft.intersection(*sfts)
 
             elif cmd == "product":
@@ -281,10 +298,12 @@ class Diddy:
                     raise Exception("{} has no forbidden patterns".format(sft_name))
                 periods = args[1]
                 threads = kwds.get("threads", 1)
+                conf_name = kwds.get("conf_name", None)
                 comp_mode = kwds.get("mode", 'S')
                 if comp_mode not in ['Q','S','L']:
-                    print("Unknown mode:", comp_mode)
-                    break
+                    raise Exception("Unknown mode for minimum density: {}".format(comp_mode))
+                if comp_mode == 'L' and conf_name is not None:
+                    raise Exception("No configuration is available with mode L")
                 chunk_size = kwds.get("chunk_size", 200)
                 sym_bound = kwds.get("symmetry", None)
                 if sym_bound is not None and any(n%2 for n in periods[0]):
@@ -295,15 +314,19 @@ class Diddy:
                 verb = "verbose" in flags
                 rot = "rotate" in flags
                 if rot and (the_sft.dim != 2 or periods[0][0] != 0):
-                    print("Rotation only available in 2D and with periods (N,0)")
-                    break
+                    raise Exception("Rotation only available in 2D and with periods (N,0)")
                 print("Computing minimum density for %s restricted to period(s) %s"%(sft_name, periods) + (" using weights {}".format(self.weights) if self.weights is not None else ""))
                 nfa = period_automaton.PeriodAutomaton(the_sft, periods, weights=self.weights, verbose=verb, rotate=rot, sym_bound=sym_bound)
+                border_size = len(the_sft.nodes)*len(nfa.frontier)
+                pmat = nfa.pmat
                 if verbose_here: print("const")
                 nfa.populate(verbose=verb, num_threads=threads, chunk_size=chunk_size, report=print_freq_pop)
                 if verbose_here: print("popula")
                 nfa.minimize(verbose=verb)
                 comps = list(nfa.strong_components())
+                if not comps:
+                    print("No configurations exist with given period(s)")
+                    continue
                 if verbose_here: print("strng com")
                 del nfa
                 min_data = (math.inf,)
@@ -321,13 +344,43 @@ class Diddy:
                         min_data = data
                         min_aut = comp
                 if verbose_here: print("kikek")
-                border_size = len(the_sft.nodes)*len(min_aut.frontier)
                 if comp_mode in 'QS':
                     dens, minlen, stcyc, cyc = min_data
                     true_dens = fractions.Fraction(sum(self.weights[b] if self.weights is not None else b for fr in cyc for b in fr.values()),
                                                         len(cyc)*border_size)
                     print("Density", true_dens, "~", dens/(border_size*min_aut.weight_denominator), "realized by cycle of length", len(cyc))
-                    print([(period_automaton.nvadd(nvec,(tr,)+(0,)*(the_sft.dim-1)),c) for (tr,pat) in enumerate(cyc) for (nvec,c) in sorted(pat.items())])
+                    if conf_name is None:
+                        print([(nvadd(nvec,(tr,)+(0,)*(the_sft.dim-1)),c) for (tr,pat) in enumerate(cyc) for (nvec,c) in sorted(pat.items())])
+                    else:
+                        # TODO: this should be in period_automaton
+                        cycpat = dict()
+                        for (tr, subpat) in enumerate(cyc):
+                            for (nvec, sym) in subpat.items():
+                                nvec = ((nvec[0]+tr)%len(cyc),) + nvec[1:]
+                                cycpat[nvec] = sym
+                        #print("cycpat", list(sorted(cycpat.items())))
+                        conf_periods = []
+                        for i in reversed(range(1, the_sft.dim)):
+                            running_lcm = math.lcm(len(cyc), pmat[i-1][i])
+                            for (j, per) in enumerate(conf_periods, start=1):
+                                running_lcm = math.lcm(running_lcm, per, pmat[i-1][the_sft.dim-j])
+                            conf_periods.append(running_lcm)
+                        #print("cycpat", cycpat)
+                        conf_periods = [len(cyc)] + conf_periods[::-1]
+                        #print("cpers", conf_periods)
+                        #print("pmat", pmat)
+                        pat = dict()
+                        for vec in hyperrect([(0,per) for per in conf_periods]):
+                            patvec = vec
+                            for i in range(1, the_sft.dim):
+                                nper = vec[i]//pmat[i-1][i]
+                                vec = tuple(a-nper*c for (a,c) in zip(vec, pmat[i-1]))
+                            #print(vec[0])
+                            vec = (vec[0]%len(cyc),) + vec[1:]
+                            #print("patvec", patvec, "into vec", vec)
+                            for node in the_sft.nodes:
+                                pat[patvec + (node,)] = cycpat[vec + (node,)]
+                        self.confs[conf_name] = configuration.PeriodicConf(pat)
                 else:
                     dens, minlen, _ = min_data
                     print("Density", dens/(border_size*min_aut.weight_denominator), "realized by cycle of length", minlen, "in minimized automaton")
@@ -394,6 +447,16 @@ class Diddy:
                 print(formula)
                 print()
 
+            elif cmd == "show_conf" and mode == "report":
+                name = args[0]
+                hide_contents = "hide_contents" in flags
+                if name in self.confs:
+                    conf = self.confs[name]
+                else:
+                    raise Exception("No configuration named %s" % name)
+                print(conf.display_str(hide_contents=hide_contents))
+                print()
+
             elif cmd == "equal":
                 name1 = args[0]
                 name2 = args[1]
@@ -424,11 +487,18 @@ class Diddy:
                 item2 = args[1]
                 expect = kwds.get("expect", None)
                 method = kwds.get("method", "periodic")
+                conf_name = kwds.get("conf_name", None)
                 verb = "verbose" in flags
                 if item1 in self.SFTs:
                     SFT1 = self.SFTs[item1]
-                    SFT2 = self.SFTs[item2]
-                    report_SFT_contains((item1, SFT1), (item2, SFT2), mode=mode, truth=expect, method=method, verbose=verb)
+                    if item2 in self.SFTs:
+                        SFT2 = self.SFTs[item2]
+                        conf = report_SFT_contains((item1, SFT1), (item2, SFT2), mode=mode, truth=expect, method=method, verbose=verb)
+                        if conf_name is not None and conf is not None:
+                            self.confs[conf_name] = conf
+                    elif item2 in self.confs:
+                        conf = self.confs[item2]
+                        report_SFT_in((item1, SFT1), (item2, conf), mode=mode, truth=expect)
                 else:
                     clopen1 = self.clopens[item1]
                     clopen2 = self.clopens[item2]
@@ -639,6 +709,12 @@ class Diddy:
                 node_offsets = {node: tuple(float(a) for a in vec) for (node, vec) in node_offsets.items()}
                 pictures = kwds.get("pictures", None)
                 gridmoves = [tuple(map(float, move)) for move in kwds.get("gridmoves", self.tiler_gridmoves)]
+                conf_name = kwds.get("initial", None)
+                if conf_name is not None:
+                    try:
+                        conf = self.confs[conf_name]
+                    except KeyError:
+                        raise Exception("No configuration named {}".format(conf_name))
                 print(gridmoves)
                 print(self.tiler_gridmoves)
                 SFT = self.SFTs[name]
@@ -648,7 +724,7 @@ class Diddy:
                 else:
                     topology = self.environments[topo_name][2]
                 colors = kwds.get("colors", None)
-                tiler.run(SFT, topology, gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic, pictures, colors)
+                tiler.run(SFT, topology, gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic, pictures, colors, initial=conf)
                 #tiler.run(SFT, self.topology, gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic, pictures)
             
             elif cmd == "entropy_upper_bound":
@@ -901,7 +977,7 @@ def forbos_to_formula(fof):
     ret = preamble + (("AND",) + tuple(andeds),)
     #print(ret, "MIL")
     return ret
-        
+
 def report_SFT_contains(a, b, mode="report", truth=True, method=None, verbose=False):
     aname, aSFT = a
     bname, bSFT = b
@@ -914,12 +990,12 @@ def report_SFT_contains(a, b, mode="report", truth=True, method=None, verbose=Fa
     else:
         print("%s DOES NOT CONTAIN %s (radius %s, time %s)" % (aname, bname, rad, tim))
         if mode == "report":
-            print("Separating {} configuration:".format(method))
-            print(conf)
+            print("Separated by " + conf.display_str())
     print()
     if mode == "assert":
         print(res, truth)
         assert res == (truth == "T")
+    return conf
 
 def report_SFT_equal(a, b, mode="report", truth=True, method=None, verbose=False):
     aname, aSFT = a
@@ -932,6 +1008,22 @@ def report_SFT_equal(a, b, mode="report", truth=True, method=None, verbose=False
         print("They are EQUAL (radius %s, time %s)." % (rad, tim))
     else:
         print("They are DIFFERENT (radius %s, time %s)." % (rad, tim))
+    print()
+    if mode == "assert":
+        print(res, truth)
+        assert res == (truth == "T")
+
+def report_SFT_in(a, b, mode="report", truth=True):
+    aname, aSFT = a
+    bname, bconf = b
+    print("Testing whether SFT %s contains configuration %s." % (aname, bname))
+    tim = time.time()
+    res = bconf in aSFT
+    tim = time.time() - tim
+    if res: 
+        print("It DOES (time %s)." % tim)
+    else:
+        print("It DOES NOT (time %s)." % tim)
     print()
     if mode == "assert":
         print(res, truth)
