@@ -789,7 +789,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                         #    print(grid[(x,y,n)], "!=", UNKNOWN)
                         elif grid[(x,y,nodes[n])][0] == DEDUCED:
                             #print(alphabets[nodes[n]])
-                            sym = grid[(x,y,nodes[n])]
+                            sym = grid[(x,y,nodes[n])][1]
                             #sym = alphabets[nodes[n]][symidx]
                             #color = colors[grid[(x,y,nodes[n])][1]] #deduced_colors[sym]
                             color = colors[nodes[n], sym]

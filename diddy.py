@@ -715,6 +715,8 @@ class Diddy:
                         conf = self.confs[conf_name]
                     except KeyError:
                         raise Exception("No configuration named {}".format(conf_name))
+                else:
+                    conf = None
                 print(gridmoves)
                 print(self.tiler_gridmoves)
                 SFT = self.SFTs[name]
