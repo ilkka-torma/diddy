@@ -276,7 +276,7 @@ topology_keyword = lexeme(p.regex(r'line|grid|square|squaregrid|king|kinggrid|tr
 def set_arg_value():
     arg_name = yield label
     yield p.string('=')
-    arg_value = yield fraction | label | nested_list | nested_mapping(label | integer, flat_value | nested_list)
+    arg_value = yield fraction | label | nested_list | nested_mapping(node_name | label | integer, flat_value | nested_list)
     return (arg_name, arg_value)
     
 # Node name: period-separated sequence of labels

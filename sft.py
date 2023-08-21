@@ -799,6 +799,7 @@ class SFT:
         return not (m == False)
 
 def intersection(*sfts):
+    assert all(node in sfts[0].nodes for other in sfts[1:] for node in other.nodes)
     circuit = AND(*(sft.circuit.copy() for sft in sfts))
     return SFT(sfts[0].dim, sfts[0].nodes, sfts[0].alph, sfts[0].topology, circuit=circuit, onesided=sfts[0].onesided)
 

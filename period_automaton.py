@@ -307,7 +307,7 @@ class PeriodAutomaton:
             while True:
                 if verbose:
                     i += 1
-                    print("{}: {} states separated.".format(i, num_colors))
+                    print("sub-round {}: {} states separated.".format(i, num_colors))
                 # First, use tuples of colors as new colors
                 new_coloring = {}
                 new_colors = set()
@@ -728,8 +728,9 @@ class PeriodAutomaton:
                         new_state = 0
                         for (forb, tr) in new_pairs:
                             ix = self.border_forbs.index(forb)
-                            new_state += 2**(numf*tr + ix)   
-                    if self.s2idict[new_state] == bix:
+                            new_state += 2**(numf*tr + ix)
+                    # note: new_state may be in a different component
+                    if new_state in self.s2idict and self.s2idict[new_state] == bix:
                         labels.append(new_front)
                         try:
                             i = states.index(new_state)
@@ -807,13 +808,15 @@ class PeriodAutomaton:
                             aut.weight_numerators = self.weight_numerators
                             aut.weight_denominator = self.weight_denominator
 
-                            idict = {ix:i for (i,ix) in
-                                     enumerate(ix for ix in set(self.s2idict.values()) if ix in comp)}
+                            #idict = {ix:i for (i,ix) in
+                            #         enumerate(ix for ix in set(self.s2idict.values()) if ix in comp)}
+                            idict = {ix:i for (i,ix) in enumerate(comp)}
                             aut.s2idict = {st:idict[ix] for (st, ix) in self.s2idict.items() if ix in comp}
+                            aut.i2sdict = {ix:st for (st,ix) in aut.s2idict.items()}
                             aut.states = set(aut.s2idict)
-                            aut.trans = {aut.s2idict[self.i2sdict[st]] : {aut.s2idict[self.i2sdict[st2]] : c
-                                                                          for (st2, c) in self.trans[st].items()
-                                                                          if st2 in comp}
+                            aut.trans = {idict[st] : {idict[st2] : c
+                                                      for (st2, c) in self.trans[st].items()
+                                                      if st2 in comp}
                                          for st in comp}
 
                             #print("old s2idict",self.s2idict)

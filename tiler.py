@@ -287,6 +287,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
     #print("mus")
     global nodes
     nodes = list(the_SFT.nodes) #list(n for n in the_SFT.nodes)
+    if any(node in nodeoffsets for node in nodes) and any(node not in nodeoffsets for node in nodes):
+        raise Exception("All or none of nodes should have offsets specified")
     runningoffset = 0
     for n in nodes:
         if n not in nodeoffsets:
