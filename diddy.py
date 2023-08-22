@@ -333,7 +333,7 @@ class Diddy:
                 min_aut = None
                 for (ic, comp) in enumerate(comps):
                     if verb:
-                        print("Component {}/{}".format(ic+1, len(comps)))
+                        print("Component {}/{} ({} states)".format(ic+1, len(comps), len(comp.trans)))
                     if comp_mode == 'Q':
                         data = comp.square_min_density_cycle(verbose=verb, num_threads=threads, report=print_freq_cyc)
                     elif comp_mode == 'S':

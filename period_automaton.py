@@ -7,7 +7,7 @@ import sys
 import pickle
 import argparse
 import fractions
-#import frozendict as fd
+import frozendict as fd
 from sft import *
 
 class CompMode(Enum):
@@ -32,19 +32,24 @@ def hyperrectangle(heights):
             for coord in range(heights[0]):
                 yield (coord,) + vec
 
-def pats(domain, alph):
-    if not domain:
+def pats(domain, alph, forbs, i=0):
+    if i >= len(domain):
         yield dict()
     else:
-        nvec = domain.pop()
-        for pat in pats(domain, alph):
+        nvec = domain[i]
+        for pat in pats(domain, alph, forbs, i=i+1):
             for c in alph[nvec[-1]][:-1]:
                 pat2 = pat.copy()
                 pat2[nvec] = c
-                yield pat2
+                if all(any(pat2.get(v, None) != c
+                           for (v, c) in forb.items())
+                       for forb in forbs):
+                    yield pat2
             pat[nvec] = alph[nvec[-1]][-1]
-            yield pat
-        domain.add(nvec)
+            if all(any(pat.get(v, None) != c
+                       for (v, c) in forb.items())
+                   for forb in forbs):
+                yield pat
         
 def gcd_bezout(nums):
     "Return the pair (gcd, bezout_coefficients)"
@@ -157,7 +162,7 @@ class PeriodAutomaton:
                     new_forb = {(nvec[0]+tr,)+nvec[1:] : c for (nvec, c) in new_forb.items()}
                 if good and new_forb not in self.border_forbs:
                     self.border_forbs.append(new_forb)
-        self.node_frontier = set(nvec+(q,) for nvec in self.frontier for q in self.sft.nodes)
+        self.node_frontier = list(sorted(nvec+(q,) for nvec in self.frontier for q in self.sft.nodes))
         self.states = set([0])
         self.trans = dict()
         if verbose:
@@ -665,6 +670,7 @@ class PeriodAutomaton:
         self.compute_i2sdict()
         labels = []
         states = [self.i2sdict[cycle_as_states[0]]]
+        frontier = self.node_frontier
         if self.rotate:
             heights = [self.pmat[i][i+1] for i in range(len(self.pmat))]
         s = 1
@@ -682,8 +688,18 @@ class PeriodAutomaton:
                     shifted.append((self.border_forbs[ix], tr+1))
                 n = n//2
                 i += 1
-            frontier = set(self.node_frontier)
-            for new_front in pats(frontier, self.sft.alph):
+            pat_forbs = set()
+            for (forb, tr) in shifted:
+                pat_forb = dict()
+                for (nvec, c) in forb.items():
+                    if nvec[0]-tr > border_at(self.pmat, nvec[1:-1]):
+                        break
+                    tr_nvec = (nvec[0]-tr,) + nvec[1:]
+                    if tr_nvec in frontier:
+                        pat_forb[tr_nvec] = c
+                else:
+                    pat_forbs.add(fd.frozendict(pat_forb))
+            for new_front in pats(frontier, self.sft.alph, pat_forbs):
                 try:
                     if weighted_sum(self.weight_numerators, new_front.values()) != self.trans[self.s2idict[a]][bix]:
                         continue
@@ -700,7 +716,7 @@ class PeriodAutomaton:
                         x = nvec[0]
                         ys = nvec[1:-1]
                         q = nvec[-1]
-                        if x-tr >= border_at(self.pmat, ys)+1:
+                        if x-tr > border_at(self.pmat, ys):
                             over = True
                         if new_front.get(wrap(self.pmat, (x-tr,)+ys+(q,)), c) != c:
                             # this forb can be discarded
@@ -739,7 +755,7 @@ class PeriodAutomaton:
                             states.append(new_state)
                             break
             else:
-                print(a,b,self.trans)
+                print(a,self.s2idict[a],bix,self.trans)
                 raise Exception("bad cycle, no transition")
             s += 1
 
@@ -854,7 +870,18 @@ def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_
                     shifted.append((border_forbs[ix], tr+1))
                 n = n//2
                 i += 1
-            for new_front in pats(frontier, alph):
+            pat_forbs = set()
+            for (forb, tr) in shifted:
+                pat_forb = dict()
+                for (nvec, c) in forb.items():
+                    if nvec[0]-tr > border_at(pmat, nvec[1:-1]):
+                        break
+                    tr_nvec = (nvec[0]-tr,) + nvec[1:]
+                    if tr_nvec in frontier:
+                        pat_forb[tr_nvec] = c
+                else:
+                    pat_forbs.add(fd.frozendict(pat_forb))
+            for new_front in pats(frontier, alph, pat_forbs):
                 new_pairs = []
                 sym_pairs = dict()
                 for pair in shifted:
@@ -864,7 +891,7 @@ def populate_worker(pmat, alph, border_forbs, frontier, sym_bound, rotate, task_
                         x = nvec[0]
                         ys = nvec[1:-1]
                         q = nvec[-1]
-                        if x-tr >= border_at(pmat, ys)+1:
+                        if x-tr > border_at(pmat, ys):
                             over = True
                         #print("did", x-tr, ys, q, (x-tr,)+ys+(q,))
                         if new_front.get(wrap(pmat, (x-tr,)+ys+(q,)), c) != c:
