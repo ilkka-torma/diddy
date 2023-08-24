@@ -1036,12 +1036,15 @@ def report_blockmap_equal(a, b, mode="report", truth=True, verbose=False): # ver
     bname, bmap = b
     print("Testing whether block maps %s and %s are equal." % (aname, bname))
     tim = time.time()
-    res = amap == bmap
+    diff = amap.separating(bmap)
     tim = time.time() - tim
-    if res: 
+    if diff is None:
         print("They are EQUAL (time %s)." % (tim))
     else:
         print("They are DIFFERENT (time %s)." % (tim))
+        (node, value), pattern = diff
+        print("Separated by pattern with return value {} on node {}:".format(value, node))
+        print(pattern)
     print()
     if mode == "assert":
         print(res, truth)

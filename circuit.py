@@ -689,7 +689,7 @@ def models_under(C1, C2, under, return_sep = False):
 
     C1 = AND(C1, under([C1, C2]))
 
-    return models(C1, C2)
+    return models(C1, C2, return_sep)
 
 """
 C1 and C2 are lists of circuits

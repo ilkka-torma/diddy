@@ -161,6 +161,26 @@ class BlockMap:
                 return False
         return True
 
+    def separating(self, other):
+        "Return a witness for inequality, or None if one does not exist"
+        for ns in self.circuits:
+            #print(ns)
+            ldac = LDAC2(self.from_alphabet) #lambda a: last_diff_and_count(a, len(self.to_alphabet))
+            diff = equivalent_under(self.circuits[ns], other.circuits[ns], ldac, return_sep=True)
+            if diff != True:
+                pat = dict()
+                domain = set(var[:-2] for var in diff)
+                for vec in domain:
+                    for node in self.from_nodes:
+                        for sym in self.from_alphabet[node][1:]:
+                            if diff.get(vec+(node,sym), False):
+                                pat[vec+(node,)] = sym
+                                break
+                        else:
+                            pat[vec+(node,)] = self.from_alphabet[node][0]
+                return (ns, pat)
+        return None
+
     def injective_to_ball(self, r):
         # two circuits per position per letter
         # force images same
