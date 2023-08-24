@@ -779,7 +779,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                         continue
                     else:
 
-                        sym = None
+                        sym_ix = None
                         #if grid[(x,y,n)] != UNKNOWN:
                         #    print (grid[(x,y,n)],  DEDUCED)
 
@@ -791,17 +791,17 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                         #    print(grid[(x,y,n)], "!=", UNKNOWN)
                         elif grid[(x,y,nodes[n])][0] == DEDUCED:
                             #print(alphabets[nodes[n]])
-                            sym = grid[(x,y,nodes[n])][1]
+                            sym_ix = grid[(x,y,nodes[n])][1]
                             #sym = alphabets[nodes[n]][symidx]
                             #color = colors[grid[(x,y,nodes[n])][1]] #deduced_colors[sym]
-                            color = colors[nodes[n], sym]
+                            color = colors[nodes[n], the_SFT.alph[nodes[n]][sym_ix]]
                         elif grid[(x,y,nodes[n])][0] == SET:
-                            sym = grid[(x,y,nodes[n])][1]
+                            sym_ix = grid[(x,y,nodes[n])][1]
                             #print(alphabets, nodes[n], sym, colors)
                             #sym = alphabets[nodes[n]][symidx]
                             #print(sym)
                             #color = colors[grid[(x,y,nodes[n])][1]]
-                            color = colors[nodes[n], sym]
+                            color = colors[nodes[n], the_SFT.alph[nodes[n]][sym_ix]]
                             white_circle = True
 
                         #if (x, y, n) in vemmel:
@@ -825,7 +825,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                         if not drawing_picture or True: # actually I like the circles
                             pygame.draw.circle(screen, color, cp_to_screen(p), nodesize)
 
-                        if show_labels and not drawing_picture and sym != None:
+                        if show_labels and not drawing_picture and sym_ix != None:
                             #print(sym, color)
                             col = (255, 255, 255)
                             if sum(color) > 250:
@@ -833,12 +833,12 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                             
                             # write name of node, or draw picture
                             if pictures == None or nodes[n] not in pictures:
-                                font_surf = my_font.render(str(sym), False, col)
+                                font_surf = my_font.render(str(the_SFT.alph[nodes[n]][sym_ix]), False, col)
                                 v = (font_surf.get_width()//2, -font_surf.get_height()//2)
                                 screen.blit(font_surf, cp_to_screen(vsub(p, v)))
                                 
                         if sym != None and drawing_picture:
-                            pic = pictures[nodes[n]][symidx]
+                            pic = pictures[nodes[n]][sym_ix]
                             pic = pygame.transform.scale(pic, (nodesize*2, nodesize*2))
                             v = (pic.get_width()//2, -pic.get_height()//2)
                             screen.blit(pic, cp_to_screen(vsub(p, v)))
