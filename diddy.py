@@ -1047,8 +1047,8 @@ def report_blockmap_equal(a, b, mode="report", truth=True, verbose=False): # ver
         print(pattern)
     print()
     if mode == "assert":
-        print(res, truth)
-        assert res == (truth == "T")
+        print(diff is None, truth)
+        assert (diff is None) == (truth == "T")
 
 
 line = [("rt", (0,0), (1,0)),
