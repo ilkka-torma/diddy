@@ -443,6 +443,41 @@ class SFT:
         #print("mmmm", mm)
         return mm
 
+    def all_periodics(self, periods, existing=None):
+        if existing is None:
+            existing = dict()
+
+        
+        all_positions = set(hyperrect([(0,p) for p in periods]))
+        nvecs = set(vec + (node,)
+                    for vec in all_positions
+                    for node in self.nodes)
+        
+        circuits = []
+        for vec in all_positions:
+            circ = self.circuit.copy()
+            transform(circ, lambda var: nvmods(periods, nvadd(var[:-1], vec)) + var[-1:])
+            circuits.append(circ)
+
+        for (nvec, sym) in existing.items():
+            if sym == self.alph[nvec[-1]][0]:
+                circuits.extend(NOT(V(nvec+(a,))) for a in self.alph[nvec[-1]][1:])
+            else:
+                circuits.append(V(nvec+(sym,)))
+
+        add_uniqueness_constraints(self.alph, circuits, nvecs)
+
+        for model in projections(AND(*circuits), [nvec+(sym,) for nvec in nvecs for sym in self.alph[nvec[-1]][1:]]):
+            pat = dict()
+            for nvec in nvecs:
+                for sym in self.alph[nvec[-1]][1:]:
+                    if model[nvec+(sym,)]:
+                        pat[nvec] = sym
+                        break
+                else:
+                    pat[nvec] = self.alph[nvec[-1]][0]
+            yield pat
+    
     # domain is a collection of nodevectors
     def all_patterns(self, domain, existing=None, extra_rad=0):
 
