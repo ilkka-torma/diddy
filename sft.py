@@ -525,42 +525,6 @@ class SFT:
             for q in sorted(p):
                 s.append(p[q])
             yield tuple(s)
-            
-    # domain is a collection of nodevectors
-    def all_periodic_points(self, dims, existing=None):
-
-        if existing is None:
-            existing = dict()
-        
-        domain = set([tuple()])
-        for h in dims:
-            domain = set(vec + (i,) for vec in domain for i in range(h))
-        domain = set(vec + (n,) for vec in domain for n in self.nodes)
-        
-        circuits = []
-        for vec in domain:
-            circ = self.circuit.copy()
-            transform(circ, lambda var: nvmods(dims, nvadd(var[:-1], vec)) + var[-1:])
-            circuits.append(circ)
-            
-        for (nvec, sym) in existing.items():
-            if sym == self.alph[nvec[-1]][0]:
-                circuits.extend(NOT(V(nvec+(a,))) for a in self.alph[nvec[-1]][1:])
-            else:
-                circuits.append(V(nvec+(sym,)))
-
-        add_uniqueness_constraints(self.alph, circuits, domain)
-
-        for model in projections(AND(*circuits), [nvec+(sym,) for nvec in domain for sym in self.alph[nvec[-1]][1:]]):
-            pat = dict()
-            for nvec in domain:
-                for sym in self.alph[nvec[-1]][1:]:
-                    if model[nvec+(sym,)]:
-                        pat[nvec] = sym
-                        break
-                else:
-                    pat[nvec] = self.alph[nvec[-1]][0]
-            yield pat
 
     def deduce_circuit(self):
         if self.circuit is None:
