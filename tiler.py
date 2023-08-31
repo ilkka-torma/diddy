@@ -837,7 +837,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                                 v = (font_surf.get_width()//2, -font_surf.get_height()//2)
                                 screen.blit(font_surf, cp_to_screen(vsub(p, v)))
                                 
-                        if sym != None and drawing_picture:
+                        if sym_ix != None and drawing_picture:
                             pic = pictures[nodes[n]][sym_ix]
                             pic = pygame.transform.scale(pic, (nodesize*2, nodesize*2))
                             v = (pic.get_width()//2, -pic.get_height()//2)
