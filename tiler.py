@@ -398,15 +398,16 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
 
     thred = None
 
-    filename_box = pygame_gui.elements.UITextEntryLine(pygame.Rect((10, 160), (100, 50)),
+    hh = 220
+    filename_box = pygame_gui.elements.UITextEntryLine(pygame.Rect((10, hh), (100, 50)),
                                                         manager=manager,
                                                         object_id="#filename")
     filename_box.set_text("conf")
 
-    save_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((10, 220), (60, 50)),
+    save_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((10, hh+40), (60, 50)),
                                              text='save',
                                              manager=manager)
-    load_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((70, 220), (60, 50)),
+    load_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((70, hh+40), (60, 50)),
                                              text='load',
                                              manager=manager)
 
@@ -853,7 +854,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                 draw_msg = ["Drawing {}".format(drawcolor)]
             draw_msg.append("Draw: left mouse button")
             draw_msg.append("Select symbol: number keys")
-            draw_msg.append("Select unknown symbol: u")
+            draw_msg.append("Select <unknown symbol>: u")
+            draw_msg.append("Select <erase node>]: backspace")
             draw_msg.append("Pan: arrow keys")
             draw_msg.append("Zoom: az")
             draw_msg.append("Node size: sx")
