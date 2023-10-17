@@ -3,6 +3,7 @@ import math
 import compiler
 import sft
 import pygame
+import configuration
 #import pygame_textinput
 import pygame_gui
 import time
@@ -93,8 +94,9 @@ def deduce_a_tiling(grid, the_SFT, x_period, y_period):
         if grid[g] != UNKNOWN and grid[g][0] == DEDUCED:
             grid[g] = UNKNOWN
 
-    known_values = {}
-    domain = set()
+    pat = {}
+    
+    #print("grid", grid)
     for g in grid:
         if the_SFT.dim == 1 and g[1] != 0:
             continue
@@ -108,45 +110,38 @@ def deduce_a_tiling(grid, the_SFT, x_period, y_period):
                 print(grid[g])
                 a = bbb
             if the_SFT.dim == 1:
-                known_values[(g[0], g[-1])] = val
+                pat[(g[0], g[-1])] = val
             else:
                 #known_values[flipy(g)] = val
-                known_values[g] = val
-                
-            #print("knowing", val, "at", g)
-        if the_SFT.dim == 1:
-            domain.add((g[0],))
+                pat[g] = val
+            #print("known", g, val)
+        elif the_SFT.dim == 1:
+            pat[(g[0], g[-1])] = None
         else:
             #domain.add(flipy(g[:-1]))
-            domain.add(g[:-1])
+            pat[g] = None
+            #print("unknown", g)
             
     #print("domain", domain)
     #print("known", known_values)        
 
     #print("deducing model")
     
+    conf = configuration.RecognizableConf([x_period, y_period], pat)
+    #print("tiler deducing", conf.display_str())
 
-    model = the_SFT.deduce(known_values, domain, periods=[x_period, y_period])
+    model = the_SFT.deduce_global(conf)
 
-    #print("model found")
+    #print("model found", model.display_str())
 
     if model == None:
         currentstate = TILING_BAD
     else:
         currentstate = TILING_OK
 
-        for d in model:
-            if the_SFT.dim == 1:
-                dd = (d[0], 0, d[-1])
-            else:
-                dd = d #flipy(d)
-            #print(d, "in model", grid[dd])
-                
-            # grid may not contain all nodes of all cells, but deduction uses all in each cell
-            if dd not in grid:
-                continue
-            if grid[dd] == UNKNOWN:
-                val = model[d]
+        for g in grid:
+            if grid[g] == UNKNOWN:
+                val = model[g]
                 #print("model maps", d, "to", val)
                 
                 if val != None:
@@ -154,9 +149,9 @@ def deduce_a_tiling(grid, the_SFT, x_period, y_period):
                     #here c {('D', 0): ['a', 'b', 'c'], ('C', 0): [0, 1]} (10, 10, ('C', 0))
 
                     #print("here", val, the_SFT.alph, d)
-                    grid[dd] = (DEDUCED, the_SFT.alph[d[-1]].index(val))
+                    grid[g] = (DEDUCED, the_SFT.alph[g[-1]].index(val))
                 else:
-                    grid[dd] = UNKNOWN
+                    grid[g] = UNKNOWN
                 #print(d, "in model", grid[dd])
 
 def vadd(u, v):
