@@ -2,7 +2,7 @@ from general import *
 
 # Markers are used to structure recognizable configurations
 # Markers for a single axis can be given as
-# a) None (equivalent to (min-1,min,max+1,max+2))
+# a) None (equivalent to (min-1,min,max+1,max+2) with padded nonexisting nodes)
 # b) integer n (equivalent to (0,0,n,n))
 # c) pair (a,b) (equivalent to (a,a,b,b))
 # d) triple (a,b,c) (equivalent to (a,b,b,c)
@@ -61,11 +61,8 @@ class Conf:
     """
     A recognizable configuration of some full shift,
     possibly with missing and/or indeterminate values.
-    A missing value (i.e. node where the local rule is not checked)
-    is modeled as a value not in the internal pattern.
-    Use "nvec in conf" or catch a KeyError to test for it.
-    An indeterminate value is modeled as a list of possible values,
-    or None as a shorthand for an unrestricted value.
+    A missing value (i.e. node where the local rule is not checked) is modeled as None.
+    An indeterminate value is modeled as a list of possible values.
     """
 
     def __init__(self, onesided=None):
@@ -85,7 +82,7 @@ class Conf:
 class RecognizableConf(Conf):
     "A recognizable configuration"
 
-    def __init__(self, markers, pat, onesided=None):
+    def __init__(self, markers, pat, nodes, onesided=None):
         super().__init__(onesided)
         # markers is a list of (possibly not normalized) markers
         # pat is a dict from nvecs to symbols
@@ -108,22 +105,20 @@ class RecognizableConf(Conf):
                         
         #print("normalized markers to", self.markers)
         
-        self.pat = dict()
+        self.pat = {vec+(node,) : None
+                    for vec in hyperrect([(a,d) for (a,_,_,d) in self.markers])
+                    for node in nodes}
         
         for (nvec, sym) in pat.items():
             self.pat[nvwraps(self.markers, nvec)] = sym
 
     def __getitem__(self, nvec):
+        #print("getting", nvec, "from", self.pat, "markers", self.markers)
         return self.pat[nvwraps(self.markers, nvec)]
-        
-    def __contains__(self, nvec):
-        return nvwraps(self.markers, nvec) in self.pat
         
     def can_be_equal_at(self, *nvecs):
         "Check if values are equal in these nodes; nonexistent nodes are equal."
         #print("equal at", nvecs)
-        if any(nvec not in self for nvec in nvecs):
-            return all(nvec not in self for nvec in nvecs)
         if not nvecs:
             return True
         return all(self[nvec] == self[nvecs[0]] for nvec in nvecs[1:])
@@ -197,15 +192,12 @@ class RecognizableConf(Conf):
         for vec in hyperrect([(a,d) for (a,_,_,d) in new_markers]):
             for node in nodes:
                 nvec = vec + (node,)
-            try:
                 new_pat[nvec] = self[nvec]
-            except KeyError:
-                pass
         
-        return RecognizableConf(new_markers, new_pat, onesided=self.onesided)
+        return RecognizableConf(new_markers, new_pat, nodes, onesided=self.onesided)
 
     def display_str(self, hide_contents=False):
         s = "recognizable configuration with markers {}".format(self.markers)
         if not hide_contents:
-            s += ":\n{" + ", ".join(["{}: {}".format(nvec, sym) for (nvec, sym) in sorted(self.pat.items())]) + "}"
+            s += ":\n{" + ", ".join(["{}: {}".format(nvec, '_' if sym is None else sym) for (nvec, sym) in sorted(self.pat.items())]) + "}"
         return s

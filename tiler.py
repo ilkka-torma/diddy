@@ -116,10 +116,10 @@ def deduce_a_tiling(grid, the_SFT, x_period, y_period):
                 pat[g] = val
             #print("known", g, val)
         elif the_SFT.dim == 1:
-            pat[(g[0], g[-1])] = None
+            pat[(g[0], g[-1])] = list(the_SFT.alph[g[-1]])
         else:
             #domain.add(flipy(g[:-1]))
-            pat[g] = None
+            pat[g] = list(the_SFT.alph[g[-1]])
             #print("unknown", g)
             
     #print("domain", domain)
@@ -127,7 +127,7 @@ def deduce_a_tiling(grid, the_SFT, x_period, y_period):
 
     #print("deducing model")
     
-    conf = configuration.RecognizableConf([x_period, y_period], pat)
+    conf = configuration.RecognizableConf([x_period, y_period], pat, the_SFT.nodes)
     #print("tiler deducing", conf.display_str())
 
     model = the_SFT.deduce_global(conf)

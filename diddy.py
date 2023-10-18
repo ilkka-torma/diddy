@@ -380,7 +380,7 @@ class Diddy:
                             #print("patvec", patvec, "into vec", vec)
                             for node in the_sft.nodes:
                                 pat[patvec + (node,)] = cycpat[vec + (node,)]
-                        self.confs[conf_name] = configuration.RecognizableConf(conf_periods, pat)
+                        self.confs[conf_name] = configuration.RecognizableConf(conf_periods, pat, the_sft.nodes)
                 else:
                     dens, minlen, _ = min_data
                     print("Density", dens/(border_size*min_aut.weight_denominator), "realized by cycle of length", minlen, "in minimized automaton")

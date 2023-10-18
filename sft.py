@@ -327,14 +327,14 @@ class SFT:
                             break
                     else:
                         pat[vec + (node,)] = self.alph[node][0]
-            print("making separating conf from", pat, radii, periodics, self.onesided)
+            #print("making separating conf from", pat, radii, periodics, self.onesided)
             markers = []
             for (i,r) in enumerate(radii):
                 if i in periodics:
                     markers.append((0,0, r,r))
                 else:
                     markers.append((-r,0,r,2*r))
-            conf = RecognizableConf(markers, pat, onesided=self.onesided)
+            conf = RecognizableConf(markers, pat, self.nodes, onesided=self.onesided)
             return True, conf
         return True
 
@@ -403,9 +403,8 @@ class SFT:
             for vec in hyperrect([(-i,i+1) for _ in range(self.dim)]):
                 for node in self.nodes:
                     nvec = vec + (node,)
-                    if nvec in conf:
-                        filled[nvec] = conf[nvec]
-            finite_conf = RecognizableConf(None, filled)
+                    filled[nvec] = conf[nvec]
+            finite_conf = RecognizableConf(None, filled, self.nodes)
             #print("finite_conf", finite_conf.display_str())
             if self.deduce(finite_conf) is None:
                 break
@@ -425,7 +424,7 @@ class SFT:
         #print("diff_vecs", list(sorted(diff_vecs)))
         #print("vec_domain", list(sorted(vec_domain)))
         #print("deducing from", conf.display_str())
-        unknowns = set(nvec for (nvec, sym) in conf.pat.items() if sym is None or type(sym) == list)
+        unknowns = set(nvec for (nvec, sym) in conf.pat.items() if type(sym) == list)
         
         #print("vec_domain", vec_domain)
         #print("unknowns", unknowns)
@@ -437,7 +436,7 @@ class SFT:
         for vec in vec_domain:
             circ = self.circuit.copy()
             transform(circ, lambda var: nvwraps(conf.markers, nvadd(var[:-1], vec)) + var[-1:])
-            if all(var[:-1] in conf for var in circ.get_variables()):
+            if all(conf[var[:-1]] is not None for var in circ.get_variables()):
                 circuits[vec] = circ
                 
         #print("circuits", list(sorted(circuits.keys())))
@@ -462,22 +461,25 @@ class SFT:
 
         # Make SAT instance, solve and extract model
         instance = AND(*(list(circuits) + list(forceds)))
-        m = SAT(instance, True)
-        if m == False:
+        model = SAT(instance, True)
+        if model == False:
             return None
 
         # Produce pattern from model
+        #print("model", model)
         pat = {}
-        for vec in vec_domain:
-            for node in self.nodes:
+        for nvec in conf.pat:
+            if conf[nvec] is None:
+                pat[nvec] = None
+            else:
                 for sym in self.alph[node][1:]:
-                    if vec + (node,sym) in m and m[vec + (node,sym)]:
-                        pat[vec+(node,)] = sym
+                    if nvec + (sym,) in model and model[nvec + (sym,)]:
+                        pat[nvec] = sym
                         break
                 else:
-                    pat[vec+(node,)] = self.alph[node][0]
+                    pat[nvec] = self.alph[node][0]
         #print("final pat", pat)
-        return RecognizableConf(conf.markers, pat, onesided=conf.onesided)
+        return RecognizableConf(conf.markers, pat, self.nodes, onesided=conf.onesided)
 
     def all_periodics(self, periods, existing=None):
         if existing is None:
