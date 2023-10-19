@@ -4,6 +4,7 @@ import compiler
 import sft
 import pygame
 import configuration
+from tiler_backend import *
 #import pygame_textinput
 import pygame_gui
 import time
@@ -267,6 +268,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
 
     if initial is not None and dimension != initial.dim:
         raise Exception("Dimension mismatch between tiler and initial configuration: {} vs {}".format(dimension, initial.dim))
+        
+    
 
     #if dimension == 2:
     #y_range = list(range(-r, r+1))
@@ -342,6 +345,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
     
     camera = (x_size/2, y_size/2) # where we looking; center of screen is here
     zoom = (40, 40*skew) # how big are cells basically
+    
     global screenwidth, screenheight
     screenwidth = 700
     screenheight = 500
@@ -349,19 +353,22 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
     pygame.font.init() 
     my_font = pygame.font.SysFont('Consolas', 30)
     msg_font = pygame.font.SysFont('Consolas', 15)
+    
+    # initialize backend
+    backend = TilerBackend(the_SFT, init_conf=initial)
      
     # our grid is now just all initial_state
-    grid = {}
-    for x in range(0, x_size):
-        for y in range(0, y_size):
-            # EMPTY means we'll try to deduce a color here
-            for n in nodes: #range(len(nodes)):
-                if initial is None:
-                    grid[(x, y, n)] = UNKNOWN
-                elif initial.dim == 1:
-                    grid[(x, y, n)] = (SET, initial[x, n])
-                else:
-                    grid[(x, y, n)] = (SET, initial[x, y, n])
+    #grid = {}
+    #for x in range(0, x_size):
+    #    for y in range(0, y_size):
+    #        # EMPTY means we'll try to deduce a color here
+    #        for n in nodes: #range(len(nodes)):
+    #            if initial is None:
+    #                grid[(x, y, n)] = UNKNOWN
+    #            elif initial.dim == 1:
+    #                grid[(x, y, n)] = (SET, initial[x, n])
+    #            else:
+    #                grid[(x, y, n)] = (SET, initial[x, y, n])
     #grid[(0, 0, nodes[0])] = (SET, 1)
     #grid[(1, 0, nodes[0])] = (SET, 1)
     # print(grid)
@@ -593,12 +600,9 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                     
                 if event.key == pygame.K_e:
                     if event.mod & pygame.KMOD_SHIFT:
-                        for (nvec, status) in grid.items():
-                            grid[nvec] = UNKNOWN
+                        backend.clear_all()
                     else:
-                        for (nvec, status) in grid.items():
-                            if status != UNKNOWN and status[0] == DEDUCED:
-                                grid[nvec] = UNKNOWN
+                        backend.unfix_all()
                 
                 if event.key == pygame.K_ESCAPE:
                     if thred != None:
@@ -616,7 +620,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                     #thred = Process(target=deduce_a_tiling_threaded, args=(que, grid, gridheight, gridwidth))
                     #thred.start()
 
-                    deduce_a_tiling(grid, the_SFT, x_period = x_size if x_periodic else None, y_period = y_size if y_periodic else None)
+                    #deduce_a_tiling(grid, the_SFT, x_period = x_size if x_periodic else None, y_period = y_size if y_periodic else None)
+                    backend.deduce()
 
                     print ("Tiling process finished in %s seconds." % (time.time() - tim)) # deduce_a_tiling returned (debug print)")
                     
@@ -690,30 +695,22 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
 
         # cases where grid is perhaps clicked
         if node != None and mouseisdown and drawcolor != None and not cancel_non_UI:
-            period_ok = True
-            if x_periodic:
-                if node[0] < 0 or node[0] >= x_size:
-                    period_ok = False
-            if y_periodic:
-                if node[1] < 0 or node[1] >= y_size:
-                    period_ok = False
+            #period_ok = True
+            #if x_periodic:
+            #    if node[0] < 0 or node[0] >= x_size:
+            #        period_ok = False
+            #if y_periodic:
+            #    if node[1] < 0 or node[1] >= y_size:
+            #        period_ok = False
             # cases where we should change
-            if period_ok and (node not in grid or grid[node] != drawcolor):
-                #print(drawcolor)
-                currentstate = TILING_UNKNOWN
-                #print(node)
-                node = node[:-1] + (nodes[node[-1]],)
-                
-                if drawcolor == EMPTY:
-                    if node in grid:
-                        del grid[node]
-                elif drawcolor == UNKNOWN:
-                    grid[node] = UNKNOWN
-                elif drawcolor[0] == SET and drawcolor[1] < len(alphabets[node[-1]]):
-                    if node in grid and grid[node] != drawcolor:
-                        print("node", node, "set to", alphabets[node[-1]][drawcolor[1]])
-                        
-                    grid[node] = drawcolor
+            currentstate = TILING_UNKNOWN
+            node = node[:-1] + (nodes[node[-1]],)
+            if drawcolor == EMPTY:
+                backend.replace_patch({node : None})
+            elif drawcolor == UNKNOWN:
+                backend.replace_patch({node : (list(alphabets[node[-1]]), False)})
+            elif drawcolor[0] == SET and drawcolor[1] < len(alphabets[node[-1]]):
+                backend.replace_patch({node : (alphabets[node[-1]][drawcolor[1]], True)})
 
                 
                 
@@ -742,25 +739,28 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
             #print "pad"
             screen.fill(TILING_BAD_GRID_COLOR)
 
-        # Draw the grid
+        
+        conf = backend.conf()
+        #print("backend conf", conf.display_str())
+        # Draw the grid lines
         for x in range(xmin, xmax + 1):
             for y in range(ymin, ymax + 1):
                 if dimension == 1 and y != 0: # we need not draw in this case
                     continue
                 for n in range(len(nodes)):
                     
-                    if (x, y, nodes[n]) not in grid:
+                    if conf[x, y, nodes[n]] is None:
                         continue
                     for t in topology:
                         a, b = t[1], t[2]
                         if a[-1] == nodes[n]:
                             xx, yy, nn = vadd((x, y), vsub(b[:-1], a[:-1])) + (b[2],)
-                            if (xx, yy, nn) in grid:
-                                p = vadd(to_screen(x, y), vmul(zoom, nodeoffsets[nodes[n]]))
-                                #pp = to_screen(*vadd((xx, yy), nodeoffsets[nn]))
-                                pp = vadd(to_screen(xx, yy), vmul(zoom, nodeoffsets[nn]))
-                                pygame.draw.line(screen, GRAY, cp_to_screen(p), cp_to_screen(pp), 1)
-                                
+                            #if (xx, yy, nn) in grid:
+                            p = vadd(to_screen(x, y), vmul(zoom, nodeoffsets[nodes[n]]))
+                            #pp = to_screen(*vadd((xx, yy), nodeoffsets[nn]))
+                            pp = vadd(to_screen(xx, yy), vmul(zoom, nodeoffsets[nn]))
+                            pygame.draw.line(screen, GRAY, cp_to_screen(p), cp_to_screen(pp), 1)
+                            
 
 
         # Draw the grid
@@ -770,7 +770,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                     continue
                 for n in range(len(nodes)):
                     p = vadd(to_screen(x, y), vmul(zoom, nodeoffsets[nodes[n]]))
-                    if (x,y,nodes[n]) not in grid:
+                    if conf[x,y,nodes[n]] is None:
                         continue
                     else:
 
@@ -780,24 +780,20 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
 
                         white_circle = False
                         #print(grid[(x,y,n)] )
-                        if grid[(x,y,nodes[n])] == UNKNOWN:
+                        print("seeing", conf[x,y,nodes[n]], "at", (x,y,nodes[n]))
+                        sym, fixed = conf[x,y,nodes[n]]
+                        if type(sym) == list:
                             color = UNKNOWN_COLOR
                         #else:
                         #    print(grid[(x,y,n)], "!=", UNKNOWN)
-                        elif grid[(x,y,nodes[n])][0] == DEDUCED:
-                            #print(alphabets[nodes[n]])
-                            sym_ix = grid[(x,y,nodes[n])][1]
-                            #sym = alphabets[nodes[n]][symidx]
-                            #color = colors[grid[(x,y,nodes[n])][1]] #deduced_colors[sym]
-                            color = colors[nodes[n], the_SFT.alph[nodes[n]][sym_ix]]
-                        elif grid[(x,y,nodes[n])][0] == SET:
-                            sym_ix = grid[(x,y,nodes[n])][1]
+                        else:
+                            sym_ix = sym # ???
                             #print(alphabets, nodes[n], sym, colors)
                             #sym = alphabets[nodes[n]][symidx]
                             #print(sym)
                             #color = colors[grid[(x,y,nodes[n])][1]]
                             color = colors[nodes[n], the_SFT.alph[nodes[n]][sym_ix]]
-                            white_circle = True
+                            white_circle = fixed
 
                         #if (x, y, n) in vemmel:
                         #    xxxx = int(255- gimmel[(x, y, nodes[n])]*3)

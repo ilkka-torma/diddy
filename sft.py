@@ -376,18 +376,22 @@ class SFT:
         if fixed_axes is None:
             fixed_axes = []
         
+        print("deducing with", periodics, fixed_axes)
+        
         markers = conf.minimized_markers()
-        #print("markers minimized to", markers)
+        print("markers minimized to", markers)
         
         marker_gens = []
         for (i, marker) in enumerate(markers):
             if i in fixed_axes:
-                marker_gens.append([marker])
+                marker_gens.append(iter([marker]))
             else:
                 marker_gens.append(gen_markers_from_minimal(marker, periodic=i in periodics))
+                
+        print("marker gens", marker_gens)
         
         for (i, new_markers) in enumerate(iter_prod(*marker_gens)):
-            #print("deducing", i)
+            print("deducing", i)
             if i == bound:
                 print("bound reached")
                 break
@@ -395,7 +399,7 @@ class SFT:
             # try to find a configuration with given structure
             ret_conf = self.deduce(conf.remark(list(new_markers)))
             if ret_conf is not None:
-                #print("found", ret_conf.display_str())unit
+                print("found", ret_conf.display_str())
                 return ret_conf
             
             # try to find a finite patch
@@ -407,6 +411,7 @@ class SFT:
             finite_conf = RecognizableConf(None, filled, self.nodes)
             #print("finite_conf", finite_conf.display_str())
             if self.deduce(finite_conf) is None:
+                print("failed")
                 break
                 
         return None

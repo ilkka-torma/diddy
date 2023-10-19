@@ -94,6 +94,8 @@ class RecognizableConf(Conf):
         else:
             raise Exception("Cannot deduce dimension for configuration")
         
+        self.nodes = nodes
+        
         #print("got markers", markers)
         if type(markers) == tuple and type(markers[0]) == tuple:
             raise Exception("bad marker tuple")
