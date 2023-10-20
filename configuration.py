@@ -39,11 +39,14 @@ def gen_markers_from_minimal(markers, periodic=None):
     # TODO: take into account all apecial cases
     a, b, c, d = markers
     if periodic:
+        #print("AM HERE")
         if (a != b) or (c != d):
             # incompatible with periodic
+            #print("Incomparable with periodic.")
             return
         k = 0
         while True:
+            #print ("yield", (a, a, k, a+k*(b-a), a+k*(b-a)), b-a)
             yield (a, a, a+k*(b-a), a+k*(b-a))
             k += 1
     else:
@@ -162,6 +165,7 @@ class RecognizableConf(Conf):
             if all(self.can_be_equal_at(nvec, nvadd(nvec, (0,)*i + (b-a,) + (0,)*(self.dim-i-1)), nvadd(nvec, (0,)*i + (a-b,) + (0,)*(self.dim-i-1)))
                        for nvec in self.pat):
                 markers[i] = (a, a, b, b)
+                # 
                 #print(3, i, markers[i])
                 continue
             # rewind right tail

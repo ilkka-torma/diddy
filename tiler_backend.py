@@ -14,7 +14,8 @@ class AxisState(Enum):
     RECOG = 2
     
 def replace_sym(conf, nvec, sym, axis_states):
-    "Replace the symbol at a single node of the configuration; return a new configuration and a boolean for changes."
+    "Replace the symbol at a single node of the configuration;"
+    "return a new configuration and a boolean for changes."
     if conf[nvec] == sym:
         return (False, conf)
         
@@ -24,7 +25,8 @@ def replace_sym(conf, nvec, sym, axis_states):
             new_markers.append(marker)
         elif axis_states[i] == AxisState.PERIODIC:
             # markers are necessarily periodic
-            (a, _, c, _) = marker
+            (a, b, c, d) = marker
+            #assert a == b and c == d <- this failed, I misunderstand something I guess
             if nvec[i] < a:
                 new_a = a-((a-nvec[i])//(c-a)+1)*(c-a)
                 new_markers.append((new_a,new_a, c,c))
@@ -67,9 +69,9 @@ class TilerState:
     The nodes of the configuration are decorated with fixedness information.
     """
     
-    def __init__(self, conf=None, selection=None, dim=None, nodes=None):
-        if conf is None:
-            pat = {vec + (node,) : None for vec in hyperrect([(0,10)]*dim) for node in nodes}
+    def __init__(self, conf=None, selection=None, dim=None, nodes=None, sizes=None):
+        if conf is None: # sizes used if no initial config
+            pat = {vec + (node,) : None for vec in hyperrect([(0,sizes[d]) for d in range(dim)]) for node in nodes}
             conf = RecognizableConf(None, pat, nodes)
         self.conf = conf
         if selection is None:
@@ -93,11 +95,11 @@ class TilerBackend:
     It contains the ambient SFT and settings, the current state, and a history of states.
     """
     
-    def __init__(self, sft, init_conf=None):
+    def __init__(self, sft, init_conf=None, sizes=None):
         self.sft = sft
         if init_conf is not None:
             init_conf = decorate_default(init_conf)
-        self.history = [TilerState(conf=init_conf, dim=sft.dim, nodes=sft.nodes)]
+        self.history = [TilerState(conf=init_conf, dim=sft.dim, nodes=sft.nodes, sizes=sizes)]
         self.history_index = 0
         self.axis_states = [AxisState.FIXED]*sft.dim
         self.clipboard = None

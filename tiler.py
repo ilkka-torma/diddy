@@ -54,6 +54,7 @@ the_SFT = sft.SFT(dim, nodes, alphabet, forbs=None, circuit=c)
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 GREEN = (0, 255, 0)
+BLUE = (0, 0, 255)
 YELLOW = (255, 255, 0)
 GRAY = (120, 120, 120)
 
@@ -242,12 +243,17 @@ def load(grid, filename):
             #print(b)                
             #print(a, "now", grid[a])
 
+# In a configuration, (None, ...) can also denote a None symbol, this is for that.
+def Noneish(a):
+    return a == None or type(a) == tuple and a[0] == None
 
 #print(re.match("\((\-?[0-9]+), (\-?[0-9]+), ([\'a-zA-Z0-9_]+)\)", "(29, 9, 'top'))"))
 
 #a = bbb
 
-def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10, x_periodic=False, y_periodic=False, pictures=None, the_colors=None, initial=None):
+def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
+        x_size=10, y_size=10, x_periodic=False, y_periodic=False,
+        pictures=None, the_colors=None, initial=None):
     #print(topology)
 
     # check dimension in the first command of topology
@@ -304,6 +310,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
             for sym in alphabets[node]:
                 colors[node, sym] = the_colors[sym]
     else:
+        
         # colors used for alphabet symbols, and tinted versions for deduced ones
         ix_colors = {
           0 : WHITE, 1 : (255,0,0), 2 : (0,255,0), 3 :(0,0,255),
@@ -355,7 +362,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
     msg_font = pygame.font.SysFont('Consolas', 15)
     
     # initialize backend
-    backend = TilerBackend(the_SFT, init_conf=initial)
+    backend = TilerBackend(the_SFT, init_conf=initial, sizes=[x_size,y_size])
      
     # our grid is now just all initial_state
     #grid = {}
@@ -400,15 +407,18 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
 
     thred = None
 
-    filename_box = pygame_gui.elements.UITextEntryLine(pygame.Rect((10, 160), (100, 50)),
+
+    boxy = 260
+
+    filename_box = pygame_gui.elements.UITextEntryLine(pygame.Rect((10, boxy), (100, 50)),
                                                         manager=manager,
                                                         object_id="#filename")
     filename_box.set_text("conf")
 
-    save_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((10, 220), (60, 50)),
+    save_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((10, boxy+60), (60, 50)),
                                              text='save',
                                              manager=manager)
-    load_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((70, 220), (60, 50)),
+    load_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((70, boxy+60), (60, 50)),
                                              text='load',
                                              manager=manager)
 
@@ -544,8 +554,14 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
             # we want some focuses to steal input, let's just use the object type
             if type(focused) == pygame_gui.elements.ui_text_entry_line.UITextEntryLine:
                 cancel_non_UI = True # TODO: IGNORE THINGS WHEN TRUE, AND DO SAVES
+
+        shift_modifier = bool(pygame.key.get_mods() & pygame.KMOD_SHIFT)
+        ctrl_modifier = bool(pygame.key.get_mods() & pygame.KMOD_CTRL)
+        any_modifier = shift_modifier or ctrl_modifier
         
         for event in events:  # User did something
+
+            
 
             manager.process_events(event)
 
@@ -591,7 +607,15 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                 if event.key == pygame.K_u:
                     drawcolor = UNKNOWN # means unused
                 if event.key == pygame.K_BACKSPACE:
-                    drawcolor = EMPTY
+                    if shift_modifier:
+                        TODO = TODO
+                    else:
+                        drawcolor = EMPTY
+
+                if event.key == pygame.K_c: # x-axis state
+                    backend.axis_states[0] = AxisState((backend.axis_states[0].value + 1) % len(AxisState))
+                if event.key == pygame.K_v: # y-axis state
+                    backend.axis_states[1] = AxisState((backend.axis_states[1].value + 1) % len(AxisState))
                     
                 if event.key == pygame.K_h:
                     show_help = not show_help
@@ -599,10 +623,15 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                     show_labels = not show_labels
                     
                 if event.key == pygame.K_e:
-                    if event.mod & pygame.KMOD_SHIFT:
+                    if shift_modifier:
                         backend.clear_all()
                     else:
                         backend.unfix_all()
+
+                if event.key == pygame.K_z and ctrl_modifier:
+                    backend.undo()
+                if event.key == pygame.K_y and ctrl_modifier:
+                    backend.redo()
                 
                 if event.key == pygame.K_ESCAPE:
                     if thred != None:
@@ -645,6 +674,10 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                 
             # end of event loop
 
+        #shift_modifier = bool(pygame.get_mod() & pygame.KMOD_SHIFT)
+        #ctrl_modifier = bool(pygame.get_mod() & pygame.KMOD_CONTROL)
+        #ny_modifier = shift_modifier or ctrl_modifier
+
         mpos = pygame.mouse.get_pos()
 
         manager.update(time_delta)
@@ -667,13 +700,13 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
         
         camera = vadd(camera, gridmove)
         if not cancel_non_UI:
-            if keys[pygame.K_a]:
+            if keys[pygame.K_a] and not any_modifier:
                 zoom = smul(1.01, zoom)
-            if keys[pygame.K_z]:
+            if keys[pygame.K_z] and not any_modifier:
                 zoom = smul(1/1.01, zoom)
-            if keys[pygame.K_s]:
+            if keys[pygame.K_s] and not any_modifier:
                 nodesize += 1
-            if keys[pygame.K_x]:
+            if keys[pygame.K_x] and not any_modifier:
                 nodesize -= 1
 
         pos = cp_from_screen(mpos)
@@ -741,7 +774,10 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
 
         
         conf = backend.conf()
-        #print("backend conf", conf.display_str())
+                
+        #if nnn%10 == 0:
+        #    print("backend conf", conf.display_str())
+        
         # Draw the grid lines
         for x in range(xmin, xmax + 1):
             for y in range(ymin, ymax + 1):
@@ -749,7 +785,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                     continue
                 for n in range(len(nodes)):
                     
-                    if conf[x, y, nodes[n]] is None:
+                    if Noneish(conf[x, y, nodes[n]]):
                         continue
                     for t in topology:
                         a, b = t[1], t[2]
@@ -761,16 +797,14 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                             pp = vadd(to_screen(xx, yy), vmul(zoom, nodeoffsets[nn]))
                             pygame.draw.line(screen, GRAY, cp_to_screen(p), cp_to_screen(pp), 1)
                             
-
-
-        # Draw the grid
+        # Draw the nodes
         for x in range(xmin, xmax + 1):
             for y in range(ymin, ymax + 1):
                 if dimension == 1 and y != 0:
                     continue
                 for n in range(len(nodes)):
                     p = vadd(to_screen(x, y), vmul(zoom, nodeoffsets[nodes[n]]))
-                    if conf[x,y,nodes[n]] is None:
+                    if Noneish(conf[x,y,nodes[n]]):
                         continue
                     else:
 
@@ -780,8 +814,9 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
 
                         white_circle = False
                         #print(grid[(x,y,n)] )
-                        print("seeing", conf[x,y,nodes[n]], "at", (x,y,nodes[n]))
+                        #print("seeing", conf[x,y,nodes[n]], "at", (x,y,nodes[n]))
                         sym, fixed = conf[x,y,nodes[n]]
+                        #print(sym, fixed)
                         if type(sym) == list:
                             color = UNKNOWN_COLOR
                         #else:
@@ -835,6 +870,31 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
                             screen.blit(pic, cp_to_screen(vsub(p, v)))
 
         
+        # draw markers
+        if nnn%100 == 0: print("markers")
+        for (i, marker) in enumerate(conf.markers):
+            def draw_axis(q, xory, color, width):
+                if xory == 0:
+                    a = (to_screen(q-0.5, 0)[0], 0)
+                    b = (a[0], screenheight)
+                    pygame.draw.line(screen, color, cp_to_screen(a), cp_to_screen(b), width)
+                else:
+                    a = (0, to_screen(0, q-0.5)[1])
+                    b = (screenwidth, a[1])
+                    pygame.draw.line(screen, color, cp_to_screen(a), cp_to_screen(b), width)
+            # x axis marker
+            if nnn%100 == 0: print(i, marker)
+            for (j,q) in enumerate(marker):
+                width = 1
+                if j in [1, 2]:
+                    width = 3
+                draw_axis(q, i, GREEN, width)
+            if marker[0] == marker[1]:
+                draw_axis(marker[0], i, BLUE, 3)
+            if marker[2] == marker[3]:
+                draw_axis(marker[2], i, BLUE, 3)
+                    
+        
                                
         if show_help:                               
             # Draw some helper text
@@ -851,6 +911,10 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1, x_size=10, y_size=10,
             draw_msg.append("Deduce pattern: spacebar")
             draw_msg.append("Clear deduced nodes: e")
             draw_msg.append("Clear all nodes: shift-e")
+            draw_msg.append("Remove all nodes: shift-backspace")
+            draw_msg.append("x-axis state: %s" % backend.axis_states[0])
+            draw_msg.append("y-axis state: %s" % backend.axis_states[1])
+            
             #draw_msg.append("Cancel deduction: escape")
             draw_msg.append("Toggle symbol labels: l")
             draw_msg.append("Toggle this text: h")
