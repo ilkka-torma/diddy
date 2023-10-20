@@ -612,9 +612,9 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                     else:
                         drawcolor = EMPTY
 
-                if event.key == pygame.K_c: # x-axis state
+                if event.key == pygame.K_c and not any_modifier: # x-axis state
                     backend.axis_states[0] = AxisState((backend.axis_states[0].value + 1) % len(AxisState))
-                if event.key == pygame.K_v: # y-axis state
+                if event.key == pygame.K_v and not any_modifier: # y-axis state
                     backend.axis_states[1] = AxisState((backend.axis_states[1].value + 1) % len(AxisState))
                     
                 if event.key == pygame.K_h:
@@ -784,7 +784,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                 if dimension == 1 and y != 0: # we need not draw in this case
                     continue
                 for n in range(len(nodes)):
-                    
+
+                    print("apbara", conf.display_str(), x, y, nodes[n])
                     if Noneish(conf[x, y, nodes[n]]):
                         continue
                     for t in topology:

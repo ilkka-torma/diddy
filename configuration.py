@@ -44,10 +44,11 @@ def gen_markers_from_minimal(markers, periodic=None):
             # incompatible with periodic
             #print("Incomparable with periodic.")
             return
+        # k = 0 seems dangerous, but ok...
         k = 0
         while True:
             #print ("yield", (a, a, k, a+k*(b-a), a+k*(b-a)), b-a)
-            yield (a, a, a+k*(b-a), a+k*(b-a))
+            yield (a, a, a+k*(b-a), a+k*(b-a)) # why b-a??
             k += 1
     else:
         left_period = ((k+1)*(b-a) for k in naturals())
@@ -56,7 +57,10 @@ def gen_markers_from_minimal(markers, periodic=None):
         right_period = ((k+1)*(d-c) for k in naturals())
         for (p1, b1, b2, p2) in iter_prod(left_period, left_border, right_border, right_period):
             #print("generated markers", (b1-p1, b1, b2, b2+p2), "from", markers)
-            yield (b1-p1, b1, b2, b2+p2)
+            candidate = (b1-p1, b1, b2, b2+p2)
+            if candidate[0] == candidate[1] == candidate[2] == candidate[3]:
+                continue
+            yield candidate
     
     
 

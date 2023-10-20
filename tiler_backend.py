@@ -142,6 +142,10 @@ class TilerBackend:
         
     def deduce(self):
         "Deduce the configuration, save the old state."
+
+        #if self.conf().empty(): <- maybe smth like this is a good idea, since this fails with periodic right now.
+        #    return
+        
         fixed_axes = [i for (i,st) in enumerate(self.axis_states) if st == AxisState.FIXED]
         periodics = [i for (i,st) in enumerate(self.axis_states) if st == AxisState.PERIODIC]
         conf = undecorate(self.conf())
@@ -149,7 +153,18 @@ class TilerBackend:
         print("deduced",deduced_conf)
         if deduced_conf is not None:
             print("it's", deduced_conf.display_str())
-            self.replace_conf(decorate_default(deduced_conf)) # TODO: keep fixedness
+            decorated_conf = decorate_default(deduced_conf)
+            """
+            prev_conf = self.conf()
+            # previous configuration should be decorated
+            for (nvec, tup) in prev_conf.pat.items():
+                # fixed cell, copy this information
+                if tup and tup[1]:
+                    assert nvec in decorated_conf.pat
+                    assert decorated_conf.pat[nvec][0] == tup[0]
+                    decorated_conf.pat[nvec] = tup
+            """
+            self.replace_conf(decorated_conf) # TODO: keep fixedness
 
     def replace_patch(self, pat):
         "Replace patch in configuration, save the old state if changes were made."
