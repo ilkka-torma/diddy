@@ -17,6 +17,7 @@ import math
 import blockmap
 import tfg
 
+from basic_things import *
 
 class Diddy:
     def __init__(self):
@@ -30,7 +31,7 @@ class Diddy:
         self.alphabet = {node : [0, 1] for node in self.nodes}
         self.dim = 2
         self.topology = grid
-        self.tiler_skew = 1 # actually skew is completely useless
+        #self.tiler_skew = 1 # actually skew is completely useless
         self.tiler_gridmoves = [(1,0), (0,1)]
         self.tiler_nodeoffsets = {0 : (0,0)}
         self.formulae = []
@@ -63,11 +64,13 @@ class Diddy:
                 alph0 = list(self.alphabet.values())[0]
                 if all(alph == alph0 for alph in self.alphabet.values()):
                     self.alphabet = {node : alph0 for node in self.nodes}
-                self.tiler_gridmoves = [(1,0), (0,1)]
-                self.tiler_skew = 1
+                self.tiler_gridmoves = [(1,0), (0,1)] # why is this here? TODO
+                #self.tiler_skew = 1
                 self.tiler_nodeoffsets = {node : (2*j/(3*len(self.nodes)), 2*j/(3*len(self.nodes))) for (j,node) in enumerate(self.nodes)}
             elif cmd == "dim":
                 self.dim = args[0]
+                self.tiler_gridmoves = [char_vector(self.dim, j) for j in range(self.dim)]
+                self.tiler_nodeoffsets = {0 : zero_vector(self.dim)}
             elif cmd == "alphabet":
                 alph = args[0]
                 default = kwds.get("default", None)
@@ -95,42 +98,42 @@ class Diddy:
                     self.nodes = [0]
                     # only the first will be used
                     self.tiler_gridmoves = [(1, 0), (0, 1)]
-                    self.tiler_skew = 1
+                    #self.tiler_skew = 1
                     self.tiler_nodeoffsets = {0 : (0,0)}
                 elif top in ["square", "grid", "squaregrid"]:
                     self.dim = 2
                     self.topology = grid
                     self.nodes = [0]
                     self.tiler_gridmoves = [(1,0), (0,1)]
-                    self.tiler_skew = 1
+                    #self.tiler_skew = 1
                     self.tiler_nodeoffsets = {0 : (0,0)}
                 elif top in ["hex", "hexgrid"]:
                     self.dim = 2
                     self.topology = hexgrid
                     self.nodes = [0, 1]
                     self.tiler_gridmoves = [(1,0), (-0.5,0.8)]
-                    self.tiler_skew = 1
+                    #self.tiler_skew = 1
                     self.tiler_nodeoffsets = {0 : (0,0.15), 1 : (0.5,-0.15)}
                 elif top in ["king", "kinggrid"]:
                     self.dim = 2
                     self.topology = kinggrid
                     self.nodes = [0]
                     self.tiler_gridmoves = [(1,0), (0,1)]
-                    self.tiler_skew = 1
+                    #self.tiler_skew = 1
                     self.tiler_nodeoffsets = {0 : (0,0)}
                 elif top in ["triangle", "trianglegrid"]:
                     self.dim = 2
                     self.topology = trianglegrid
                     self.nodes = [0]
                     self.tiler_gridmoves = [(1,0), (-0.5,0.6)]
-                    self.tiler_skew = 1
+                    #self.tiler_skew = 1
                     self.tiler_nodeoffsets = {0 : (0,0)}
                 elif top in ["CR"]:
                     self.dim = 2
                     self.topology = CR4d8e2_topology
                     self.nodes = CR4d8e2_nodes
                     self.tiler_gridmoves = [(1,0), (-0.5,0.5)]
-                    self.tiler_skew = 1
+                    #self.tiler_skew = 1
                     self.tiler_nodeoffsets = {"big" : (0,0), "small" : (0.5,0)}
                 else:
                     self.topology = []
@@ -726,7 +729,7 @@ class Diddy:
                 else:
                     topology = self.environments[topo_name][2]
                 colors = kwds.get("colors", None)
-                tiler.run(SFT, topology, gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic, pictures, colors, initial=conf)
+                tiler.run(SFT, topology, gridmoves, node_offsets, x_size, y_size, x_periodic, y_periodic, pictures, colors, initial=conf)
                 #tiler.run(SFT, self.topology, gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic, pictures)
             
             elif cmd == "entropy_upper_bound":
