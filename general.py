@@ -47,6 +47,26 @@ def nvmod(m, nvec):
     
 def nvmods(mods, nvec):
     return tuple(a if m is None else a%m for (m,a) in zip(mods, nvec[:-1])) + nvec[-1:]
+    
+def nvwraps(markers, nvec):
+    "Wrap a nodevector around recognizability markers"
+    #print("wrapping", nvec, "around", markers)
+    ret = []
+    for ((a,b,c,d), x) in zip(markers, nvec):
+        if b <= x:
+            if x < c:
+                ret.append(x)
+            elif c < d:
+                ret.append(c + (x-c) % (d-c))
+            else: # periodic right tail
+                ret.append(b + (x-b) % (c-b))
+        elif a < b:
+            ret.append(a + (x-a) % (b-a))
+        else: # periodic left tail
+            ret.append(b + (x-b) % (c-b))
+    ret.append(nvec[-1])
+    #print("nvwraps", markers, nvec, tuple(ret))
+    return tuple(ret)
 
 def vneg(vec):
     return tuple(-a for a in vec)
@@ -70,4 +90,43 @@ def pats(domain, alph):
             pat[vec] = alph[-1]
             yield pat
         domain.add(vec)
+        
+def cart_prod_ix(ix_sum, *lists):
+    "Cartesian product with fixed (1-based) index sum"
+    #print("cart", ix_sum, lists)
+    if not (ix_sum or lists):
+        yield ()
+    elif sum(len(l) for l in lists) >= ix_sum:
+        head, tail = lists[0], lists[1:]
+        #print("tail", tail)
+        for i in range(1, min(len(head), ix_sum+1)):
+            item = head[i-1]
+            for rest in cart_prod_ix(ix_sum-i, *tail):
+                yield (item,) + rest
+    
+        
+        
+def iter_prod(*iters):
+    "Lazy Cartesian product of iterators"
+    memos = [[] for _ in iters]
+    ix_sum = len(iters)
+    new = True
+    while new:
+        new = False
+        for (memo, iterator) in zip(memos, iters):
+            try:
+                memo.append(next(iterator))
+                new = True
+            except StopIteration:
+                pass
+        #print("looping with", memos, ix_sum)
+        for tup in cart_prod_ix(ix_sum, *memos):
+            #print("yielding", tup, "from", memos, "with sum", ix_sum)
+            yield tup
+        ix_sum += 1
 
+def naturals():
+    k = 0
+    while True:
+        yield k
+        k += 1

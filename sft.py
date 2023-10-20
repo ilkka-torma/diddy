@@ -206,34 +206,21 @@ class SFT:
     def __contains__(self, conf):
         if not isinstance(conf, Conf):
             raise TypeError("Expected Conf, not {}".format(type(conf)))
-        if isinstance(conf, PeriodicConf):
+        elif isinstance(conf, RecognizableConf):
+            print("testing containment of", conf.display_str())
             if conf.dim != self.dim or conf.onesided != self.onesided:
                 return False
-            for vec in hyperrect([(0,p) for p in conf.periods]):
-                circ = self.circuit.copy()
-                def tr(var):
-                    if var[-1] == conf[nvadd(var[:-1], vec)]:
-                        return T
-                    else:
-                        return F
-                transform(circ, tr)
-                if not SAT(circ):
-                    return False
-            return True
-        if isinstance(conf, RecognizableConf):
-            if conf.dim != self.dim or conf.onesided != self.onesided:
-                return False
-            conf_vecs = set(hyperrect([(-pre,trans+post) for (pre, trans, post) in conf.geometry]))
+            conf_vecs = set(hyperrect([(a, d) for (a, b, c, d) in conf.markers]))
             my_vecs = set(var[:-2] for var in self.circuit.get_variables())
             if not my_vecs:
                 my_vecs.add((0,)*self.dim)
             tr_bounds = []
-            for (i, (pre, trans, post)) in enumerate(conf.geometry):
+            for (i, (a, b, c, d)) in enumerate(conf.markers):
                 if i in self.onesided:
                     min_bound = 0
                 else:
-                    min_bound = -pre - max(vec[i] for vec in my_vecs)
-                max_bound = trans + post - min(vec[i] for vec in my_vecs)
+                    min_bound = a - max(vec[i] for vec in my_vecs)
+                max_bound = d - min(vec[i] for vec in my_vecs)
                 tr_bounds.append((min_bound, max_bound))
             #print(var_vecs, all_vecs)
             for vec in hyperrect(tr_bounds):
@@ -247,6 +234,8 @@ class SFT:
                 if not SAT(circ):
                     return False
             return True
+        else:
+            raise Exception("Unknown configuration type")
 
     # Find recognizable configuration (i.e. uniformly eventually periodic in each orthogonal direction) in self which is not in other
     # The semilinear structure is a periodic rectangular tiling, and the contents of a rectangle depend on which axes its lowest corner lies
@@ -338,12 +327,14 @@ class SFT:
                             break
                     else:
                         pat[vec + (node,)] = self.alph[node][0]
-            #print("making conf from", pat, radii, periodics, self.onesided)
-            if periodics == list(range(self.dim)):
-                # totally periodic configuration
-                conf = PeriodicConf(pat, onesided=self.onesided)
-            else:
-                conf = RecognizableConf(radii, pat, periodics=periodics, onesided=self.onesided)
+            #print("making separating conf from", pat, radii, periodics, self.onesided)
+            markers = []
+            for (i,r) in enumerate(radii):
+                if i in periodics:
+                    markers.append((0,0, r,r))
+                else:
+                    markers.append((-r,0,r,2*r))
+            conf = RecognizableConf(markers, pat, self.nodes, onesided=self.onesided)
             return True, conf
         return True
 
@@ -372,76 +363,123 @@ class SFT:
         if m == False:
             return True
         return False
-
-    def deduce(self, known_values, domain, periods=None):
-        #raise Exception("sft.deduce is currently broken")
-        #print("deducing", domain, known_values)
-        #if len(self.alph) != 2:
-        #    raise Exception("Only binary alphabets supported in deduce")
-
-        #print(self.circuit)
         
-        if periods is None:
-            periods = [None]*self.dim
+    def deduce_global(self, conf, periodics=None, fixed_axes=None, bound=None):
+        # Deduce a configuration with variable structure.
         
-        circuits = {}
-    
-        for v in domain:
-            circuits[v] = self.circuit.copy()
-            #for var in self.circuit.get_variables():
-                # translate and add 0 at end so that we don't replace twice
-
-                #rel_pos = vadd(v, var[:-2]) + (var[-2], var[-1], 0) 
-                #substitute(circuits[v], var, V(rel_pos))
-
-            transform(circuits[v], lambda var: nvmods(periods, nvadd(var[:-1], v)) + var[-1:])
-            #print(v, circuits[v])
-
-        #print("that was circuits")
-        forceds = set()
-        for v in known_values:
-            if known_values[v] == self.alph[v[-1]][0]:
-                for a in self.alph[v[-1]][1:]:
-                    forceds.add(NOT(V(v + (a,))))
-                #forceds.add(V(v + (1, 0)))
+        # known_conf is a recognizable configuration
+        # periodics is a list of directions we want to be periodic
+        # fixed_axes is a list of directions where we have fixed the markers
+        
+        if periodics is None:
+            periodics = []
+        if fixed_axes is None:
+            fixed_axes = []
+        
+        markers = conf.minimized_markers()
+        #print("markers minimized to", markers)
+        
+        marker_gens = []
+        for (i, marker) in enumerate(markers):
+            if i in fixed_axes:
+                marker_gens.append([marker])
             else:
-                forceds.add(V(v + (known_values[v],)))
-        #for f in forceds:
-        #    print(f)
-        #print("was forced")
+                marker_gens.append(gen_markers_from_minimal(marker, periodic=i in periodics))
+        
+        for (i, new_markers) in enumerate(iter_prod(*marker_gens)):
+            #print("deducing", i)
+            if i == bound:
+                print("bound reached")
+                break
+            
+            # try to find a configuration with given structure
+            ret_conf = self.deduce(conf.remark(list(new_markers)))
+            if ret_conf is not None:
+                #print("found", ret_conf.display_str())unit
+                return ret_conf
+            
+            # try to find a finite patch
+            filled = dict()
+            for vec in hyperrect([(-i,i+1) for _ in range(self.dim)]):
+                for node in self.nodes:
+                    nvec = vec + (node,)
+                    filled[nvec] = conf[nvec]
+            finite_conf = RecognizableConf(None, filled, self.nodes)
+            #print("finite_conf", finite_conf.display_str())
+            if self.deduce(finite_conf) is None:
+                break
+                
+        return None
+
+    def deduce(self, conf):
+        # Deduce a recognizable configuration with a fixed marker structure.
+        
+        #print("markers", markers)
+                
+        diff_vecs = set(var[:-2] for var in self.circuit.get_variables())
+        vec_domain = set(vsub(nvec[:-1], dvec)
+                         for nvec in conf.pat
+                         for dvec in diff_vecs)
+                         
+        #print("diff_vecs", list(sorted(diff_vecs)))
+        #print("vec_domain", list(sorted(vec_domain)))
+        #print("deducing from", conf.display_str())
+        unknowns = set(nvec for (nvec, sym) in conf.pat.items() if type(sym) == list)
+        
+        #print("vec_domain", vec_domain)
+        #print("unknowns", unknowns)
+        
+        # circuits will only contain the circuits that refer only to nodes in the domain
+        circuits = {}
+        #vecs = set(nvec[:-1] for nvec in conf.pat)
+    
+        for vec in vec_domain:
+            circ = self.circuit.copy()
+            transform(circ, lambda var: nvwraps(conf.markers, nvadd(var[:-1], vec)) + var[-1:])
+            if all(conf[var[:-1]] is not None for var in circ.get_variables()):
+                circuits[vec] = circ
+                
+        #print("circuits", list(sorted(circuits.keys())))
+        
+        forceds = set()
+        for (nvec, syms) in conf.pat.items():
+            node = nvec[-1]
+            if syms is None or (type(syms) == list and set(syms) == set(self.alph[node])):
+                continue
+            if type(syms) != list:
+                syms = [syms]
+            ored = []
+            for sym in syms:
+                if sym == self.alph[node][0]:
+                    ored.append(AND(*(NOT(V(nvec + (a,))) for a in self.alph[node][1:])))
+                else:
+                    ored.append(V(nvec + (sym,)))
+            forceds.add(OR(*ored))
 
         circuits = list(circuits.values())
-        add_uniqueness_constraints(self.alph, circuits, [d + (n,) for n in self.nodes for d in domain])
+        add_uniqueness_constraints(self.alph, circuits, unknowns)
 
+        # Make SAT instance, solve and extract model
         instance = AND(*(list(circuits) + list(forceds)))
-        #print("Instance size", len(instance), sum(len(i) for i in instance))
-        m = SAT(instance, True)
-        if m == False:
-            #print("No solution.")
+        model = SAT(instance, True)
+        if model == False:
             return None
 
-        #print("limimisad", m)
-        
-        mm = {}
-        for v in domain:
-            for n in self.nodes:
-                for a in self.alph[n][1:]:
-                    if v + (n, a) in m and m[v + (n, a)]:
-                        mm[v + (n,)] = a
+        # Produce pattern from model
+        #print("model", model)
+        pat = {}
+        for nvec in conf.pat:
+            if conf[nvec] is None:
+                pat[nvec] = None
+            else:
+                for sym in self.alph[node][1:]:
+                    if nvec + (sym,) in model and model[nvec + (sym,)]:
+                        pat[nvec] = sym
                         break
                 else:
-                    mm[v + (n,)] = self.alph[n][0]
-                """    
-                    #print()
-                    if m[v + (n, 1, 0)]:
-                        mm[v + (n,)] = self.alph[1] #m[v + (n, 1, 0)]
-                    else:
-                        mm[v + (n,)] = self.alph[0]"""
-                #else:
-                #    print(v + (n, 1, 0), "not in")
-                #    mm[v + (n,)] = None # was not actually discussed by rules
-        #print("mmmm", mm)
-        return mm
+                    pat[nvec] = self.alph[node][0]
+        #print("final pat", pat)
+        return RecognizableConf(conf.markers, pat, self.nodes, onesided=conf.onesided)
 
     def all_periodics(self, periods, existing=None):
         if existing is None:
