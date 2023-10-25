@@ -49,6 +49,11 @@ def gen_markers_from_minimal(markers, periodic=None):
             yield (a, a, a+k*(c-a), a+k*(c-a))
             k += 1
     else:
+        #print("AM OTHER")
+        if a==b:
+            a = a-(c-b)
+        if c==d:
+            d = d+(c-b)
         left_period = ((k+1)*(b-a) for k in naturals())
         left_border = (b-k for k in naturals())
         right_border = (c+k for k in naturals())
