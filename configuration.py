@@ -215,7 +215,7 @@ class RecognizableConf(Conf):
         
     def is_periodic(self, axis):
         "Is this configuration periodic along the given axis?"
-        a, b, c, d = self.markers[axis]
+        a, b, c, d = self.minimized_markers()[axis]
         return a==b and c==d
 
     def display_str(self, hide_contents=False):

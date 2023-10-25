@@ -408,17 +408,18 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
     thred = None
 
 
-    boxy = 260
+    boxx = 300
+    boxy = 20
 
-    filename_box = pygame_gui.elements.UITextEntryLine(pygame.Rect((10, boxy), (100, 50)),
+    filename_box = pygame_gui.elements.UITextEntryLine(pygame.Rect((boxx, boxy), (100, 50)),
                                                         manager=manager,
                                                         object_id="#filename")
     filename_box.set_text("conf")
 
-    save_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((10, boxy+60), (60, 50)),
+    save_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((boxx, boxy+60), (60, 50)),
                                              text='save',
                                              manager=manager)
-    load_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((70, boxy+60), (60, 50)),
+    load_button = pygame_gui.elements.UIButton(relative_rect=pygame.Rect((boxx+60, boxy+60), (60, 50)),
                                              text='load',
                                              manager=manager)
 
@@ -905,28 +906,31 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                 draw_msg = ["Drawing symbol {}".format(drawcolor[1])]
             else:
                 draw_msg = ["Drawing {}".format(drawcolor)]
+            draw_msg.append("x-axis state: %s" % backend.axis_states[0])
+            draw_msg.append("y-axis state: %s" % backend.axis_states[1])
+            draw_msg.append("")
             draw_msg.append("Draw: left mouse button")
-            draw_msg.append("Select symbol: number keys")
-            draw_msg.append("Select unknown symbol: u")
+            draw_msg.append("Pick symbol: number keys")
+            draw_msg.append("Pick unknown symbol: u")
+            draw_msg.append("Pick empty node: backspace")
             draw_msg.append("Pan: arrow keys")
             draw_msg.append("Zoom: az")
             draw_msg.append("Node size: sx")
+            draw_msg.append("Toggle axis states: cv")
             draw_msg.append("Deduce pattern: spacebar")
             draw_msg.append("Clear deduced nodes: e")
             draw_msg.append("Clear all nodes: shift-e")
             draw_msg.append("Remove all nodes: shift-backspace")
-            draw_msg.append("x-axis state: %s" % backend.axis_states[0])
-            draw_msg.append("y-axis state: %s" % backend.axis_states[1])
-            
+            draw_msg.append("Minimize markers: m")
             #draw_msg.append("Cancel deduction: escape")
             draw_msg.append("Toggle symbol labels: l")
-            draw_msg.append("Toggle this text: h")
+            draw_msg.append("Toggle UI: h")
             for (i, msg) in enumerate(draw_msg):
                 font_surf = msg_font.render(msg, False, GREEN)
                 screen.blit(font_surf, (10, 10+i*15))
      
-        #screen.blit(textinput.surface, (30, 30))
-        manager.draw_ui(screen)
+            #screen.blit(textinput.surface, (30, 30))
+            manager.draw_ui(screen)
 
         # Limit to 60 frames per second
         clock.tick(60)
