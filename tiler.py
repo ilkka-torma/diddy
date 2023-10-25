@@ -12,6 +12,7 @@ import numpy as np
 from numpy.linalg import inv
 import os
 import re
+from enum import Enum
 
 """
 nodes = [0]
@@ -85,6 +86,11 @@ EMPTY_COLOR = BLACK # actually we just don't draw these
 TILING_UNKNOWN = 0
 TILING_OK = 1
 TILING_BAD = 2
+
+class CursorState(Enum):
+    PAINT = 0
+    SELECT = 1
+    MOVE_MARKERS = 2
 
 
 def deduce_a_tiling(grid, the_SFT, x_period, y_period):
@@ -334,6 +340,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
     #que = Queue()
 
     currentstate = TILING_OK
+    
+    cursor_state = CursorState.PAINT
 
     # This sets the positions of nodes in grid cells.
     # This is done after transformation.
@@ -499,6 +507,27 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                         closest = (x0, y0, n)
         return closest
         
+        
+    # given corners of screen rectangle, find all nodes inside
+    def get_nodes_in_rect(u1, v1, u2, v2):
+        # screen corners to grid
+        xmin, ymin = to_grid(min(u1,u2), min(v1,v2))
+        xmax, ymax = to_grid(max(u1,u2), max(v1,v2))
+        xmin = int(xmin-5)
+        ymin = int(ymin-5)
+        xmax = int(xmax+5)
+        ymax = int(ymax+5)
+        
+        res = []
+        # just filter the nodes
+        for x in range(xmin, xmax+1):
+            for y in range(ymin, ymax+1):
+                for n in range(len(nodes)):
+                    nodeu, nodev = vadd(to_screen(x, y), vmul(zoom, nodeoffsets[nodes[n]]))
+                    if min(u1,u2) <= nodeu <= max(u1,u2) and min(v1,v2) <= nodev <= max(v1,v2):
+                        res.append((x,y,n))
+        
+        return res
     # print(get_node(0,7))
 
     def mouse_on_ui(mpos):
@@ -515,8 +544,13 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
     
     show_help = True
     show_labels = True
+    
+    selection_anchor = None
+    selection = set()
+    
     # -------- Main Program Loop -----------
     while not done:
+        mousechanged = False
         #print("main looppo")
         new_tim = time.time()
         time_delta = new_tim - tim
@@ -585,33 +619,59 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                 
             elif event.type == pygame.KEYDOWN and not cancel_non_UI:
 
+                drawcolor_set = False
                 if event.key == pygame.K_1:
                     drawcolor = (SET, 0)
+                    drawcolor_set = True
                 if event.key == pygame.K_2:
                     drawcolor = (SET, 1)
+                    drawcolor_set = True
                 if event.key == pygame.K_3:
                     drawcolor = (SET, 2)
+                    drawcolor_set = True
                 if event.key == pygame.K_4:
                     drawcolor = (SET, 3)
+                    drawcolor_set = True
                 if event.key == pygame.K_5:
                     drawcolor = (SET, 4)
+                    drawcolor_set = True
                 if event.key == pygame.K_6:
                     drawcolor = (SET, 5)
+                    drawcolor_set = True
                 if event.key == pygame.K_7:
                     drawcolor = (SET, 6)
+                    drawcolor_set = True
                 if event.key == pygame.K_8:
                     drawcolor = (SET, 7)
+                    drawcolor_set = True
                 if event.key == pygame.K_9:
                     drawcolor = (SET, 8)
+                    drawcolor_set = True
                 if event.key == pygame.K_0:
                     drawcolor = (SET, 9)
+                    drawcolor_set = True
                 if event.key == pygame.K_u:
                     drawcolor = UNKNOWN # means unused
+                    drawcolor_set = True
                 if event.key == pygame.K_BACKSPACE:
                     if shift_modifier:
                         TODO = TODO
                     else:
                         drawcolor = EMPTY
+                        drawcolor_set = True
+                        
+                sel = backend.selection()
+                if drawcolor_set and sel:
+                    patch = dict()
+                    for (x,y,n) in sel:
+                        if drawcolor == EMPTY:
+                            patch[x,y,nodes[n]] = None
+                        elif drawcolor == UNKNOWN:
+                            patch[x,y,nodes[n]] = (list(the_SFT.alph[nodes[n]]), False)
+                        else:
+                            patch[x,y,nodes[n]] = (the_SFT.alph[nodes[n]][drawcolor[1]], True)
+                    backend.replace_patch(patch)
+                    backend.update_selection(set(), save=False)
 
                 if event.key == pygame.K_c and not any_modifier: # x-axis state
                     backend.toggle_axis(0)
@@ -630,6 +690,14 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                         backend.clear_all()
                     else:
                         backend.unfix_all()
+                        
+                if event.key == pygame.K_d:
+                    if cursor_state == CursorState.PAINT:
+                        cursor_state = CursorState.SELECT
+                    elif cursor_state == CursorState.SELECT:
+                        cursor_state = CursorState.MOVE_MARKERS
+                    else:
+                        cursor_state = CursorState.PAINT
 
                 if event.key == pygame.K_z and ctrl_modifier:
                     backend.undo()
@@ -662,9 +730,13 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                 # even if using _START_PRESS in _gui, mouse events come one iteration later
                 # than in pygame, so we just do an explicit check...
                 if not mouse_on_ui(mpos):
+                    if not mouseisdown:
+                        mousechanged = True
                     mouseisdown = True
                     
             elif event.type == pygame.MOUSEBUTTONUP:
+                if mouseisdown:
+                    mousechanged = True
                 mouseisdown = False
                 
             elif event.type == pygame.VIDEORESIZE:
@@ -730,7 +802,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
         """
 
         # cases where grid is perhaps clicked
-        if node != None and mouseisdown and drawcolor != None and not cancel_non_UI:
+        if cursor_state == CursorState.PAINT and node != None and mouseisdown and drawcolor != None and not cancel_non_UI:
             #period_ok = True
             #if x_periodic:
             #    if node[0] < 0 or node[0] >= x_size:
@@ -755,6 +827,25 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                     thred.terminate()
                     thred = None
                     print ("deduction cancelled")
+                   
+        if cursor_state == CursorState.SELECT and not cancel_non_UI:
+            if mouseisdown:
+                if mousechanged:
+                    selection_anchor = (mpos[0], screenheight-mpos[1])
+                if selection_anchor is not None:
+                    u1, v1 = mpos
+                    u2, v2 = selection_anchor
+                    selection = set((x,y,nodes[n]) for (x,y,n) in get_nodes_in_rect(u1, screenheight-v1, u2, v2))
+            elif mousechanged:
+                if shift_modifier:
+                    backend.update_selection(backend.selection() | selection)
+                elif ctrl_modifier:
+                    backend.update_selection(backend.selection() - selection)
+                else:
+                    backend.update_selection(selection)
+                selection_anchor = None
+                selection = set()
+            
 
         # screen corners to grid
         xmin, ymin = to_grid(0, 0)
@@ -808,6 +899,14 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                     continue
                 for n in range(len(nodes)):
                     p = vadd(to_screen(x, y), vmul(zoom, nodeoffsets[nodes[n]]))
+                    # highlight selected nodes and nodes currently being selected
+                    if (x,y,nodes[n]) in selection:
+                        if (x,y,nodes[n]) in backend.selection():
+                            pygame.draw.circle(screen, GREEN, cp_to_screen(p), nodesize+6)
+                        else:
+                            pygame.draw.circle(screen, YELLOW, cp_to_screen(p), nodesize+6)
+                    elif (x,y,nodes[n]) in backend.selection():
+                        pygame.draw.circle(screen, BLUE, cp_to_screen(p), nodesize+6)
                     if Noneish(conf[x,y,nodes[n]]):
                         continue
                     else:
@@ -902,10 +1001,17 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                                
         if show_help:                               
             # Draw some helper text
-            if type(drawcolor) == tuple and drawcolor[0] == SET:
-                draw_msg = ["Drawing symbol {}".format(drawcolor[1])]
+            if cursor_state == CursorState.PAINT:
+                if type(drawcolor) == tuple and drawcolor[0] == SET:
+                    draw_msg = ["Painting symbol {}".format(drawcolor[1])]
+                else:
+                    draw_msg = ["Painting {}".format(drawcolor)]
+            elif cursor_state == CursorState.SELECT:
+                draw_msg = ["Selecting nodes"]
+            elif cursor_state == CursorState.MOVE_MARKERS:
+                draw_msg = ["Moving markers"]
             else:
-                draw_msg = ["Drawing {}".format(drawcolor)]
+                raise Exception("Unknown cursor state: {}".format(cursor_state))
             draw_msg.append("x-axis state: %s" % backend.axis_states[0])
             draw_msg.append("y-axis state: %s" % backend.axis_states[1])
             draw_msg.append("")
@@ -917,6 +1023,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
             draw_msg.append("Zoom: az")
             draw_msg.append("Node size: sx")
             draw_msg.append("Toggle axis states: cv")
+            draw_msg.append("Toggle cursor state: d")
             draw_msg.append("Deduce pattern: spacebar")
             draw_msg.append("Clear deduced nodes: e")
             draw_msg.append("Clear all nodes: shift-e")

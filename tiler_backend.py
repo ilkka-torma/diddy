@@ -151,19 +151,23 @@ class TilerBackend:
         else:
             return False
             
-    def update_state(self, new_state):
+    def update_state(self, new_state, save=True):
         "Update the state, keeping the history that's older than the current state."
-        self.history = self.history[:self.history_index+1]
-        self.history.append(new_state)
-        self.history_index += 1
+        if save:
+            self.history = self.history[:self.history_index+1]
+            self.history.append(new_state)
+            self.history_index += 1
+        else:
+            self.history = self.history[:self.history_index]
+            self.history.append(new_state)
     
     def replace_conf(self, conf):
         "Replace the configuration with a new one, save the old state."
         self.update_state(TilerState(conf=conf, selection=self.selection(), dim=self.sft.dim, nodes=self.sft.nodes))
         
-    def update_selection(self, selection):
+    def update_selection(self, selection, save=True):
         "Replace selection with a new one, save the old state."
-        self.update_state(TilerState(conf=self.conf(), selection=selection))
+        self.update_state(TilerState(conf=self.conf(), selection=selection), save=save)
         
     def deduce(self):
         """
