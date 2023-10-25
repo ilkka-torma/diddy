@@ -44,11 +44,9 @@ def gen_markers_from_minimal(markers, periodic=None):
             # incompatible with periodic
             #print("Incomparable with periodic.")
             return
-        # k = 0 seems dangerous, but ok...
-        k = 0
+        k = 1
         while True:
-            #print ("yield", (a, a, k, a+k*(b-a), a+k*(b-a)), b-a)
-            yield (a, a, a+k*(b-a), a+k*(b-a)) # why b-a??
+            yield (a, a, a+k*(c-a), a+k*(c-a))
             k += 1
     else:
         left_period = ((k+1)*(b-a) for k in naturals())
@@ -132,14 +130,18 @@ class RecognizableConf(Conf):
             return True
         return all(self[nvec] == self[nvecs[0]] for nvec in nvecs[1:])
         
-    def minimized_markers(self):
+    def minimized_markers(self, fixed_axes=None):
         "Move the markers as close to each other as possible and return them."
         # more specifically, first minimize periods of both periodic tails, then rewind right and left tail
         # TODO: handle all special cases
+        if fixed_axes is None:
+            fixed_axes = []
         markers = self.markers[:]
         #print("pattern", self.pat)
         for (i, (a, b, c, d)) in enumerate(markers):
             #print("minimizing marker", (a,b,c,d))
+            if i in fixed_axes:
+                continue
             # if we are periodic, minimize period
             if a==b and c==d:
                 p = min(p for p in range(1, c-a+1)
@@ -205,6 +207,11 @@ class RecognizableConf(Conf):
                 new_pat[nvec] = self[nvec]
         
         return RecognizableConf(new_markers, new_pat, nodes, onesided=self.onesided)
+        
+    def is_periodic(self, axis):
+        "Is this configuration periodic along the given axis?"
+        a, b, c, d = self.markers[axis]
+        return a==b and c==d
 
     def display_str(self, hide_contents=False):
         s = "recognizable configuration with markers {}".format(self.markers)

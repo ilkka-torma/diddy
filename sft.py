@@ -378,7 +378,7 @@ class SFT:
         
         print("deducing with", periodics, fixed_axes)
         
-        markers = conf.minimized_markers()
+        markers = conf.minimized_markers(fixed_axes = fixed_axes)
         print("markers minimized to", markers)
         
         marker_gens = []
@@ -391,7 +391,7 @@ class SFT:
         print("marker gens", marker_gens)
         
         for (i, new_markers) in enumerate(iter_prod(*marker_gens)):
-            print("deducing", i)
+            print("deducing", i, "with markers", new_markers)
             if i == bound:
                 print("bound reached")
                 break

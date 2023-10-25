@@ -613,9 +613,11 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                         drawcolor = EMPTY
 
                 if event.key == pygame.K_c and not any_modifier: # x-axis state
-                    backend.axis_states[0] = AxisState((backend.axis_states[0].value + 1) % len(AxisState))
+                    backend.toggle_axis(0)
                 if event.key == pygame.K_v and not any_modifier: # y-axis state
-                    backend.axis_states[1] = AxisState((backend.axis_states[1].value + 1) % len(AxisState))
+                    backend.toggle_axis(1)
+                if event.key == pygame.K_m:
+                    backend.minimize_markers()
                     
                 if event.key == pygame.K_h:
                     show_help = not show_help
@@ -785,18 +787,18 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                     continue
                 for n in range(len(nodes)):
 
-                    print("apbara", conf.display_str(), x, y, nodes[n])
+                    #print("apbara", conf.display_str(), x, y, nodes[n])
                     if Noneish(conf[x, y, nodes[n]]):
                         continue
                     for t in topology:
                         a, b = t[1], t[2]
                         if a[-1] == nodes[n]:
                             xx, yy, nn = vadd((x, y), vsub(b[:-1], a[:-1])) + (b[2],)
-                            #if (xx, yy, nn) in grid:
-                            p = vadd(to_screen(x, y), vmul(zoom, nodeoffsets[nodes[n]]))
-                            #pp = to_screen(*vadd((xx, yy), nodeoffsets[nn]))
-                            pp = vadd(to_screen(xx, yy), vmul(zoom, nodeoffsets[nn]))
-                            pygame.draw.line(screen, GRAY, cp_to_screen(p), cp_to_screen(pp), 1)
+                            if not Noneish(conf[xx, yy, nodes[nn]]):
+                                p = vadd(to_screen(x, y), vmul(zoom, nodeoffsets[nodes[n]]))
+                                #pp = to_screen(*vadd((xx, yy), nodeoffsets[nn]))
+                                pp = vadd(to_screen(xx, yy), vmul(zoom, nodeoffsets[nn]))
+                                pygame.draw.line(screen, GRAY, cp_to_screen(p), cp_to_screen(pp), 1)
                             
         # Draw the nodes
         for x in range(xmin, xmax + 1):
@@ -872,7 +874,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
 
         
         # draw markers
-        if nnn%100 == 0: print("markers")
+        #if nnn%100 == 0: print("markers")
         for (i, marker) in enumerate(conf.markers):
             def draw_axis(q, xory, color, width):
                 if xory == 0:
@@ -884,7 +886,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                     b = (screenwidth, a[1])
                     pygame.draw.line(screen, color, cp_to_screen(a), cp_to_screen(b), width)
             # x axis marker
-            if nnn%100 == 0: print(i, marker)
+            #if nnn%100 == 0: print(i, marker)
             for (j,q) in enumerate(marker):
                 width = 1
                 if j in [1, 2]:

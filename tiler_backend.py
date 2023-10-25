@@ -69,9 +69,11 @@ class TilerState:
     The nodes of the configuration are decorated with fixedness information.
     """
     
-    def __init__(self, conf=None, selection=None, dim=None, nodes=None, sizes=None):
+    def __init__(self, conf=None, selection=None, dim=None, nodes=None, alph=None, sizes=None):
         if conf is None: # sizes used if no initial config
-            pat = {vec + (node,) : None for vec in hyperrect([(0,sizes[d]) for d in range(dim)]) for node in nodes}
+            pat = {vec + (node,) : (list(alph[node]), False)
+                   for vec in hyperrect([(0,sizes[d]) for d in range(dim)])
+                   for node in nodes}
             conf = RecognizableConf(None, pat, nodes)
         self.conf = conf
         if selection is None:
@@ -83,10 +85,33 @@ def decorate_default(conf):
     decor_pat = {nvec : (sym, False) for (nvec, sym) in conf.pat.items()}
     return RecognizableConf(conf.markers, decor_pat, conf.nodes, onesided=conf.onesided)
     
-def undecorate(conf):
-    "Remove decorations."
-    print("undecorating", conf.display_str())
-    undec_pat = {nvec : tup[0] if tup is not None else None for (nvec, tup) in conf.pat.items()}
+def copy_decoration(undec_conf, dec_conf):
+    """
+    Make a configuration with contents of undec_conf and decorations of dec_conf.
+    Assume they have same defined nodes.
+    """
+    decor_pat = dict()
+    for (nvec, sym) in undec_conf.pat.items():
+        sym2 = dec_conf[nvec]
+        if sym is None:
+            decor_pat[nvec] = None
+        else: # sym2 should also not be None
+            decor_pat[nvec] = (sym, sym2[1])
+    return RecognizableConf(undec_conf.markers, decor_pat, undec_conf.nodes, onesided=undec_conf.onesided)
+    
+def undecorate(conf, unfix_atoms=False, alph=None):
+    "Remove decorations. unfix_atoms replaces non-fixed singletons with the full list."
+    #print("undecorating", conf.display_str())
+    undec_pat = dict()
+    for (nvec, tup) in conf.pat.items():
+        if tup is None:
+            undec_pat[nvec] = None
+        else:
+            sym, fix = tup
+            if type(sym) != list and not fix:
+                undec_pat[nvec] = list(alph[nvec[-1]])
+            else:
+                undec_pat[nvec] = sym
     return RecognizableConf(conf.markers, undec_pat, conf.nodes, onesided=conf.onesided)
 
 class TilerBackend:
@@ -99,7 +124,7 @@ class TilerBackend:
         self.sft = sft
         if init_conf is not None:
             init_conf = decorate_default(init_conf)
-        self.history = [TilerState(conf=init_conf, dim=sft.dim, nodes=sft.nodes, sizes=sizes)]
+        self.history = [TilerState(conf=init_conf, dim=sft.dim, nodes=sft.nodes, alph=sft.alph, sizes=sizes)]
         self.history_index = 0
         self.axis_states = [AxisState.FIXED]*sft.dim
         self.clipboard = None
@@ -141,19 +166,22 @@ class TilerBackend:
         self.update_state(TilerState(conf=self.conf(), selection=selection))
         
     def deduce(self):
-        "Deduce the configuration, save the old state."
+        """
+        Deduce the configuration, save the old state.
+        Unfixed non-list nodes are set to unknown before deduction.
+        """
 
         #if self.conf().empty(): <- maybe smth like this is a good idea, since this fails with periodic right now.
         #    return
         
         fixed_axes = [i for (i,st) in enumerate(self.axis_states) if st == AxisState.FIXED]
         periodics = [i for (i,st) in enumerate(self.axis_states) if st == AxisState.PERIODIC]
-        conf = undecorate(self.conf())
-        deduced_conf = self.sft.deduce_global(conf, periodics=periodics, fixed_axes=fixed_axes)
+        undec_conf = undecorate(self.conf(), unfix_atoms=True, alph=self.sft.alph)
+        deduced_conf = self.sft.deduce_global(undec_conf, periodics=periodics, fixed_axes=fixed_axes)
         print("deduced",deduced_conf)
         if deduced_conf is not None:
             print("it's", deduced_conf.display_str())
-            decorated_conf = decorate_default(deduced_conf)
+            decorated_conf = copy_decoration(deduced_conf, self.conf())
             """
             prev_conf = self.conf()
             # previous configuration should be decorated
@@ -164,7 +192,15 @@ class TilerBackend:
                     assert decorated_conf.pat[nvec][0] == tup[0]
                     decorated_conf.pat[nvec] = tup
             """
-            self.replace_conf(decorated_conf) # TODO: keep fixedness
+            self.replace_conf(decorated_conf)
+            
+    def minimize_markers(self):
+        "Minimize the markers along each non-fixed axis, save the old state if changes were made."
+        fixeds = [axis for (axis, st) in enumerate(self.axis_states) if st == AxisState.FIXED]
+        conf = self.conf()
+        mins = conf.minimized_markers(fixed_axes=fixeds)
+        if mins != conf.markers:
+            self.replace_conf(conf.remark(mins))
 
     def replace_patch(self, pat):
         "Replace patch in configuration, save the old state if changes were made."
@@ -192,9 +228,20 @@ class TilerBackend:
         if self.clipboard is not None:
             replace_patch({nvadd(nvec, vec) : sym for (nvec, sym) in self.clipboard.items()})
             
-    def toggle_axis(self, axis, new_state):
+    def toggle_axis(self, axis):
         "Toggle the state of an axis."
-        self.axis_states[axis] = new_state
+        st = self.axis_states[axis]
+        conf = self.conf()
+        if st == AxisState.FIXED:
+            if conf.is_periodic(axis):
+                new_st = AxisState.PERIODIC
+            else:
+                new_st = AxisState.RECOG
+        elif st == AxisState.PERIODIC:
+            new_st = AxisState.RECOG
+        else:
+            new_st = AxisState.FIXED
+        self.axis_states[axis] = new_st
         
     def replace_markers(self, axis, new_markers):
         "Replace the markers on a given axis, save the old state."
