@@ -429,7 +429,7 @@ class SFT:
         #print("diff_vecs", list(sorted(diff_vecs)))
         #print("vec_domain", list(sorted(vec_domain)))
         #print("deducing from", conf.display_str())
-        unknowns = set(nvec for (nvec, sym) in conf.pat.items() if type(sym) == list)
+        unknowns = set(nvec for (nvec, sym) in conf.pat.items())
         
         #print("vec_domain", vec_domain)
         #print("unknowns", unknowns)
@@ -466,6 +466,7 @@ class SFT:
 
         # Make SAT instance, solve and extract model
         instance = AND(*(list(circuits) + list(forceds)))
+        #print("forceds", forceds)
         model = SAT(instance, True)
         if model == False:
             return None

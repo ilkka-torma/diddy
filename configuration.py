@@ -144,7 +144,7 @@ class RecognizableConf(Conf):
         markers = self.markers[:]
         #print("pattern", self.pat)
         for (i, (a, b, c, d)) in enumerate(markers):
-            #print("minimizing marker", (a,b,c,d))
+            #print("minimizing marker", (a,b,c,d), "on axis", i)
             if i in fixed_axes:
                 continue
             # if we are periodic, minimize period
@@ -168,7 +168,7 @@ class RecognizableConf(Conf):
                 if all(self.can_be_equal_at(nvec, nvadd(nvec, (0,)*i + (p,) + (0,)*(self.dim-i-1)))
                        for nvec in self.pat
                        if nvec[i] >= c):
-                    markers[i] = (a, b, c, p)
+                    markers[i] = (a, b, c, c+p)
                     break
             (a, b, c, d) = markers[i]
             #print(2, i, markers[i])
@@ -197,10 +197,24 @@ class RecognizableConf(Conf):
         #print("minimized to", markers)
         return markers
         
+    def compatible(self, axis, new_markers):
+        "Is this configuration compatible with the given marker structure?"
+        a, b, c, d = new_markers
+        amin, bmin, cmin, dmin = self.minimized_markers()[axis]
+        if a==b and c==d:
+            # new markers are periodic -> old ones should be periodic and consistent
+            return amin == bmin and cmin == dmin and (c-a) % (cmin-amin) == 0
+        elif amin == bmin and cmin == dmin:
+            # new markers are not periodic, old ones are -> tail periods must be consistent
+            return (b-a) % (cmin-amin) == (d-c) % (cmin-amin) == 0
+        else:
+            # neither markers are periodic -> tail periods are consistent, transient part is contained
+            return (b-a) % (bmin-amin) == (d-c) % (dmin-cmin) == 0 and b <= bmin and c >= cmin
+        
     def remark(self, new_markers):
         """
         Produce a restructured configuration using the new marker structure.
-        It's assumed to be compatible with the minimized markers.
+        The markers are assumed to be compatible.
         """
         
         nodes = set(nvec[-1] for nvec in self.pat)

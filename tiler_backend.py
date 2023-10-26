@@ -48,7 +48,7 @@ def replace_sym(conf, nvec, sym, axis_states):
             elif c == d:
                 d = c+(c-b)
             if nvec[i] < b:
-                new_b = b-((b-nvec[i])//(b-a)+1)*(b-a)
+                new_b = b-((b-nvec[i])//(b-a))*(b-a)
                 new_markers.append((new_b-(b-a),new_b, c,d))
             elif nvec[i] >= c:
                 new_c = c+((nvec[i]-c)//(d-c)+1)*(d-c)
@@ -108,10 +108,13 @@ def undecorate(conf, unfix_atoms=False, alph=None):
             undec_pat[nvec] = None
         else:
             sym, fix = tup
-            if type(sym) != list and not fix:
+            if (type(sym) != list or len(sym) == 1) and not fix:
                 undec_pat[nvec] = list(alph[nvec[-1]])
+            elif type(sym) == list and len(sym) == 1:
+                undec_pat[nvec] = sym[0]
             else:
                 undec_pat[nvec] = sym
+            #print("unfixed", tup, "at", nvec, "to", undec_pat[nvec])
     return RecognizableConf(conf.markers, undec_pat, conf.nodes, onesided=conf.onesided)
 
 class TilerBackend:
@@ -173,6 +176,7 @@ class TilerBackend:
         """
         Deduce the configuration, save the old state.
         Unfixed non-list nodes are set to unknown before deduction.
+        Return a Boolean for success.
         """
 
         #if self.conf().empty(): <- maybe smth like this is a good idea, since this fails with periodic right now.
@@ -182,21 +186,13 @@ class TilerBackend:
         periodics = [i for (i,st) in enumerate(self.axis_states) if st == AxisState.PERIODIC]
         undec_conf = undecorate(self.conf(), unfix_atoms=True, alph=self.sft.alph)
         deduced_conf = self.sft.deduce_global(undec_conf, periodics=periodics, fixed_axes=fixed_axes)
-        print("deduced",deduced_conf)
+        #print("deduced",deduced_conf)
         if deduced_conf is not None:
-            print("it's", deduced_conf.display_str())
+            #print("it's", deduced_conf.display_str())
             decorated_conf = copy_decoration(deduced_conf, self.conf())
-            """
-            prev_conf = self.conf()
-            # previous configuration should be decorated
-            for (nvec, tup) in prev_conf.pat.items():
-                # fixed cell, copy this information
-                if tup and tup[1]:
-                    assert nvec in decorated_conf.pat
-                    assert decorated_conf.pat[nvec][0] == tup[0]
-                    decorated_conf.pat[nvec] = tup
-            """
             self.replace_conf(decorated_conf)
+            return True
+        return False
             
     def minimize_markers(self):
         "Minimize the markers along each non-fixed axis, save the old state if changes were made."
@@ -225,12 +221,12 @@ class TilerBackend:
                    for i in range(self.sft.dim)]
         self.clipboard = {nvsub(nvec, min_vec) : self.conf()[nvec]
                           for nvec in self.selection()}
-        update_selection(set())
+        self.update_selection(set())
         
     def paste_clipboard(self, vec):
         "Paste a translated copy of the clipboard, and save the old state if changes were made."
         if self.clipboard is not None:
-            replace_patch({nvadd(nvec, vec) : sym for (nvec, sym) in self.clipboard.items()})
+            self.replace_patch({nvadd(nvec, vec) : sym for (nvec, sym) in self.clipboard.items()})
             
     def toggle_axis(self, axis):
         "Toggle the state of an axis."
@@ -248,12 +244,16 @@ class TilerBackend:
         self.axis_states[axis] = new_st
         
     def replace_markers(self, axis, new_markers):
-        "Replace the markers on a given axis, save the old state."
+        "Replace the markers on a given axis if valid, save the old state."
         conf = self.conf()
+        a, b, c, d = new_markers
+        if not (((a < b <= c < d) or (a==b < c==d)) and conf.compatible(axis, new_markers)):
+            return
         markers = conf.markers[:]
         markers[axis] = new_markers
         new_conf = conf.remark(markers)
-        self.replace_conf(new_conf)
+        if new_conf is not None:
+            self.replace_conf(new_conf)
         
     def fix_nodes(self, nvecs):
         "Fix the given nodes, save if changes are made."
