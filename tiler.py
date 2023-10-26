@@ -334,7 +334,9 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
     for c in colors:
         deduced_colors[c] = tuple(map(lambda a:a//2, colors[c]))
 
-    #print("alph", alphabets)
+    print("nodes", nodes)
+    print("alph", alphabets)
+    print("colors", colors)
 
     origin = (0,)*dimension + (nodes[0],)
 
@@ -402,9 +404,14 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
     # Set title of screen
     pygame.display.set_caption("Tiler")
 
+    print("pictures", pictures)
+    
     if pictures != None:
-        pictures = {p : [get_picture(q) for q in pictures[p]] for p in pictures}
-      
+        pictures = {node : {sym : get_picture(pic) for (sym, pic) in zip(alphabets[node], pics)}
+                    for (node, pics) in pictures.items()}
+    
+    print("pictures2", pictures)
+    
     # Loop until the user clicks the close button.
     done = False
     
@@ -909,7 +916,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                 axis, marker = moving_marker
                 marker.append([x,y][axis])
                 if len(marker) == 4:
-                    backend.replace_markers(axis, marker)
+                    marker.sort()
+                    backend.replace_markers(axis, tuple(marker))
                     moving_marker = None
                     currentstate = TILING_UNKNOWN
         
@@ -980,7 +988,6 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                         continue
                     else:
 
-                        sym_ix = None
                         #if grid[(x,y,n)] != UNKNOWN:
                         #    print (grid[(x,y,n)],  DEDUCED)
 
@@ -994,12 +1001,12 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                         #else:
                         #    print(grid[(x,y,n)], "!=", UNKNOWN)
                         else:
-                            sym_ix = sym # ???
+                            #sym_ix = sym # ???
                             #print(alphabets, nodes[n], sym, colors)
                             #sym = alphabets[nodes[n]][symidx]
                             #print(sym)
                             #color = colors[grid[(x,y,nodes[n])][1]]
-                            color = colors[nodes[n], the_SFT.alph[nodes[n]][sym_ix]]
+                            color = colors[nodes[n], sym]
                             white_circle = fixed
 
                         #if (x, y, n) in vemmel:
@@ -1023,7 +1030,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                         if not drawing_picture or True: # actually I like the circles
                             pygame.draw.circle(screen, color, cp_to_screen(p), nodesize)
 
-                        if show_labels and not drawing_picture and sym_ix != None:
+                        if show_labels and not drawing_picture and sym != None and type(sym) != list:
                             #print(sym, color)
                             col = (255, 255, 255)
                             if sum(color) > 250:
@@ -1031,12 +1038,13 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                             
                             # write name of node, or draw picture
                             if pictures == None or nodes[n] not in pictures:
-                                font_surf = my_font.render(str(the_SFT.alph[nodes[n]][sym_ix]), False, col)
+                                #print("rendering", sym)
+                                font_surf = my_font.render(str(sym), False, col)
                                 v = (font_surf.get_width()//2, -font_surf.get_height()//2)
                                 screen.blit(font_surf, cp_to_screen(vsub(p, v)))
                                 
-                        if sym_ix != None and drawing_picture:
-                            pic = pictures[nodes[n]][sym_ix]
+                        if sym != None and type(sym) != list and drawing_picture:
+                            pic = pictures[nodes[n]][sym]
                             pic = pygame.transform.scale(pic, (nodesize*2, nodesize*2))
                             v = (pic.get_width()//2, -pic.get_height()//2)
                             screen.blit(pic, cp_to_screen(vsub(p, v)))
@@ -1073,12 +1081,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
             #if nnn%100 == 0: print(i, marker)
             axis, marker = moving_marker
             for (j,q) in enumerate(marker):
-                width = 1
-                if j in [1, 2]:
-                    width = 3
-                draw_axis(q, axis, GREEN + (0,), width)
-            if len(marker) >= 2 and marker[0] == marker[1]:
-                draw_axis(marker[0], axis, BLUE + (0,), 3)
+                draw_axis(q, axis, WHITE, 1)
                     
         
                                
@@ -1105,10 +1108,10 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
             draw_msg.append("y-axis state: %s" % backend.axis_states[1])
             draw_msg.append("")
             draw_msg.append("Draw: left mouse button")
-            draw_msg.append("Pick symbol: number keys")
-            draw_msg.append("Pick unknown symbol: u")
-            draw_msg.append("Pick empty node: backspace")
-            draw_msg.append("Pick fixity: f")
+            draw_msg.append("Draw symbol: number keys")
+            draw_msg.append("Draw unknown symbol: u")
+            draw_msg.append("Draw empty node: backspace")
+            draw_msg.append("Draw fixity: f")
             draw_msg.append("Pan: arrow keys")
             draw_msg.append("Zoom: az")
             draw_msg.append("Node size: sx")
@@ -1127,7 +1130,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
             draw_msg.append("Toggle symbol labels: l")
             draw_msg.append("Toggle UI: h")
             for (i, msg) in enumerate(draw_msg):
-                font_surf = msg_font.render(msg, False, GREEN)
+                font_surf = msg_font.render(msg, False, GREEN, BLACK)
                 screen.blit(font_surf, (10, 10+i*15))
      
             #screen.blit(textinput.surface, (30, 30))

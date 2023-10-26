@@ -31,12 +31,11 @@ def normalize_markers(i, markers, domain=None):
     else:
         raise Exception("Bad marker specification: {}".format(axis))
         
-def gen_markers_from_minimal(markers, periodic=None):
+def gen_markers_from_minimal(markers, periodic=None, inits=None):
     """
     Generate quadruples of markers that are in principle compatible with the given ones (and possibly periodic).
     The input markers are assumed to be minimized.
     """
-    # TODO: take into account all apecial cases
     a, b, c, d = markers
     if periodic:
         #print("AM HERE")
@@ -44,7 +43,9 @@ def gen_markers_from_minimal(markers, periodic=None):
             # incompatible with periodic
             #print("Incomparable with periodic.")
             return
-        k = 1
+        if inits is None:
+            inits = 5
+        k = inits
         while True:
             yield (a, a, a+k*(c-a), a+k*(c-a))
             k += 1
@@ -54,10 +55,13 @@ def gen_markers_from_minimal(markers, periodic=None):
             a = a-(c-b)
         if c==d:
             d = d+(c-b)
-        left_period = ((k+1)*(b-a) for k in naturals())
-        left_border = (b-k for k in naturals())
-        right_border = (c+k for k in naturals())
-        right_period = ((k+1)*(d-c) for k in naturals())
+        if inits is None:
+            inits = (5,0,0,5)
+        k1, k2, k3, k4 = inits
+        left_period = ((k+k1+1)*(b-a) for k in naturals())
+        left_border = (b-k-k2 for k in naturals())
+        right_border = (c+k+k3 for k in naturals())
+        right_period = ((k+k4+1)*(d-c) for k in naturals())
         for (p1, b1, b2, p2) in iter_prod(left_period, left_border, right_border, right_period):
             #print("generated markers", (b1-p1, b1, b2, b2+p2), "from", markers)
             candidate = (b1-p1, b1, b2, b2+p2)
