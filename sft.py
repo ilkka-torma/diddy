@@ -376,10 +376,10 @@ class SFT:
         if fixed_axes is None:
             fixed_axes = []
         
-        print("deducing with", periodics, fixed_axes)
+        #print("deducing with", periodics, fixed_axes)
         
         markers = conf.minimized_markers(fixed_axes = fixed_axes)
-        print("markers minimized to", markers)
+        #print("markers minimized to", markers)
         
         marker_gens = []
         for (i, marker) in enumerate(markers):
@@ -390,29 +390,34 @@ class SFT:
                 
         print("marker gens", marker_gens)
         
+        area = 0
         for (i, new_markers) in enumerate(iter_prod(*marker_gens)):
             print("deducing", i, "with markers", new_markers)
             if i == bound:
-                print("bound reached")
+                #print("bound reached")
                 break
+                
+            max_marker = max(abs(a) for marker in markers for a in marker)
             
             # try to find a configuration with given structure
             ret_conf = self.deduce(conf.remark(list(new_markers)))
             if ret_conf is not None:
-                print("found", ret_conf.display_str())
+                #print("found", ret_conf.display_str())
                 return ret_conf
             
-            # try to find a finite patch
-            filled = dict()
-            for vec in hyperrect([(-i,i+1) for _ in range(self.dim)]):
-                for node in self.nodes:
-                    nvec = vec + (node,)
-                    filled[nvec] = conf[nvec]
-            finite_conf = RecognizableConf(None, filled, self.nodes)
-            #print("finite_conf", finite_conf.display_str())
-            if self.deduce(finite_conf) is None:
-                print("failed")
-                break
+            if max_marker > area:
+                area = max_marker
+                # try to find a finite patch
+                filled = dict()
+                for vec in hyperrect([(-i,i+1) for _ in range(self.dim)]):
+                    for node in self.nodes:
+                        nvec = vec + (node,)
+                        filled[nvec] = conf[nvec]
+                finite_conf = RecognizableConf(None, filled, self.nodes)
+                #print("finite_conf", finite_conf.display_str())
+                if self.deduce(finite_conf) is None:
+                    #print("failed")
+                    break
                 
         return None
 
@@ -478,12 +483,12 @@ class SFT:
             if conf[nvec] is None:
                 pat[nvec] = None
             else:
-                for sym in self.alph[node][1:]:
+                for sym in self.alph[nvec[-1]][1:]:
                     if nvec + (sym,) in model and model[nvec + (sym,)]:
                         pat[nvec] = sym
                         break
                 else:
-                    pat[nvec] = self.alph[node][0]
+                    pat[nvec] = self.alph[nvec[-1]][0]
         #print("final pat", pat)
         return RecognizableConf(conf.markers, pat, self.nodes, onesided=conf.onesided)
 
