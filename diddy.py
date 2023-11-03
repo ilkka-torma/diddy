@@ -1055,6 +1055,11 @@ def report_blockmap_equal(a, b, mode="report", truth=True, verbose=False): # ver
         print(diff is None, truth)
         assert (diff is None) == (truth == "T")
 
+def fix_filename(filename):
+    if "." not in filename:
+        return filename + ".diddy"
+    return filenam
+
 
 line = [("rt", (0,0), (1,0)),
         ("lt", (0,0), (-1,0))]
@@ -1120,7 +1125,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("filename", metavar='f', type=str)
     args = arg_parser.parse_args()
 
-    with open(args.filename, 'r') as f:
+    with open(fix_filename(args.filename), 'r') as f:
         code = f.read()
 
     runner = Diddy()

@@ -701,8 +701,27 @@ class SFT:
         
         self.deduce_forbs_(vec_domain)
 
+    def inconsistent_with(self, other, verbose=False):
+        if verbose:
+            if self.dim != other.dim:
+                print("The compared SFTs have different dimensions.")
+            elif self.onesided != other.onesided:
+                print("The compared SFTs have different sidedness.")
+            elif self.nodes != other.nodes:
+                print("The compared SFTs have different nodes.")
+            elif self.alph != other.alph:
+                print("The compared SFTs have different alphabets.")
+        return self.dim != other.dim or self.onesided != other.onesided or self.nodes != other.nodes or self.alph != other.alph
+
     def contains(self, other, limit = None, return_radius_and_sep = False, method="periodic", verbose=False):
         "Test containment using forced allowed patterns or special configurations"
+        test = self.inconsistent_with(other, verbose=verbose)
+        if test:
+            if return_radius_and_sep:
+                return False, 0, Conf()
+            else:
+                return False
+            
         r = 1
         while limit is None or r <= limit:
             if verbose:
@@ -725,6 +744,12 @@ class SFT:
         return None
 
     def equals(self, other, limit = None, return_radius = False, method=None, verbose=False):
+        test = self.inconsistent_with(other, verbose=verbose)
+        if test:
+            if return_radius_and_sep:
+                return False, 0, Conf()
+            else:
+                return False
         if verbose:
             print("Testing containment 1")
         c12, rad, _ = self.contains(other, limit, return_radius_and_sep = True, method=method, verbose=verbose)
