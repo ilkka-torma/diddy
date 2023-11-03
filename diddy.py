@@ -5,6 +5,7 @@ import parsy
 import compiler
 import sft
 import configuration
+import circuit
 
 import period_automaton
 import density_linear_program
@@ -171,6 +172,14 @@ class Diddy:
                     self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, self.topology, forbs=defn, onesided=onesided)
                 elif type(defn) == tuple:
                     circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, defn, self.externals)
+                    vardict = dict()
+                    inst = circuit.circuit_to_sat_instance(circ, vardict)
+                    import abstract_SAT_simplify
+                    simp = abstract_SAT_simplify.compute_eq_relation(inst[0])
+                    ##3print (inst[0])
+                    s = set(abs(v) for c in inst[0] for v in c)
+                    print (len(s), "reduced to", len(simp))
+                    
                     self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, self.topology, circuit=circ, formula=defn, onesided=onesided)
                 else:
                     raise Exception("Unknown SFT definition: {}".format(defn))
@@ -446,6 +455,13 @@ class Diddy:
                 print("Showing parsed formula for %s." % name)
                 print(formula)
                 print()
+
+            elif cmd == "show_environment":
+                name = kwds.get("sft", None)
+                if name == None:
+                    print (self.dim, self.nodes, self.topology, self.alphabet)
+                else:
+                    print (self.SFTs[name].dim, self.SFTs[name].nodes, self.SFTs[name].topology, self.SFTs[name].alph)
 
             elif cmd == "show_conf" and mode == "report":
                 name = args[0]
@@ -1058,7 +1074,7 @@ def report_blockmap_equal(a, b, mode="report", truth=True, verbose=False): # ver
 def fix_filename(filename):
     if "." not in filename:
         return filename + ".diddy"
-    return filenam
+    return filename
 
 
 line = [("rt", (0,0), (1,0)),

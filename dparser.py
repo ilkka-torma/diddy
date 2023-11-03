@@ -190,6 +190,9 @@ commands = [
     Command("show_forbidden_patterns",
             [ArgType.LABEL],
             aliases = ["print_forbidden_patterns"]),
+    Command("show_environment",
+            [],
+            opts = ["sft"]),
 
     # Comparing objects
     Command("equal",

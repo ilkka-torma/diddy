@@ -28,7 +28,7 @@ def compute_eq_relation_and_inverses(instance):
         new_variables.append(v)
         new_variables.append(max_var + v)
     eq_rel = compute_eq_relation(instance + inverse_clauses, new_variables)
-    print(eq_rel)
+    #print(eq_rel)
     # we remove inverse variables from all blocks, and calculate inverses of blocks
     invless_eq_rel = set()
     inverses = {}
