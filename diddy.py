@@ -93,7 +93,7 @@ class Diddy:
                 if top in ["line"]:
                     self.dim = 1
                     self.topology = line
-                    self.nodes = [0]
+                    self.nodes = sft.Nodes([0])
                     # only the first will be used
                     self.tiler_gridmoves = [(1, 0), (0, 1)]
                     self.tiler_skew = 1
@@ -101,28 +101,28 @@ class Diddy:
                 elif top in ["square", "grid", "squaregrid"]:
                     self.dim = 2
                     self.topology = grid
-                    self.nodes = [0]
+                    self.nodes = sft.Nodes([0])
                     self.tiler_gridmoves = [(1,0), (0,1)]
                     self.tiler_skew = 1
                     self.tiler_nodeoffsets = {0 : (0,0)}
                 elif top in ["hex", "hexgrid"]:
                     self.dim = 2
                     self.topology = hexgrid
-                    self.nodes = [0, 1]
+                    self.nodes = sft.Nodes([0,1])
                     self.tiler_gridmoves = [(1,0), (-0.5,0.8)]
                     self.tiler_skew = 1
                     self.tiler_nodeoffsets = {0 : (0,0.15), 1 : (0.5,-0.15)}
                 elif top in ["king", "kinggrid"]:
                     self.dim = 2
                     self.topology = kinggrid
-                    self.nodes = [0]
+                    self.nodes = sft.Nodes([0])
                     self.tiler_gridmoves = [(1,0), (0,1)]
                     self.tiler_skew = 1
                     self.tiler_nodeoffsets = {0 : (0,0)}
                 elif top in ["triangle", "trianglegrid"]:
                     self.dim = 2
                     self.topology = trianglegrid
-                    self.nodes = [0]
+                    self.nodes = sft.Nodes([0])
                     self.tiler_gridmoves = [(1,0), (-0.5,0.6)]
                     self.tiler_skew = 1
                     self.tiler_nodeoffsets = {0 : (0,0)}
@@ -172,13 +172,13 @@ class Diddy:
                     self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, self.topology, forbs=defn, onesided=onesided)
                 elif type(defn) == tuple:
                     circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, defn, self.externals)
-                    vardict = dict()
-                    inst = circuit.circuit_to_sat_instance(circ, vardict)
-                    import abstract_SAT_simplify
-                    simp = abstract_SAT_simplify.compute_eq_relation(inst[0])
-                    ##3print (inst[0])
-                    s = set(abs(v) for c in inst[0] for v in c)
-                    print (len(s), "reduced to", len(simp))
+                    #vardict = dict()
+                    #inst = circuit.circuit_to_sat_instance(circ, vardict)
+                    #import abstract_SAT_simplify
+                    #simp = abstract_SAT_simplify.compute_eq_relation(inst[0])
+                    #print (inst[0])
+                    #s = set(abs(v) for c in inst[0] for v in c)
+                    #print (len(s), "reduced to", len(simp))
                     
                     self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, self.topology, circuit=circ, formula=defn, onesided=onesided)
                 else:
@@ -1121,7 +1121,7 @@ Wang_topology = [("up", (0,0,"N"), (0,1,"S")),
 
 # Cundy Rollet 4.8^2, see Wikipedia
 # Euclidean tilings by convex regular polygons
-CR4d8e2_nodes = ["big", "small"]
+CR4d8e2_nodes = sft.Nodes(["big", "small"])
 CR4d8e2_topology = [('N', (0, 0, 'big'), (0, 1, 'small')),
                     ('NE', (0, 0, 'big'), (1, 1, 'big')),
                     ('E', (0, 0, 'big'), (0, 0, 'small')),

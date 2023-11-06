@@ -337,7 +337,6 @@ code = """
 %show_environment sft=var
 %equal expect=T diagram var @verbose
 """
-unit_tests = []
 unit_tests.append(("spacetime diagram", code))
 
 code = """
