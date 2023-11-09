@@ -6,6 +6,7 @@ import compiler
 import sft
 import configuration
 import circuit
+import abstract_SAT_simplify
 
 import period_automaton
 import density_linear_program
@@ -167,6 +168,8 @@ class Diddy:
                 name = args[0]
                 defn = args[1]
                 onesided = kwds.get("onesided", [])
+                if "verbose" in flags:
+                    print("Defining SFT named", name)
                 # Definition is either a list of forbidden patterns or a formula
                 if type(defn) == list:
                     self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, self.topology, forbs=defn, onesided=onesided)
@@ -175,10 +178,16 @@ class Diddy:
                     #vardict = dict()
                     #inst = circuit.circuit_to_sat_instance(circ, vardict)
                     #import abstract_SAT_simplify
-                    #simp = abstract_SAT_simplify.compute_eq_relation(inst[0])
-                    #print (inst[0])
-                    #s = set(abs(v) for c in inst[0] for v in c)
-                    #print (len(s), "reduced to", len(simp))
+                    if "simplify" in flags:
+                        _, simp = abstract_SAT_simplify.simplify_circ_eqrel(circ)
+                        simp.simplify()
+                        #print (inst[0])
+                        #s = set(abs(v) for c in inst[0] for v in c)
+                        s1 = sum(1 for _ in circ.internal_nodes(vars_too=True))
+                        s2 = sum(1 for _ in simp.internal_nodes(vars_too=True))
+                        if "verbose" in flags:
+                            print ("Circuit size", s1, "reduced to", s2)
+                        circ = simp
                     
                     self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, self.topology, circuit=circ, formula=defn, onesided=onesided)
                 else:
@@ -645,7 +654,6 @@ class Diddy:
                             continue
                         node, sym, formula = rule
                         circ = compiler.formula_to_circuit(dom_nodes, dom_dim, dom_top, dom_alph, formula, self.externals)
-                        #circuits[(node, sym)] = circ
                         circuits.append((node, sym, circ))
                 #print(circuits)
                 self.blockmaps[name] = blockmap.BlockMap(dom_alph, cod_alph, dom_nodes, cod_nodes, dom_dim, circuits, dom_top, cod_top, overlaps=overlaps, verbose=verbose)

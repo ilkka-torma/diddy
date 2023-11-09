@@ -181,8 +181,14 @@ class Circuit:
             return ret
     def get_variables(self):
         return get_vars(self)
-    def internal_nodes(self):
-        return int_nodes(self)
+    def internal_nodes(self, vars_too=False):
+        return int_nodes(self, vars_too)
+        
+    def get_id(self):
+        if self.op == "V":
+            return self.inputs[0]
+        else:
+            return id(self)
     #def __eq__(self, other):
     #    return models(self, other) and models(other, self)
     #def __hash__(self):
@@ -495,13 +501,13 @@ def get_vars_(c, dealts):
             s.update(get_vars_(t, dealts))
         return s
 
-def int_nodes(c):
+def int_nodes(c, vars_too=False):
     #isi = Circuit.internal_sweep_int
     #Circuit.internal_sweep_int += 1
     dealts = set()
-    return int_nodes_(c, dealts)
+    return int_nodes_(c, dealts, vars_too)
 
-def int_nodes_(c, dealts):
+def int_nodes_(c, dealts, vars_too):
     #if c.isi == isi:
     #    return list()
     if c not in dealts:
@@ -510,8 +516,10 @@ def int_nodes_(c, dealts):
     
         if c.op != "V":
             for t in c.inputs:
-                for node in int_nodes_(t, dealts):
+                for node in int_nodes_(t, dealts, vars_too):
                     yield node
+            yield c
+        elif vars_too:
             yield c
 
 def LDAC(n):
