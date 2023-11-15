@@ -850,10 +850,11 @@ class SFT:
             r += 1
         return None
 
-    def tile_box(self, r):
+    def tile_box(self, r, verbose=False):
         all_positions = set()
         circuits = []
         
+        tim = time.time()
         for vec in centered_hypercube(self.dim, r):
             circ = self.circuit.copy()
             transform(circ, lambda var: nvadd(var[:-1], vec) + var[-1:])
@@ -862,8 +863,13 @@ class SFT:
             circuits.append(circ)
 
         add_uniqueness_constraints(self.alph, circuits, all_positions)
+        if verbose:
+            print("Constructed instance in {} seconds".format(time.time() - tim))
 
+        tim = time.time()
         m = SAT(AND(*circuits))
+        if verbose:
+            print("Solved instance in {} seconds".format(time.time() - tim))
         return not (m == False)
 
 def intersection(*sfts):

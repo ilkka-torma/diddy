@@ -4,6 +4,7 @@ import parsy
 
 import compiler
 import sft
+import sofic1d
 import configuration
 import circuit
 import abstract_SAT_simplify
@@ -162,7 +163,7 @@ class Diddy:
                     self.dim = the_sft.dim
                     self.nodes = the_sft.nodes
                     self.topology = the_sft.topology
-                    self.alphabey = the_sft.alph
+                    self.alphabet = the_sft.alph
                     
             elif cmd == "sft":
                 name = args[0]
@@ -193,6 +194,22 @@ class Diddy:
                 else:
                     raise Exception("Unknown SFT definition: {}".format(defn))
                 #print("CIRCUIT", circ)
+                
+            elif cmd == "sofic1D":
+                name = args[0]
+                sft_name = args[1]
+                verbose = "verbose" in flags
+                self.SFTs[name] = sofic1d.Sofic1D.from_SFT(self.SFTs[sft_name], verbose=verbose)
+                
+            elif cmd == "determinize":
+                name = args[0]
+                verbose = "verbose" in flags
+                self.SFTs[name].determinize(verbose=verbose, trim=True)
+                
+            elif cmd == "minimize":
+                name = args[0]
+                verbose = "verbose" in flags
+                self.SFTs[name].minimize(verbose=verbose)
 
             elif cmd == "intersection":
                 isect_name = args[0]
@@ -215,7 +232,35 @@ class Diddy:
                         raise Exception("Incompatible alphabets: {} and {}".format(first.alph, other.alph))
                     if first.onesided != other.onesided:
                         raise Exception("Cannot intersect onesided and twosided SFT")
-                self.SFTs[isect_name] = sft.intersection(*sfts)
+                if isinstance(first, sft.SFT):
+                    self.SFTs[isect_name] = sft.intersection(*sfts)
+                else:
+                    self.SFTs[isect_name] = sofic1d.intersection(*sfts)
+                
+            elif cmd == "union":
+                isect_name = args[0]
+                names = args[1]
+                if not names:
+                    raise Exception("Empty intersection")
+                sofics = []
+                for name in names:
+                    try:
+                        sofics.append(self.SFTs[name])
+                    except KeyError:
+                        raise Exception("{} is not an SFT".format(name))
+                    if not isinstance(self.SFTs[name], sofic1d.Sofic1D):
+                        raise Exception("Can only compute unions of 1D sofic shifts")
+                first = sofics[0]
+                for other in sofics[1:]:
+                    if first.dim != other.dim:
+                        raise Exception("Incompatible dimensions: {} and {}".format(first.dim, other.dim))
+                    if first.nodes != other.nodes:
+                        raise Exception("Incompatible node sets: {} and {}".format(first.nodes, other.nodes))
+                    if first.alph != other.alph:
+                        raise Exception("Incompatible alphabets: {} and {}".format(first.alph, other.alph))
+                    if first.onesided != other.onesided:
+                        raise Exception("Cannot intersect onesided and twosided SFT")
+                self.SFTs[isect_name] = sofic1d.union(*sofics)
 
             elif cmd == "product":
                 prod_name = args[0]
@@ -820,9 +865,10 @@ class Diddy:
                 name = args[0]
                 rad = kwds.get("min", 1)
                 max_rad = kwds.get("max", None)
+                verbose = "verbose" in flags
                 while max_rad is None or rad > max_rad:
                     print("Tiling %s-hypercube of SFT %s." % (rad, name))
-                    self.SFTs[name].tile_box(rad)
+                    self.SFTs[name].tile_box(rad, verbose=verbose)
                     rad += 1
                     
                                         
