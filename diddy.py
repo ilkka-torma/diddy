@@ -4,8 +4,10 @@ import parsy
 
 import compiler
 import sft
+import sofic1d
 import configuration
 import circuit
+import abstract_SAT_simplify
 
 import period_automaton
 import density_linear_program
@@ -164,12 +166,14 @@ class Diddy:
                     self.dim = the_sft.dim
                     self.nodes = the_sft.nodes
                     self.topology = the_sft.topology
-                    self.alphabey = the_sft.alph
+                    self.alphabet = the_sft.alph
                     
             elif cmd == "sft":
                 name = args[0]
                 defn = args[1]
                 onesided = kwds.get("onesided", [])
+                if "verbose" in flags:
+                    print("Defining SFT named", name)
                 # Definition is either a list of forbidden patterns or a formula
                 if type(defn) == list:
                     self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, self.topology, forbs=defn, onesided=onesided)
@@ -178,15 +182,37 @@ class Diddy:
                     #vardict = dict()
                     #inst = circuit.circuit_to_sat_instance(circ, vardict)
                     #import abstract_SAT_simplify
-                    #simp = abstract_SAT_simplify.compute_eq_relation(inst[0])
-                    #print (inst[0])
-                    #s = set(abs(v) for c in inst[0] for v in c)
-                    #print (len(s), "reduced to", len(simp))
+                    if "simplify" in flags:
+                        _, simp = abstract_SAT_simplify.simplify_circ_eqrel(circ)
+                        simp.simplify()
+                        #print (inst[0])
+                        #s = set(abs(v) for c in inst[0] for v in c)
+                        s1 = sum(1 for _ in circ.internal_nodes(vars_too=True))
+                        s2 = sum(1 for _ in simp.internal_nodes(vars_too=True))
+                        if "verbose" in flags:
+                            print ("Circuit size", s1, "reduced to", s2)
+                        circ = simp
                     
                     self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, self.topology, circuit=circ, formula=defn, onesided=onesided)
                 else:
                     raise Exception("Unknown SFT definition: {}".format(defn))
                 #print("CIRCUIT", circ)
+                
+            elif cmd == "sofic1D":
+                name = args[0]
+                sft_name = args[1]
+                verbose = "verbose" in flags
+                self.SFTs[name] = sofic1d.Sofic1D.from_SFT(self.SFTs[sft_name], verbose=verbose)
+                
+            elif cmd == "determinize":
+                name = args[0]
+                verbose = "verbose" in flags
+                self.SFTs[name].determinize(verbose=verbose, trim=True)
+                
+            elif cmd == "minimize":
+                name = args[0]
+                verbose = "verbose" in flags
+                self.SFTs[name].minimize(verbose=verbose)
 
             elif cmd == "intersection":
                 isect_name = args[0]
@@ -209,7 +235,35 @@ class Diddy:
                         raise Exception("Incompatible alphabets: {} and {}".format(first.alph, other.alph))
                     if first.onesided != other.onesided:
                         raise Exception("Cannot intersect onesided and twosided SFT")
-                self.SFTs[isect_name] = sft.intersection(*sfts)
+                if isinstance(first, sft.SFT):
+                    self.SFTs[isect_name] = sft.intersection(*sfts)
+                else:
+                    self.SFTs[isect_name] = sofic1d.intersection(*sfts)
+                
+            elif cmd == "union":
+                isect_name = args[0]
+                names = args[1]
+                if not names:
+                    raise Exception("Empty intersection")
+                sofics = []
+                for name in names:
+                    try:
+                        sofics.append(self.SFTs[name])
+                    except KeyError:
+                        raise Exception("{} is not an SFT".format(name))
+                    if not isinstance(self.SFTs[name], sofic1d.Sofic1D):
+                        raise Exception("Can only compute unions of 1D sofic shifts")
+                first = sofics[0]
+                for other in sofics[1:]:
+                    if first.dim != other.dim:
+                        raise Exception("Incompatible dimensions: {} and {}".format(first.dim, other.dim))
+                    if first.nodes != other.nodes:
+                        raise Exception("Incompatible node sets: {} and {}".format(first.nodes, other.nodes))
+                    if first.alph != other.alph:
+                        raise Exception("Incompatible alphabets: {} and {}".format(first.alph, other.alph))
+                    if first.onesided != other.onesided:
+                        raise Exception("Cannot intersect onesided and twosided SFT")
+                self.SFTs[isect_name] = sofic1d.union(*sofics)
 
             elif cmd == "product":
                 prod_name = args[0]
@@ -648,7 +702,6 @@ class Diddy:
                             continue
                         node, sym, formula = rule
                         circ = compiler.formula_to_circuit(dom_nodes, dom_dim, dom_top, dom_alph, formula, self.externals)
-                        #circuits[(node, sym)] = circ
                         circuits.append((node, sym, circ))
                 #print(circuits)
                 self.blockmaps[name] = blockmap.BlockMap(dom_alph, cod_alph, dom_nodes, cod_nodes, dom_dim, circuits, dom_top, cod_top, overlaps=overlaps, verbose=verbose)
@@ -815,9 +868,10 @@ class Diddy:
                 name = args[0]
                 rad = kwds.get("min", 1)
                 max_rad = kwds.get("max", None)
+                verbose = "verbose" in flags
                 while max_rad is None or rad > max_rad:
                     print("Tiling %s-hypercube of SFT %s." % (rad, name))
-                    self.SFTs[name].tile_box(rad)
+                    self.SFTs[name].tile_box(rad, verbose=verbose)
                     rad += 1
                     
                                         

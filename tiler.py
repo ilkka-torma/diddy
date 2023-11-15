@@ -698,11 +698,11 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                     else:
                         for (x,y,n) in sel:
                             if drawcolor == EMPTY:
-                                patch[x,y,nodes[n]] = None
+                                patch[x,y,n] = None
                             elif drawcolor == UNKNOWN:
-                                patch[x,y,nodes[n]] = (list(the_SFT.alph[nodes[n]]), False)
+                                patch[x,y,n] = (list(the_SFT.alph[n]), False)
                             else:
-                                patch[x,y,nodes[n]] = (the_SFT.alph[nodes[n]][drawcolor[1]], True)
+                                patch[x,y,n] = (the_SFT.alph[n][drawcolor[1]], True)
                     backend.replace_patch(patch)
                     currentstate = TILING_UNKNOWN
                     #backend.update_selection(set(), save=False)
@@ -963,7 +963,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
                         a, b = t[1], t[2]
                         if a[-1] == nodes[n]:
                             xx, yy, nn = vadd((x, y), vsub(b[:-1], a[:-1])) + (b[2],)
-                            if not Noneish(conf[xx, yy, nodes[nn]]):
+                            #print(xx,yy,nn,nodes,conf)
+                            if not Noneish(conf[xx, yy, nn]):
                                 p = vadd(to_screen(x, y), vmul(zoom, nodeoffsets[nodes[n]]))
                                 #pp = to_screen(*vadd((xx, yy), nodeoffsets[nn]))
                                 pp = vadd(to_screen(xx, yy), vmul(zoom, nodeoffsets[nn]))
