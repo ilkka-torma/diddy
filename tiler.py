@@ -1109,10 +1109,12 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
             draw_msg.append("y-axis state: %s" % backend.axis_states[1])
             draw_msg.append("")
             draw_msg.append("Draw: left mouse button")
-            draw_msg.append("Draw symbol: number keys")
-            draw_msg.append("Draw unknown symbol: u")
-            draw_msg.append("Draw empty node: backspace")
-            draw_msg.append("Draw fixity: f")
+
+            draw_msg.append("Select symbol: number keys")
+            draw_msg.append("Select <unknown symbol>: u")
+            draw_msg.append("Select <erase node>: backspace")
+            draw_msg.append("Select <fixity>: f")
+
             draw_msg.append("Pan: arrow keys")
             draw_msg.append("Zoom: az")
             draw_msg.append("Node size: sx")
