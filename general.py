@@ -98,9 +98,10 @@ def cart_prod_ix(ix_sum, *lists):
         yield ()
     elif sum(len(l) for l in lists) >= ix_sum:
         head, tail = lists[0], lists[1:]
-        #print("tail", tail)
-        for i in range(1, min(len(head), ix_sum+1)):
+        #print("head", head, "tail", tail)
+        for i in range(1, min(len(head)+1, ix_sum+1)):
             item = head[i-1]
+            #print("head", item, i)
             for rest in cart_prod_ix(ix_sum-i, *tail):
                 yield (item,) + rest
     

@@ -31,29 +31,43 @@ def normalize_markers(i, markers, domain=None):
     else:
         raise Exception("Bad marker specification: {}".format(axis))
         
-def gen_markers_from_minimal(markers, periodic=None):
+def gen_markers_from_minimal(markers, periodic=None, inits=None):
     """
     Generate quadruples of markers that are in principle compatible with the given ones (and possibly periodic).
     The input markers are assumed to be minimized.
     """
-    # TODO: take into account all apecial cases
     a, b, c, d = markers
     if periodic:
+        #print("AM HERE")
         if (a != b) or (c != d):
             # incompatible with periodic
+            #print("Incomparable with periodic.")
             return
-        k = 0
+        if inits is None:
+            inits = 5
+        k = inits
         while True:
-            yield (a, a, a+k*(b-a), a+k*(b-a))
+            yield (a, a, a+k*(c-a), a+k*(c-a))
             k += 1
     else:
-        left_period = ((k+1)*(b-a) for k in naturals())
-        left_border = (b-k for k in naturals())
-        right_border = (c+k for k in naturals())
-        right_period = ((k+1)*(d-c) for k in naturals())
+        #print("AM OTHER")
+        if a==b:
+            a = a-(c-b)
+        if c==d:
+            d = d+(c-b)
+        if inits is None:
+            inits = (5,0,0,5)
+        k1, k2, k3, k4 = inits
+        left_period = ((k+k1+1)*(b-a) for k in naturals())
+        left_border = (b-k-k2 for k in naturals())
+        right_border = (c+k+k3 for k in naturals())
+        right_period = ((k+k4+1)*(d-c) for k in naturals())
         for (p1, b1, b2, p2) in iter_prod(left_period, left_border, right_border, right_period):
             #print("generated markers", (b1-p1, b1, b2, b2+p2), "from", markers)
-            yield (b1-p1, b1, b2, b2+p2)
+            candidate = (b1-p1, b1, b2, b2+p2)
+            if candidate[0] == candidate[1] == candidate[2] == candidate[3]:
+                continue
+            yield candidate
     
     
 
@@ -94,6 +108,8 @@ class RecognizableConf(Conf):
         else:
             raise Exception("Cannot deduce dimension for configuration")
         
+        self.nodes = nodes
+        
         #print("got markers", markers)
         if type(markers) == tuple and type(markers[0]) == tuple:
             raise Exception("bad marker tuple")
@@ -123,14 +139,18 @@ class RecognizableConf(Conf):
             return True
         return all(self[nvec] == self[nvecs[0]] for nvec in nvecs[1:])
         
-    def minimized_markers(self):
+    def minimized_markers(self, fixed_axes=None):
         "Move the markers as close to each other as possible and return them."
         # more specifically, first minimize periods of both periodic tails, then rewind right and left tail
         # TODO: handle all special cases
+        if fixed_axes is None:
+            fixed_axes = []
         markers = self.markers[:]
         #print("pattern", self.pat)
         for (i, (a, b, c, d)) in enumerate(markers):
-            #print("minimizing marker", (a,b,c,d))
+            #print("minimizing marker", (a,b,c,d), "on axis", i)
+            if i in fixed_axes:
+                continue
             # if we are periodic, minimize period
             if a==b and c==d:
                 p = min(p for p in range(1, c-a+1)
@@ -152,7 +172,7 @@ class RecognizableConf(Conf):
                 if all(self.can_be_equal_at(nvec, nvadd(nvec, (0,)*i + (p,) + (0,)*(self.dim-i-1)))
                        for nvec in self.pat
                        if nvec[i] >= c):
-                    markers[i] = (a, b, c, p)
+                    markers[i] = (a, b, c, c+p)
                     break
             (a, b, c, d) = markers[i]
             #print(2, i, markers[i])
@@ -160,6 +180,7 @@ class RecognizableConf(Conf):
             if all(self.can_be_equal_at(nvec, nvadd(nvec, (0,)*i + (b-a,) + (0,)*(self.dim-i-1)), nvadd(nvec, (0,)*i + (a-b,) + (0,)*(self.dim-i-1)))
                        for nvec in self.pat):
                 markers[i] = (a, a, b, b)
+                # 
                 #print(3, i, markers[i])
                 continue
             # rewind right tail
@@ -180,10 +201,24 @@ class RecognizableConf(Conf):
         #print("minimized to", markers)
         return markers
         
+    def compatible(self, axis, new_markers):
+        "Is this configuration compatible with the given marker structure?"
+        a, b, c, d = new_markers
+        amin, bmin, cmin, dmin = self.minimized_markers()[axis]
+        if a==b and c==d:
+            # new markers are periodic -> old ones should be periodic and consistent
+            return amin == bmin and cmin == dmin and (c-a) % (cmin-amin) == 0
+        elif amin == bmin and cmin == dmin:
+            # new markers are not periodic, old ones are -> tail periods must be consistent
+            return (b-a) % (cmin-amin) == (d-c) % (cmin-amin) == 0
+        else:
+            # neither markers are periodic -> tail periods are consistent, transient part is contained
+            return (b-a) % (bmin-amin) == (d-c) % (dmin-cmin) == 0 and b <= bmin and c >= cmin
+        
     def remark(self, new_markers):
         """
         Produce a restructured configuration using the new marker structure.
-        It's assumed to be compatible with the minimized markers.
+        The markers are assumed to be compatible.
         """
         
         nodes = set(nvec[-1] for nvec in self.pat)
@@ -195,6 +230,11 @@ class RecognizableConf(Conf):
                 new_pat[nvec] = self[nvec]
         
         return RecognizableConf(new_markers, new_pat, nodes, onesided=self.onesided)
+        
+    def is_periodic(self, axis):
+        "Is this configuration periodic along the given axis?"
+        a, b, c, d = self.minimized_markers()[axis]
+        return a==b and c==d
 
     def display_str(self, hide_contents=False):
         s = "recognizable configuration with markers {}".format(self.markers)

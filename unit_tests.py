@@ -329,10 +329,13 @@ code = """
 %CA xor
 0 1 Ao o!=o.succ
 %spacetime_diagram diagram xor
+%show_environment
+%show_environment sft=diagram
 %dim 2
 %topology grid
 %SFT var onesided=[1] Ao o!=o.rt <-> o.up=1
-%equal expect=T diagram var
+%show_environment sft=var
+%equal expect=T diagram var @verbose
 """
 unit_tests.append(("spacetime diagram", code))
 

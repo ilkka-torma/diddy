@@ -376,18 +376,22 @@ class SFT:
         if fixed_axes is None:
             fixed_axes = []
         
-        markers = conf.minimized_markers()
-        #print("markers minimized to", markers)
+        print("deducing with", periodics, fixed_axes)
+        
+        markers = conf.minimized_markers(fixed_axes = fixed_axes)
+        print("markers minimized to", markers)
         
         marker_gens = []
         for (i, marker) in enumerate(markers):
             if i in fixed_axes:
-                marker_gens.append([marker])
+                marker_gens.append(iter([marker]))
             else:
                 marker_gens.append(gen_markers_from_minimal(marker, periodic=i in periodics))
+                
+        print("marker gens", marker_gens)
         
         for (i, new_markers) in enumerate(iter_prod(*marker_gens)):
-            #print("deducing", i)
+            print("deducing", i, "with markers", new_markers)
             if i == bound:
                 print("bound reached")
                 break
@@ -395,7 +399,7 @@ class SFT:
             # try to find a configuration with given structure
             ret_conf = self.deduce(conf.remark(list(new_markers)))
             if ret_conf is not None:
-                #print("found", ret_conf.display_str())unit
+                print("found", ret_conf.display_str())
                 return ret_conf
             
             # try to find a finite patch
@@ -407,6 +411,7 @@ class SFT:
             finite_conf = RecognizableConf(None, filled, self.nodes)
             #print("finite_conf", finite_conf.display_str())
             if self.deduce(finite_conf) is None:
+                print("failed")
                 break
                 
         return None
@@ -424,7 +429,7 @@ class SFT:
         #print("diff_vecs", list(sorted(diff_vecs)))
         #print("vec_domain", list(sorted(vec_domain)))
         #print("deducing from", conf.display_str())
-        unknowns = set(nvec for (nvec, sym) in conf.pat.items() if type(sym) == list)
+        unknowns = set(nvec for (nvec, sym) in conf.pat.items())
         
         #print("vec_domain", vec_domain)
         #print("unknowns", unknowns)
@@ -461,6 +466,7 @@ class SFT:
 
         # Make SAT instance, solve and extract model
         instance = AND(*(list(circuits) + list(forceds)))
+        #print("forceds", forceds)
         model = SAT(instance, True)
         if model == False:
             return None
@@ -695,8 +701,27 @@ class SFT:
         
         self.deduce_forbs_(vec_domain)
 
+    def inconsistent_with(self, other, verbose=False):
+        if verbose:
+            if self.dim != other.dim:
+                print("The compared SFTs have different dimensions.")
+            elif self.onesided != other.onesided:
+                print("The compared SFTs have different sidedness.")
+            elif self.nodes != other.nodes:
+                print("The compared SFTs have different nodes.")
+            elif self.alph != other.alph:
+                print("The compared SFTs have different alphabets.")
+        return self.dim != other.dim or self.onesided != other.onesided or self.nodes != other.nodes or self.alph != other.alph
+
     def contains(self, other, limit = None, return_radius_and_sep = False, method="periodic", verbose=False):
         "Test containment using forced allowed patterns or special configurations"
+        test = self.inconsistent_with(other, verbose=verbose)
+        if test:
+            if return_radius_and_sep:
+                return False, 0, Conf()
+            else:
+                return False
+            
         r = 1
         while limit is None or r <= limit:
             if verbose:
@@ -719,6 +744,12 @@ class SFT:
         return None
 
     def equals(self, other, limit = None, return_radius = False, method=None, verbose=False):
+        test = self.inconsistent_with(other, verbose=verbose)
+        if test:
+            if return_radius:
+                return False, 0
+            else:
+                return False
         if verbose:
             print("Testing containment 1")
         c12, rad, _ = self.contains(other, limit, return_radius_and_sep = True, method=method, verbose=verbose)
