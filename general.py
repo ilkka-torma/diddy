@@ -131,3 +131,11 @@ def naturals():
     while True:
         yield k
         k += 1
+        
+def words(n, alph):
+    if n:
+        for word in words(n-1, alph):
+            for sym in alph:
+                yield word + (sym,)
+    else:
+        yield tuple()

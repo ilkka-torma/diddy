@@ -367,7 +367,7 @@ class SFT:
     def deduce_global(self, conf, periodics=None, fixed_axes=None, bound=None):
         # Deduce a configuration with variable structure.
         
-        # known_conf is a recognizable configuration
+        # conf is a recognizable configuration
         # periodics is a list of directions we want to be periodic
         # fixed_axes is a list of directions where we have fixed the markers
         

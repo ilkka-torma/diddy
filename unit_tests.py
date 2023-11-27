@@ -537,6 +537,36 @@ code = """
 """
 unit_tests.append(("domino forbidden patterns", code))
 
+code = """
+%topology line
+%alphabet 0 1 2
+%SFT neq1 Ao o != o.rt
+%SFT neq2 Ao o.lt != o != o.rt
+%SFT neq_gap Ao o.lt != o.rt
+%SFT shift Ao
+(o=0 -> o.rt != 2) &
+(o=1 -> o.rt != 0) &
+(o=2 -> o.rt != 1)
+%compute_forbidden_patterns neq1
+%compute_forbidden_patterns neq2
+%compute_forbidden_patterns neq_gap
+%compute_forbidden_patterns shift
+%sofic1D sofic_neq1 neq1
+%sofic1D sofic_neq2 neq2
+%sofic1D sofic_neq_gap neq_gap
+%sofic1D sofic_shift shift
+%minimize sofic_neq1
+%minimize sofic_neq2
+%minimize sofic_neq_gap
+%minimize sofic_shift
+%equal expect=T sofic_neq1 sofic_neq2
+%equal expect=F sofic_neq1 sofic_neq_gap
+%equal expect=F sofic_neq1 sofic_shift
+%equal expect=F sofic_shift sofic_neq_gap
+"""
+unit_tests.append(("1d sofic (SFT) equality", code))
+
+
 
 
 if __name__ == "__main__":

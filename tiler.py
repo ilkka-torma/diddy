@@ -1106,7 +1106,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
             else:
                 raise Exception("Unknown cursor state: {}".format(cursor_state))
             draw_msg.append("x-axis state: %s" % backend.axis_states[0])
-            draw_msg.append("y-axis state: %s" % backend.axis_states[1])
+            if dim == 2:
+                draw_msg.append("y-axis state: %s" % backend.axis_states[1])
             draw_msg.append("")
             draw_msg.append("Draw: left mouse button")
 

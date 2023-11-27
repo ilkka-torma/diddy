@@ -1,7 +1,9 @@
 
 from general import *
+from configuration import RecognizableConf
 import collections
 import sft
+from itertools import combinations
 
 # Much of this is copied from period_automaton with minor modifications
 # TODO: unify the common parts?
@@ -65,6 +67,115 @@ class Sofic1D:
         self.right_resolving = right_resolving
         self.onesided = onesided
         self.minimal = False
+        
+    def equals(self, other, return_radius=True, method=None, verbose=False):
+        "If this 1d sofic equal to the other?"
+        assert self.minimal
+        assert isinstance(other, Sofic1D)
+        assert other.minimal
+        
+        # check number of states and transitions
+        if verbose:
+            print("checking sizes of automata")
+        if len(self.states) != len(other.states):
+            if return_radius:
+                return False, None
+            else:
+                return False
+        if len(self.trans) != len(other.trans):
+            if return_radius:
+                return False, None
+            else:
+                return False
+        
+        # compute separating words (positive and negative followers for each state)
+        if verbose:
+            print("computing followers")
+        followers = {st : [set(), set()] for st in self.states}
+        for (st1, st2) in combinations(self.states, 2):
+            # if the states are already separate, do nothing
+            if followers[st1][0] & followers[st2][1] or followers[st1][1] & followers[st2][0]:
+                continue
+            # separate these states
+            states1 = {tuple() : st1}
+            states2 = {tuple() : st2}
+            n = 0
+            while True:
+                n += 1
+                new_states1 = dict()
+                new_states2 = dict()
+                for (word, state1) in states1.items():
+                    state2 = states2[word]
+                    for sym in self.trans_alph:
+                        new1 = self.trans.get((state1, sym), None)
+                        new2 = self.trans.get((state2, sym), None)
+                        new_word = word + (sym,)
+                        if new1 is None:
+                            if new2 is not None:
+                                followers[st1][1].add(new_word)
+                                followers[st2][0].add(new_word)
+                                break
+                        elif new2 is None:
+                            followers[st1][0].add(new_word)
+                            followers[st2][1].add(new_word)
+                            break
+                        else:
+                            new_states1[new_word] = new1
+                            new_states2[new_word] = new2
+                    else:
+                        continue
+                    break
+                else:
+                    states1.update(new_states1)
+                    states2.update(new_states2)
+                    continue
+                break
+        
+        # match the states
+        if verbose:
+            print("matching states")
+        match = dict()
+        for other_st in other.states:
+            for (st, [poss, negs]) in followers.items():
+                if st not in match:
+                    for word in poss:
+                        cur = other_st
+                        for sym in word:
+                            try:
+                                cur = other.trans[cur, sym]
+                            except KeyError:
+                                break
+                        else:
+                            continue
+                        break
+                    else:
+                        for word in negs:
+                            cur = other_st
+                            for sym in word:
+                                try:
+                                    cur = other.trans[cur, sym]
+                                except KeyError:
+                                    break
+                            else:
+                                break                                
+                        else:
+                            match[st] = other_st
+                            break
+        
+        # check for isomorphism of automata (note that they have equally many transitions)
+        if verbose:
+            print("checking for isomorphism")
+        for ((st, sym), st2) in self.trans.items():
+            if other.trans.get((match[st],sym), None) != match[st2]:
+                if return_radius:
+                    return False, None
+                else:
+                    return False
+        if return_radius:
+            return True, None
+        else:
+            return True
+            
         
     @classmethod
     def from_SFT(cls, the_sft, verbose=False):
@@ -186,7 +297,112 @@ class Sofic1D:
                       for ((st, sym), st2) in self.trans.items()}
         self.states = set(tr[0] for tr in self.trans)
         self.minimal = True
+                    
+    def deduce_transition(self, conf_word, fixed_axes, st1=None, st2=None, equal=False):
+        "Deduce transition words and pairs along the finite/periodic word"
+        period = len(conf_word)
+        pairs = {(st, st) : tuple()
+                 for st in (self.states if st1 is None else [st1])}
+        word_len = 0
+        seen = set()
+        while pairs:
+            found_new = False
+            # extend the words by a single symbol of the periodic word
+            conf_syms = conf_word[word_len % period]
+            if None in conf_syms:
+                # nonexistent node -> put arbitrary symbols, restart from arbitrary state
+                new_pairs = dict()
+                for ((st, stt), word) in pairs.items():
+                    new_sym = tuple(min(sym) if type(sym) == list else sym for sym in conf_syms)
+                    for new_st in self.states:
+                        new_pairs[st, new_st] = word + (new_sym,)
+            else:
+                # all nodes exist -> compute new states
+                new_pairs = dict()
+                for ((st, stt), word) in pairs.items():
+                    for sym in iter_prod(*(iter(syms if type(syms) == list else [syms])
+                                           for syms in conf_syms)):
+                        try:
+                            new_st = self.trans[stt, sym]
+                            new_pairs[st, new_st] = word+(sym,)
+                        except KeyError:
+                            pass
+            pairs = new_pairs
+            word_len += 1
+            if word_len % period == 0:
+                # check if we have found a configuration
+                for ((st, stt), word) in pairs.items():
+                    if (st, stt) not in seen:
+                        seen.add((st, stt))
+                        found_new = True
+                        if (st1 is None or st == st1) and (st2 is None or stt == st2) and (st == stt or not equal):
+                            # transition was found
+                            yield (st, stt, word)
+                if fixed_axes or not found_new:
+                    # no configuration was found
+                    break
         
+    def deduce_global(self, conf, periodics=None, fixed_axes=None, bound=None):
+        "Deduce a global configuration with variable structure."
+        assert self.right_resolving # for now
+        
+        # conf is a recognizable configuration
+        # periodics is a list of directions we want to be periodic (either [] or [0])
+        # fixed_axes is a list of directions where we have fixed the markers (either [] or [0])
+        
+        [(a,b,c,d)] = conf.markers
+        if a==b and c==d:
+            # periodic configuration
+            period = c-a
+            conf_word = [tuple(conf[a+i,node] for node in self.nodes)
+                         for i in range(period)]
+            # find periodic result (since one must exist, if a result exists)
+            for (st, stt, word) in self.deduce_transition(conf_word, fixed_axes, equal=True):
+                word_len = len(word)
+                markers = [(a,a, a+word_len, a+word_len)]
+                pat = {(a+i, node) : sym
+                       for (i, syms) in enumerate(word)
+                       for (node, sym) in zip(self.nodes, syms)}
+                return RecognizableConf(markers, pat, self.nodes, onesided=self.onesided)
+        else:
+            # general recognizable configuration
+            # first find all possible periodic tails
+            left_per = [tuple(conf[a+i,node] for node in self.nodes) for i in range(b-a)]
+            middle = [tuple(conf[i,node] for node in self.nodes) for i in range(b,c)]
+            right_per = [tuple(conf[c+i,node] for node in self.nodes) for i in range(d-c)]
+            
+            if self.onesided:
+                left_per_tails = {st : tuple() for st in self.states}
+            else:
+                left_per_tails = {st : per
+                                  for (st, _, per) in self.deduce_transition(left_per, fixed_axes, equal=True)}
+            if fixed_axes:
+                left_tails = {st : (per, tuple())
+                              for (st, per) in left_per_tails.items()}
+            else:
+                left_tails = {st : (per, trans)
+                              for (lst, per) in left_per_tails.items()
+                              for (_, st, trans) in self.deduce_transition(left_per, False, st1=lst)}
+            left_mids = {st : (per, trans, mid)
+                         for (lst, (per, trans)) in left_tails.items()
+                         for (_, st, mid) in self.deduce_transition(middle, True, st1=lst)}
+            if fixed_axes:
+                right_trans = left_mids
+            else:
+                right_trans = {st : (per, ltrans, mid+trans)
+                         for (lst, (per, ltrans, mid)) in left_mids.items()
+                         for (_, st, trans) in self.deduce_transition(right_per, False, st1=lst)}
+            for (lst, (lper, ltrans, rtrans)) in right_trans.items():
+                for (_, _, rper) in self.deduce_transition(right_per, fixed_axes, st1=lst, st2=lst):
+                    # we have found the configuration
+                    marker = (b-len(lper)-len(ltrans), b-len(ltrans), b+len(rtrans), b+len(rtrans)+len(rper))
+                    pat = dict()
+                    for (i, syms) in enumerate(lper + ltrans + rtrans + rper):
+                        for (node, sym) in zip(self.nodes, syms):
+                            pat[marker[0]+i, node] = sym
+                    return RecognizableConf([marker], pat, self.nodes, onesided=self.onesided)
+        return None
+            
     def intersection(self, other):
         "Intersection of two 1D sofics."
         assert self.nodes == other.nodes and self.alph == other.alph and self.onesided == other.onesided

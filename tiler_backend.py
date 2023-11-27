@@ -123,7 +123,7 @@ class TilerBackend:
     It contains the ambient SFT and settings, the current state, and a history of states.
     """
     
-    def __init__(self, sft, init_conf=None, sizes=None):
+    def __init__(self, sft, init_conf=None, sizes=None, project_to=None):
         self.sft = sft
         if init_conf is not None:
             init_conf = decorate_default(init_conf)
@@ -131,6 +131,16 @@ class TilerBackend:
         self.history_index = 0
         self.axis_states = [AxisState.FIXED]*sft.dim
         self.clipboard = None
+        if project_to is None:
+            project_to = list(range(sft.dim))
+        self.project_to = project_to
+            
+    def project(self, nvec):
+        return tuple(nvec[i] for i in self.project_to) + (nvec[-1],)
+        
+    def deproject(self, nvec):
+        return tuple(nvec[self.project_to.index(i)] if i in self.project_to else 0
+                     for i in range(self.sft.dim)) + (nvec[-1],)
         
     def conf(self):
         return self.history[self.history_index].conf
@@ -182,14 +192,29 @@ class TilerBackend:
         #if self.conf().empty(): <- maybe smth like this is a good idea, since this fails with periodic right now.
         #    return
         
-        fixed_axes = [i for (i,st) in enumerate(self.axis_states) if st == AxisState.FIXED]
-        periodics = [i for (i,st) in enumerate(self.axis_states) if st == AxisState.PERIODIC]
+        
+        
+        fixed_axes = [i for (i,st) in enumerate(self.axis_states) if st == AxisState.FIXED and i in self.project_to]
+        periodics = [i for (i,st) in enumerate(self.axis_states) if st == AxisState.PERIODIC and i in self.project_to]
         undec_conf = undecorate(self.conf(), unfix_atoms=True, alph=self.sft.alph)
-        deduced_conf = self.sft.deduce_global(undec_conf, periodics=periodics, fixed_axes=fixed_axes)
+        projection = RecognizableConf([undec_conf.markers[i] for i in self.project_to],
+                                      {self.project(nvec) : sym for (nvec, sym) in undec_conf.pat.items()},
+                                      self.sft.nodes,
+                                      onesided=self.sft.onesided)
+        #print("tiler deducing", projection.display_str())
+        deduced_conf = self.sft.deduce_global(projection, periodics=periodics, fixed_axes=fixed_axes)
         #print("deduced",deduced_conf)
         if deduced_conf is not None:
+            new_markers = undec_conf.markers[:]
+            for (marker, ix) in zip(deduced_conf.markers, self.project_to):
+                new_markers[ix] = marker
+            deprojection = RecognizableConf(new_markers,
+                                            {self.deproject(nvec) : sym
+                                             for (nvec, sym) in deduced_conf.pat.items()},
+                                            self.sft.nodes,
+                                            onesided=self.sft.onesided)
             #print("it's", deduced_conf.display_str())
-            decorated_conf = copy_decoration(deduced_conf, self.conf())
+            decorated_conf = copy_decoration(deprojection, self.conf())
             self.replace_conf(decorated_conf)
             return True
         return False
@@ -207,7 +232,7 @@ class TilerBackend:
         conf = self.conf()
         changed = False
         for (nvec, sym) in pat.items():
-            change_now, conf = replace_sym(conf, nvec, sym, self.axis_states)
+            change_now, conf = replace_sym(conf, self.project(nvec), sym, self.axis_states)
             changed = changed or change_now
         if changed:
             self.replace_conf(conf)
