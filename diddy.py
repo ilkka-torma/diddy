@@ -20,7 +20,7 @@ import math
 import blockmap
 import tfg
 
-#from basic_things import *
+from basic_things import *
 
 class Diddy:
     def __init__(self):
