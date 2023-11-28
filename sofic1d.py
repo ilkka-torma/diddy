@@ -69,7 +69,7 @@ class Sofic1D:
         self.minimal = False
         
     def equals(self, other, return_radius=True, method=None, verbose=False):
-        "If this 1d sofic equal to the other?"
+        "Is this 1d sofic equal to the other?"
         assert self.minimal
         assert isinstance(other, Sofic1D)
         assert other.minimal
@@ -176,6 +176,13 @@ class Sofic1D:
         else:
             return True
             
+    def contains(self, other):
+        "Does this 1d sofic contain the other?"
+        assert other.minimal
+        inter = self.intersection(other)
+        inter.determinize()
+        inter.minimize()
+        return other.equals(inter)
         
     @classmethod
     def from_SFT(cls, the_sft, verbose=False):
@@ -198,7 +205,8 @@ class Sofic1D:
         
     def determinize(self, verbose=False, trim=True):
         "Determinize this automaton using the powerset construction."
-        assert not self.right_resolving
+        if self.right_resolving:
+            return
         
         # Maintain sets of seen and unprocessed state sets, and integer labels for seen sets
         if verbose:
@@ -300,6 +308,7 @@ class Sofic1D:
                     
     def deduce_transition(self, conf_word, fixed_axes, st1=None, st2=None, equal=False):
         "Deduce transition words and pairs along the finite/periodic word"
+        assert self.right_resolving # for now
         period = len(conf_word)
         pairs = {(st, st) : tuple()
                  for st in (self.states if st1 is None else [st1])}
