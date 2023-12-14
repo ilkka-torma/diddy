@@ -96,17 +96,20 @@ class Conf:
 class RecognizableConf(Conf):
     "A recognizable configuration"
 
-    def __init__(self, markers, pat, nodes, onesided=None):
+    def __init__(self, markers, pat, nodes, onesided=None, dim=None):
         super().__init__(onesided)
         # markers is a list of (possibly not normalized) markers
         # pat is a dict from nvecs to symbols
         # it will be wrapped around the markers
-        if type(markers) == list:
-            self.dim = dim = len(markers)
-        elif pat:
-            self.dim = dim = len(min(pat)) - 1
-        else:
-            raise Exception("Cannot deduce dimension for configuration")
+        if dim is None:
+            if type(markers) == list:
+                dim = len(markers)
+            elif pat:
+                dim = len(min(pat)) - 1
+            else:
+                raise Exception("Cannot deduce dimension for configuration")
+            
+        self.dim = dim
         
         self.nodes = nodes
         

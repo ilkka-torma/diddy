@@ -295,6 +295,22 @@ class Diddy:
                         self.nodes = env_nodes
                         self.topology = env_topology
                         self.alphabet = env_alphabet
+                        
+            elif cmd == "trace":
+                trace_name = args[0]
+                sft_name = args[1]
+                try:
+                    the_sft = self.SFTs[sft_name]
+                except KeyError:
+                    raise Exception("{} is not an SFT".format(sft_name))
+                trace_size = args[2]
+                trace_spec = args[3]
+                verbose = "verbose" in flags
+                if verbose:
+                    print("Extracting trace of size {} and spec {} from SFT {}".format(trace_size, trace_spec, sft_name))
+                onesided = "onesided" in flags
+                the_trace = sofic1d.Sofic1D.trace(the_sft, trace_size, trace_spec, onesided=onesided, verbose=verbose)
+                self.SFTs[trace_name] = the_trace
 
             elif cmd == "clopen":
                 raise NotImplementedError("Clopen sets not implemented")

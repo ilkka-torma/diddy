@@ -1,9 +1,11 @@
 
 from general import *
+from basic_things import *
 from configuration import RecognizableConf
 import collections
 import sft
 from itertools import combinations
+from frozendict import frozendict
 
 # Much of this is copied from period_automaton with minor modifications
 # TODO: unify the common parts?
@@ -178,6 +180,7 @@ class Sofic1D:
             
     def contains(self, other):
         "Does this 1d sofic contain the other?"
+        # TODO: make more efficient
         assert other.minimal
         inter = self.intersection(other)
         inter.determinize()
@@ -202,6 +205,90 @@ class Sofic1D:
                  for word in trans_words}
         trans = remove_sinks(trans, trans_alph, sources_too = 0 not in the_sft.onesided, verbose=verbose)
         return cls(the_sft.nodes, the_sft.alph, the_sft.topology, trans, right_resolving=True, onesided = the_sft.onesided==[0])
+    
+    @classmethod
+    def trace(cls, the_sft, size, spec, onesided=False, verbose=False):
+        """
+        Compute the 1-dimensional trace of the given SFT of dimension >= 2.
+        Size is a the_sft.dim-length list of integers.
+        The trace alphabet consists of patterns (frozendicts) of this shape.
+        The spec is a list of length the_sft.dim.
+        Each element of the spec is one of the following.
+        * "dir", signifying the direction of the trace. There must be exactly one of these.
+        * ("per", p), signifying a periodic direction of period p.
+        * A pair (a, b), where each of a and b is one of the following.
+          - ("rad", r) for radius r.
+          - ("uper", t, p) for ultimately periodic with transient length t and ultimate period p.
+        The n gives the width of the trace in the corresponding direction.
+        """
+        # TODO: add gluing to arbitrary 1D sofic in 2D case.
+        # TODO: rethink the nodes
+        trace_nodes = sft.Nodes([0])
+        trace_topology = [("rt", (0,0), (1,0)), ("lt", (0,0), (-1,0))]
+        alph_domain = [vec + (node,)
+                       for vec in hyperrect([(0,s) for s in size])
+                       for node in the_sft.nodes]
+        trace_alph = {0 : [frozendict(pat) for pat in the_sft.all_patterns(alph_domain)]}
+        
+        # compute transition sizes from specification
+        trans_bounds = []
+        dir_ix = None
+        period_structure = []
+        for (ix, (width, struct)) in enumerate(zip(size, spec)):
+            if struct == "dir":
+                trans_bounds.append((0, max(width, the_sft.radii()[ix])))
+                period_structure.append((None, None))
+                if dir_ix is None:
+                    dir_ix = ix
+                else:
+                    raise Exception("Multiple directions in trace spec")
+            elif struct[0] == "per":
+                assert struct[1] >= width
+                trans_bounds.append((0, struct[1]))
+                period_structure.append(None)
+            else:
+                left, right = struct
+                if left[0] == "rad":
+                    lower = -left[1]
+                    lper = None
+                elif left[0] == "uper":
+                    lower = -(left[1]+left[2])
+                    lper = left[2]
+                else:
+                    raise Exception("Unknown trace spec")
+                if right[0] == "rad":
+                    upper = width+right[1]
+                    rper = None
+                elif right[0] == "uper":
+                    upper = width+right[1]+right[2]
+                    rper = right[2]
+                else:
+                    raise Exception("Unknown trace spec")
+                trans_bounds.append((lower, upper))
+                period_structure.append((lper, rper))
+        if dir_ix is None:
+            raise Exception("No direction in trace spec")
+        
+        # compute transitions and states
+        states = set()
+        trans = dict()
+        for trans_pat in the_sft.all_hyperrect_patterns(trans_bounds, period_structure=period_structure):
+            source = frozendict({nvec : sym
+                                 for (nvec, sym) in trans_pat.items()
+                                 if nvec[dir_ix] < trans_bounds[dir_ix][1]-1})
+            target = frozendict({nvsub(nvec, char_vector(the_sft.dim, dir_ix)) : sym
+                                 for (nvec, sym) in trans_pat.items()
+                                 if nvec[dir_ix] > 0})
+            sym = frozendict({nvec : sym
+                              for (nvec, sym) in trans_pat.items()
+                              if all(0 <= nvec[ix] < size[ix] for ix in range(the_sft.dim))})
+            states.add(source)
+            states.add(target)
+            trans[source, sym] = target
+            
+        trans = remove_sinks(trans, trace_alph, sources_too = onesided, verbose = verbose)
+            
+        return Sofic1D(trace_nodes, trace_alph, trace_topology, trans, right_resolving = True, onesided = onesided)
         
     def determinize(self, verbose=False, trim=True):
         "Determinize this automaton using the powerset construction."

@@ -236,6 +236,15 @@ class SFT:
             return True
         else:
             raise Exception("Unknown configuration type")
+    
+    def radii(self, twosided=False):
+        vecs = set(var[:-2] for var in self.circuit.get_variables())
+        if twosided:
+            return [(min(vec[i] for vec in vecs), max(vec[i] for vec in vecs))
+                    for i in range(self.dim)]
+        else:
+            return [max(vec[i] for vec in vecs) - min(vec[i] for vec in vecs) + 1
+                    for i in range(self.dim)]
 
     # Find recognizable configuration (i.e. uniformly eventually periodic in each orthogonal direction) in self which is not in other
     # The semilinear structure is a periodic rectangular tiling, and the contents of a rectangle depend on which axes its lowest corner lies
@@ -511,6 +520,67 @@ class SFT:
 
         add_uniqueness_constraints(self.alph, circuits, nvecs)
 
+        for model in projections(AND(*circuits), [nvec+(sym,) for nvec in nvecs for sym in self.alph[nvec[-1]][1:]]):
+            pat = dict()
+            for nvec in nvecs:
+                for sym in self.alph[nvec[-1]][1:]:
+                    if model[nvec+(sym,)]:
+                        pat[nvec] = sym
+                        break
+                else:
+                    pat[nvec] = self.alph[nvec[-1]][0]
+            yield pat
+        
+    # generate all patterns over the given hyperrectangle
+    # dimensions is a list of integer pairs
+    # period_structure consists of Nones (meaning fully periodic directions) and pairs (a,b),
+    # where each of a and b is either None (no period) or an integer p (eventual period p)
+    def all_hyperrect_patterns(self, dimensions, period_structure=None):
+    
+        if period_structure is None:
+            period_structure = [(None, None)]*self.dim
+            
+        rads = self.radii(twosided=True)
+            
+        tr_bounds = []
+        for (bound, spec, (rmin, rmax)) in zip(dimensions, period_structure, rads):
+            if spec is None:
+                tr_bounds.append(bound)
+            else:
+                a, b = spec
+                if a is None:
+                    min_bound = bound[0]
+                else:
+                    min_bound = bound[0]-rmax
+                if b is None:
+                    max_bound = bound[1]
+                else:
+                    max_bound = bound[1]-rmin
+                tr_bounds.append((min_bound, max_bound))
+                
+        def wrap(vec):
+            vec = list(vec)
+            for (i, ((b1, b2), spec)) in enumerate(zip(tr_bounds, period_structure)):
+                if spec is None:
+                    vec[i] = (vec[i]-b1)%(b2-b1)+b1
+                else:
+                    a, b = spec
+                    while a is not None and vec[i] < b1+a:
+                        vec[i] += a
+                    while b is not None and vec[i] > b2-b:
+                        vec[i] -= b
+            return tuple(vec)
+        
+        circuits = []
+        for tr_vec in hyperrect(tr_bounds):
+            circ = self.circuit.copy()
+            transform(circ, lambda var: wrap(vadd(tr_vec, var[:-2])) + var[-2:])
+            circuits.append(circ)
+            
+        nvecs = set(vec + (node,) for vec in hyperrect(dimensions) for node in self.nodes)
+        
+        add_uniqueness_constraints(self.alph, circuits, nvecs)
+        
         for model in projections(AND(*circuits), [nvec+(sym,) for nvec in nvecs for sym in self.alph[nvec[-1]][1:]]):
             pat = dict()
             for nvec in nvecs:

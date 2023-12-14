@@ -258,7 +258,7 @@ def Noneish(a):
 
 #a = bbb
 
-def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
+def run(the_SFT, topology, gridmoves, nodeoffsets,
         x_size=10, y_size=10, x_periodic=False, y_periodic=False,
         pictures=None, the_colors=None, initial=None):
     #print(topology)
@@ -362,7 +362,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
     #gridwidth = 15
     
     camera = (x_size/2, y_size/2) # where we looking; center of screen is here
-    zoom = (40, 40*skew) # how big are cells basically
+    zoom = (40, 40) # how big are cells basically
     
     global screenwidth, screenheight
     screenwidth = 700
@@ -371,6 +371,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
     pygame.font.init() 
     my_font = pygame.font.SysFont('Consolas', 30)
     msg_font = pygame.font.SysFont('Consolas', 15)
+    
+    print("size", x_size, y_size)
     
     # initialize backend
     backend = TilerBackend(the_SFT, init_conf=initial, sizes=[x_size,y_size])
@@ -559,6 +561,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets, skew=1,
     moving_marker = None
     
     paint_fixity = True
+    
+    
     
     # -------- Main Program Loop -----------
     while not done:

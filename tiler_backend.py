@@ -74,7 +74,7 @@ class TilerState:
             pat = {vec + (node,) : (list(alph[node]), False)
                    for vec in hyperrect([(0,sizes[d]) for d in range(dim)])
                    for node in nodes}
-            conf = RecognizableConf(None, pat, nodes)
+            conf = RecognizableConf(None, pat, nodes, dim=dim)
         self.conf = conf
         if selection is None:
             selection = set()
