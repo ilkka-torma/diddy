@@ -77,6 +77,9 @@ def nvadd(nvec, vec):
 def nvsub(nvec, vec):
     return tuple(a-b for (a,b) in zip(nvec, vec)) + nvec[-1:]
 
+def nvmul(nvec, scalar):
+    return tuple(a*scalar for a in nvec) + nvec[-1:]
+
 def pats(domain, alph):
     if not domain:
         yield dict()
@@ -111,16 +114,15 @@ def iter_prod(*iters):
     "Lazy Cartesian product of iterators"
     memos = [[] for _ in iters]
     ix_sum = len(iters)
-    new = True
-    while new:
-        new = False
+    while True:
         for (memo, iterator) in zip(memos, iters):
             try:
                 memo.append(next(iterator))
-                new = True
             except StopIteration:
                 pass
         #print("looping with", memos, ix_sum)
+        if ix_sum > sum(len(memo) for memo in memos):
+            break
         for tup in cart_prod_ix(ix_sum, *memos):
             #print("yielding", tup, "from", memos, "with sum", ix_sum)
             yield tup

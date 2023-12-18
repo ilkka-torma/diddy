@@ -309,7 +309,7 @@ class Diddy:
                 if verbose:
                     print("Extracting trace of size {} and spec {} from SFT {}".format(trace_size, trace_spec, sft_name))
                 onesided = "onesided" in flags
-                the_trace = sofic1d.Sofic1D.trace(the_sft, trace_size, trace_spec, onesided=onesided, verbose=verbose)
+                the_trace = sofic1d.Sofic1D.trace(the_sft, trace_size, trace_spec, verbose=verbose)
                 self.SFTs[trace_name] = the_trace
 
             elif cmd == "clopen":

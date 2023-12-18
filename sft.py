@@ -531,7 +531,7 @@ class SFT:
                     pat[nvec] = self.alph[nvec[-1]][0]
             yield pat
         
-    # generate all patterns over the given hyperrectangle
+    # generate all patterns over the given hyperrectangle where the SFT rule holds locally
     # dimensions is a list of integer pairs
     # period_structure consists of Nones (meaning fully periodic directions) and pairs (a,b),
     # where each of a and b is either None (no period) or an integer p (eventual period p)
@@ -541,26 +541,32 @@ class SFT:
             period_structure = [(None, None)]*self.dim
             
         rads = self.radii(twosided=True)
+
+        print("args", dimensions, period_structure, rads)
             
         tr_bounds = []
         for (bound, spec, (rmin, rmax)) in zip(dimensions, period_structure, rads):
             if spec is None:
+                # periodic direction: use exactly the hyperrect bounds
                 tr_bounds.append(bound)
             else:
                 a, b = spec
                 if a is None:
-                    min_bound = bound[0]
+                    # free border: ensure the ciruit fits inside
+                    min_bound = bound[0]-rmin
                 else:
-                    min_bound = bound[0]-rmax
+                    # eventually periodic border: entire neighborhood must be in loop
+                    min_bound = bound[0]+a-rmax
                 if b is None:
-                    max_bound = bound[1]
+                    max_bound = bound[1]-rmax
                 else:
-                    max_bound = bound[1]-rmin
+                    max_bound = bound[1]-b+rmin
                 tr_bounds.append((min_bound, max_bound))
                 
+        print("tr_bounds", tr_bounds)
         def wrap(vec):
             vec = list(vec)
-            for (i, ((b1, b2), spec)) in enumerate(zip(tr_bounds, period_structure)):
+            for (i, ((b1, b2), spec)) in enumerate(zip(dimensions, period_structure)):
                 if spec is None:
                     vec[i] = (vec[i]-b1)%(b2-b1)+b1
                 else:
@@ -578,6 +584,9 @@ class SFT:
             circuits.append(circ)
             
         nvecs = set(vec + (node,) for vec in hyperrect(dimensions) for node in self.nodes)
+        print("circs", circuits)
+        print("nvecs", nvecs)
+        assert all(var[:-1] in nvecs for circ in circuits for var in circ.get_variables())
         
         add_uniqueness_constraints(self.alph, circuits, nvecs)
         

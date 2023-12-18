@@ -207,7 +207,7 @@ class Sofic1D:
         return cls(the_sft.nodes, the_sft.alph, the_sft.topology, trans, right_resolving=True, onesided = the_sft.onesided==[0])
     
     @classmethod
-    def trace(cls, the_sft, size, spec, onesided=False, verbose=False):
+    def trace(cls, the_sft, size, spec, verbose=False):
         """
         Compute the 1-dimensional trace of the given SFT of dimension >= 2.
         Size is a the_sft.dim-length list of integers,
@@ -277,6 +277,7 @@ class Sofic1D:
         states = set()
         trans = dict()
         trans_alph = set()
+        tr_vec = (0,)*dir_ix + (trans_bounds[dir_ix][1]-size[dir_ix],) + (0,)*(the_sft.dim-dir_ix-1)
         for trans_pat in the_sft.all_hyperrect_patterns(trans_bounds, period_structure=period_structure):
             source = frozendict({nvec : sym
                                  for (nvec, sym) in trans_pat.items()
@@ -284,21 +285,25 @@ class Sofic1D:
             target = frozendict({nvsub(nvec, char_vector(the_sft.dim, dir_ix)) : sym
                                  for (nvec, sym) in trans_pat.items()
                                  if nvec[dir_ix] > 0})
-            sym = tuple(trans_pat[nvadd(tr_node, char_vector(the_sft.dim, dir_ix))] for tr_node in trace_nodes)
+            sym = tuple(trans_pat[nvadd(tr_node, tr_vec)] for tr_node in trace_nodes)
             #sym = frozendict({nvec : sym
             #                  for (nvec, sym) in trans_pat.items()
             #                  if all(0 <= nvec[ix] < size[ix] for ix in range(the_sft.dim))})
             states.add(source)
             states.add(target)
-            trans[source, sym] = target
+            try:
+                trans[source, sym].add(target)
+            except KeyError:
+                trans[source, sym] = set([target])
             trans_alph.add(sym)
         
         sofic_alph = {node : the_sft.alph[node[-1] if len(node) == the_sft.dim+1 else node[-1:]]
                       for node in trace_nodes}
-            
-        trans = remove_sinks(trans, trans_alph, sources_too = onesided, verbose = verbose)
-            
-        return Sofic1D(trace_nodes, sofic_alph, trace_topology, trans, right_resolving = True, onesided = onesided)
+
+        is_onesided = dir_ix in the_sft.onesided
+        #trans = remove_sinks(trans, trans_alph, sources_too = is_onesided, verbose = verbose)
+        
+        return Sofic1D(trace_nodes, sofic_alph, trace_topology, trans, onesided = is_onesided)
         
     def determinize(self, verbose=False, trim=True):
         "Determinize this automaton using the powerset construction."
