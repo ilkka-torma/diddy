@@ -178,6 +178,7 @@ class Diddy:
                 if type(defn) == list:
                     self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, self.topology, forbs=defn, onesided=onesided)
                 elif type(defn) == tuple:
+                    #print("defn", defn)
                     circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, defn, self.externals)
                     #vardict = dict()
                     #inst = circuit.circuit_to_sat_instance(circ, vardict)
@@ -207,7 +208,7 @@ class Diddy:
             elif cmd == "determinize":
                 name = args[0]
                 verbose = "verbose" in flags
-                self.SFTs[name].determinize(verbose=verbose, trim=True)
+                self.SFTs[name].determinize(verbose=verbose)
                 
             elif cmd == "minimize":
                 name = args[0]
@@ -306,10 +307,10 @@ class Diddy:
                 trace_size = args[2]
                 trace_spec = args[3]
                 verbose = "verbose" in flags
+                extra_rad = kwds.get("extra_rad", 0)
                 if verbose:
                     print("Extracting trace of size {} and spec {} from SFT {}".format(trace_size, trace_spec, sft_name))
-                onesided = "onesided" in flags
-                the_trace = sofic1d.Sofic1D.trace(the_sft, trace_size, trace_spec, verbose=verbose)
+                the_trace = sofic1d.Sofic1D.trace(the_sft, trace_size, trace_spec, verbose=verbose, extra_rad=extra_rad)
                 self.SFTs[trace_name] = the_trace
 
             elif cmd == "clopen":
@@ -527,6 +528,16 @@ class Diddy:
                     raise Exception("No set named %s" % name)
                 print("Showing parsed formula for %s." % name)
                 print(formula)
+                print()
+
+            elif cmd == "show_graph" and mode == "report":
+                name = args[0]
+                if name in self.SFTs and isinstance(self.SFTs[name], sofic1d.Sofic1D):
+                    trans = self.SFTs[name].trans
+                else:
+                    raise Exception("No sofic shift named %s" % name)
+                print("Showing transition graph of %s." % name)
+                print(trans)
                 print()
 
             elif cmd == "show_environment":

@@ -566,6 +566,31 @@ code = """
 """
 unit_tests.append(("1d sofic (SFT) equality", code))
 
+code = """
+%alphabet 0 1 2
+%SFT x Ao
+(o=1 -> o.up=o.up.rt=1) &
+(o=o.rt=1 -> o.lt=1 & o.rt.rt=1) &
+(o=2 -> o.up!=1)
+%trace tr x [1 1] [dir [[rad 0] [rad 1]]] extra_rad=1
+%load_environment tr
+%SFT f1 Ao o!=2 & (o=o.rt=1 -> o.lt=o.rt.rt=1)
+%compute_forbidden_patterns f1
+%sofic1D s1 f1
+%SFT f2 Ao o!=1
+%compute_forbidden_patterns f2
+%sofic1D s2 f2
+%union u s1 s2
+%equal expect=T tr u
+%trace tr2 x [1 1] [dir [per 2]] extra_rad=1
+%SFT f3 Ao o=1 -> o.lt=o.rt=1
+%compute_forbidden_patterns f3
+%sofic1D s3 f3
+%equal expect=T tr2 s3
+%equal expect=F tr tr2
+"""
+unit_tests.append(("approximate and periodic trace", code))
+
 
 
 
