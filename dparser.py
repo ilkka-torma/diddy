@@ -210,6 +210,10 @@ commands = [
             opts = ["sft"]),
 
     # Comparing objects
+    Command("empty",
+            [ArgType.LABEL],
+            opts = ["expect"],
+            flags = ["verbose"]),
     Command("equal",
             [ArgType.LABEL, ArgType.LABEL],
             opts = ["method", "expect"],

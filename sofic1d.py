@@ -149,7 +149,21 @@ class Sofic1D:
         if not isinstance(other, Sofic1D):
             raise Exception("Sofic shifts can only be compared to sofic shifts")
         if self.onesided != other.onesided:
-            return False
+            if return_radius:
+                return False, None
+            else:
+                return False
+            
+        if not self.trans:
+            if return_radius:
+                return not other.trans, None
+            else:
+                return not other.trans
+        if not other.trans:
+            if return_radius:
+                return False, None
+            else:
+                return False
         
         if self.minimal and connected(self.states, self.trans, self.trans_alph) and\
            other.minimal and connected(other.states, other.trans, other.trans_alph):
@@ -286,14 +300,17 @@ class Sofic1D:
             return aux_sofic1.equals(aux_sofic2, verbose=verbose, return_radius=return_radius)
                     
             
-    def contains(self, other):
+    def contains(self, other, return_radius_and_sep=None, method=None, verbose=False):
         "Does this 1d sofic contain the other?"
         # TODO: make more efficient
         assert other.minimal
         inter = self.intersection(other)
-        inter.determinize()
-        inter.minimize()
-        return other.equals(inter)
+        inter.determinize(verbose=verbose)
+        inter.minimize(verbose=verbose)
+        if return_radius_and_sep:
+            return other.equals(inter), None, None
+        else:
+            return other.equals(inter)
         
     @classmethod
     def from_SFT(cls, the_sft, verbose=False):
@@ -305,13 +322,20 @@ class Sofic1D:
 
         trans_alph = list(iter_prod(*(iter(the_sft.alph[node]) for node in the_sft.nodes)))
         forbs = []
+        is_empty = False
         for forb_pat in the_sft.forbs:
+            if not forb_pat:
+                is_empty = True
+                break
             min_ix = min(nvec[0] for nvec in forb_pat)
             forbs.append({(i-min_ix, n) : c for ((i,n),c) in forb_pat.items()})
-        max_len = max(nvec[0] for forb in forbs for nvec in forb)
-        trans_words = set(words(max_len+1, trans_alph, the_sft.nodes, forbs))
-        trans = {(word[:-1], word[-1]) : word[1:]
-                 for word in trans_words}
+        if is_empty:
+            trans = {}
+        else:
+            max_len = max(nvec[0] for forb in forbs for nvec in forb)
+            trans_words = set(words(max_len+1, trans_alph, the_sft.nodes, forbs))
+            trans = {(word[:-1], word[-1]) : word[1:]
+                     for word in trans_words}
         #trans = remove_sinks(trans, trans_alph, sources_too = 0 not in the_sft.onesided, verbose=verbose)
         sofic = cls(the_sft.nodes, the_sft.alph, the_sft.topology, trans, right_resolving=True, onesided = the_sft.onesided==[0])
         sofic.remove_sinks(verbose=verbose)
@@ -427,7 +451,7 @@ class Sofic1D:
             except KeyError:
                 trans[source, sym] = set([target])
             trans_alph.add(sym)
-            if verbose and i%1000 == 0:
+            if verbose and i%10000 == 0:
                 print(i, "transitions handled")
         
         sofic_alph = {node : the_sft.alph[node[-1] if len(node) == the_sft.dim+1 else node[-1:]]

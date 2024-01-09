@@ -556,6 +556,20 @@ class Diddy:
                     raise Exception("No configuration named %s" % name)
                 print(conf.display_str(hide_contents=hide_contents))
                 print()
+                
+            elif cmd == "empty":
+                name = args[0]
+                expect = kwds.get("expect", None)
+                verb = "verbose" in flags
+                if name in self.SFTs:
+                    the_sft = self.SFTs[name]
+                    if isinstance(the_sft, sft.SFT):
+                        empty_sft = sft.SFT(the_sft.dim, the_sft.nodes, the_sft.alph, the_sft.topology, onesided=the_sft.onesided, circuit=circuit.F)
+                    else:
+                        empty_sft = sofic1d.Sofic1D(the_sft.nodes, the_sft.alph, the_sft.topology, dict(), onesided=the_sft.onesided)
+                    report_SFT_contains(("empty",empty_sft), (name,the_sft), verbose=verb, truth=None if expect is None else not expect, method="periodic")
+                else:
+                    raise Exception("No SFT or sofic shift named {}".format(name))
 
             elif cmd == "equal":
                 name1 = args[0]
