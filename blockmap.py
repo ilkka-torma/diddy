@@ -206,7 +206,7 @@ class BlockMap:
         for n in self.from_nodes:
             for a in self.from_alphabet:
                 differents.append(XOR(V(origin + (n, a, "A")), V(origin + (n, a, "B"))))
-        # all iamges must be the same, and some central node has diff preimage
+        # all images must be the same, and some central node has diff preimage
         ret = UNSAT_under(AND(AND(*eq_circuits), OR(*differents)), LDAC2(self.from_alphabet))
 
         return ret
@@ -337,7 +337,72 @@ class BlockMap:
             topology.append(("past", (0,)*time_axis + (1,) + (0,)*(dim-time_axis) + (n,), (0,)*(dim+1) + (n,)))
             
         return SFT(dim+1, nodes, alph, topology, circuit=AND(*anded), onesided=[time_axis] if onesided else [])
+
+    # pattern is just a dictionary from vectors to tuple of letters, we evaluate at origin
+    #def evaluate_on_explicit(pattern):
+    #    ...
+
+    def get_neighborhood(self, only_cells):
+        if not only_cells :
+            raise Exception("Neighborhood in terms of nodes not implemented.")
+        circs = self.circuits
+        neighborhood = set()
+        for n in nodes:
+            for s in from_alph[n]:
+                for q in circs[n, s].get_variables():
+                    vec, n, s = q[:-2], q[-2], q[-1]
+                    neighborhood.add(vec)
+        return neighborhood
+
+    def local_rule(self, pattern):
+        img_sym = ()
+        for n in self.from_nodes:
+            for a in self.from_alphabet[n]:
+                
+
+    """
+    def explicit_local_rule(self, contiguous = False):
+        if contiguous:
+            if self.dimension != 1:
+                raise Exception("Contiguous local rule can only be requested in one dimension.")
+            
+        from_nodes = self.from_nodes
+        from_alph = self.from_alphabet # this is a dict from nodes to alphabets
+        # circuits are a dictionary from node and symbol to circuit telling us when it is accepting
+        circs = self.circuits
+
+        # first, calculate the neighborhood
+        neighborhood = []
+        for n in nodes:
+            for s in from_alph[n]:
+                for q in circs[n, s].get_variables():
+                    vec, n, s = q[:-2], q[-2], q[-1]
+                    neighborhood.append(vec)
+                    
+        if contiguous:
+            # dimension is 1, note that we have singleton tuples but they compare the same
+            m, M = min(neighborhood), max(neighborhood)
+            neighborhood = [(s,) for s in range(m[0], M[0]+1)]
+            
+        #if open_singleton_tuple:
+        #    neighborhood = [s[0] for s in neighborhood]
+            
+        # next, the main part: calculate the rule as an explicit local rule
+        # for each node, we should enumerate all possible patterns in the neighborhood
+        nodepats = list()
+        for n in nodes:
+            nodepats.append(pats(neighborhood, from_alph[n]))
         
+        rule = {}
+        for c in iter_prod(*nodepats):
+            # transpose the product so that it's from vectors to product alphabet
+            ptrn = {}
+            for v in neighborhood:
+                ptrn[v] = [cc[v] for cc in c]
+            result = self.evaluate_on(ptrn)
+    """
+
+    def local rule(self):
 
 # given a list of cellular automata, compute relations
 # among them up to radius rad as semigroup
@@ -429,13 +494,14 @@ which realizes the action from my paper.
 
 # basic testing, id, not, xors
 
-"""
-alphabet = [0,1]
+alphabet = {0 : [0, 1]}
 nodes = [0]
-dimension = 2
+dimension = 1
+id_CA_circuits = {(0,0) : NOT(V((0,0,0,1))), (0,1) : V((0,0,0,1))}
+a = BlockMap(alphabet, alphabet, nodes, nodes, dimension, id_CA_circuits, None, None)
+print(a.explicit_local_rule(contiguous = True))
 
-id_CA_circuits = {(0,0) : V((0,0,0,0))}
-a = CA(alphabet, nodes, dimension, id_CA_circuits)
+"""
 
 not_CA_circuits = {(0,1) : V((0,0,0,0))}
 b = CA(alphabet, nodes, dimension, not_CA_circuits)
