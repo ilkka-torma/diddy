@@ -480,7 +480,7 @@ class Diddy:
                     print("Density", dens/(border_size*min_aut.weight_denominator), "realized by cycle of length", minlen, "in minimized automaton")
                 expect = kwds.get("expect", None)
                 if expect is not None and mode == "assert":
-                    print(true_dens, expect)
+                    print(true_dens, "=", expect)
                     assert true_dens == expect
                 print("Calculation took", time.time() - tim, "seconds.")
 
@@ -511,7 +511,7 @@ class Diddy:
                 print("Lower bound", dens)
                 expect = kwds.get("expect", None)
                 if expect is not None and mode == "assert":
-                    print(dens, expect)
+                    print(dens, "=", expect)
                     assert dens == expect
                 print("Calculation took", time.time() - tim, "seconds.")
 
@@ -1125,7 +1125,7 @@ def report_SFT_contains(a, b, mode="report", truth=True, method=None, verbose=Fa
             print("Separated by " + conf.display_str())
     print()
     if mode == "assert":
-        print(res, truth)
+        print(res, "=", (truth == "T"))
         assert res == (truth == "T")
     return conf
 
@@ -1140,10 +1140,10 @@ def report_SFT_equal(a, b, mode="report", truth=True, method=None, verbose=False
         print("They are EQUAL (radius %s, time %s)." % (rad, tim))
     else:
         print("They are DIFFERENT (radius %s, time %s)." % (rad, tim))
-    print()
     if mode == "assert":
-        print(res, truth)
+        print(res, "=", (truth == "T"))
         assert res == (truth == "T")
+    print()
 
 def report_SFT_in(a, b, mode="report", truth=True):
     aname, aSFT = a
@@ -1156,10 +1156,10 @@ def report_SFT_in(a, b, mode="report", truth=True):
         print("It DOES (time %s)." % tim)
     else:
         print("It DOES NOT (time %s)." % tim)
-    print()
     if mode == "assert":
-        print(res, truth)
+        print(res, "=", (truth == "T"))
         assert res == (truth == "T")
+    print()
 
 def report_blockmap_equal(a, b, mode="report", truth=True, verbose=False): # verbose does nothing here
     aname, amap = a
@@ -1177,7 +1177,7 @@ def report_blockmap_equal(a, b, mode="report", truth=True, verbose=False): # ver
         print(pattern)
     print()
     if mode == "assert":
-        print(diff is None, truth)
+        print(diff is None, "=", (truth == "T"))
         assert (diff is None) == (truth == "T")
 
 def fix_filename(filename):
