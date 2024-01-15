@@ -21,6 +21,7 @@ import time
 #from circuitset import CircuitSet
 import circuitset
 import itertools as it
+from general import *
 
 def circuit(op, *inputs):
     c = Circuit(op, *inputs)
@@ -660,6 +661,9 @@ def projections(circ, the_vars):
     var_to_name = dict()
     clauses, next_name = circuit_to_sat_instance(circ, var_to_name)
     clauses.append([next_name])
+    circ_vars = circ.get_variables()
+    used = [var for var in the_vars if var in circ_vars]
+    unused = [var for var in the_vars if var not in circ_vars]
     #print("names", var_to_name)
     #print("names", [(x,y) for (x,y) in var_to_name.items() if type(x) == tuple])
     #print("clauses", clauses)
@@ -667,9 +671,14 @@ def projections(circ, the_vars):
         while s.solve():
             m = s.get_model()
             #print(m)
-            yield {var : (m[abs(var_to_name[var])-1] > 0) for var in the_vars}
+            base = {var : (m[abs(var_to_name[var])-1] > 0)
+                    for var in used}
+            for boolvec in iter_prod(*(iter([False,True]) for _ in range(len(unused)))):
+                for (var, val) in zip(unused, boolvec):
+                    base[var] = val
+                yield base
             #print("adding clause", [-m[abs(var_to_name[var])-1] for var in the_vars])
-            s.add_clause([-m[abs(var_to_name[var])-1] for var in the_vars])
+            s.add_clause([-m[abs(var_to_name[var])-1] for var in used])
 
 """
 models_under tells whether C1 being true implies C2 is true,

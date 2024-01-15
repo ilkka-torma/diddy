@@ -59,7 +59,7 @@ code_hex_gms = """
 %SFT gms2 Ao Ae[o5] o~~e -> (o=0| e = 0)
 %SFT broken_gms Ao Ae[o1] o=0|e=0
 %SFT broken_gms2 Ao Ae[o5] o~e -> (o=0| e = 0)
-%SFT empty Ao 0=1
+--%SFT empty Ao 0=1
 %SFT all_zero Ao o=0
 %SFT fullshift Ao 0=0
 %SFT byforbs
@@ -400,6 +400,9 @@ code = """
 %equal expect=F empty nonempty
 %equal expect=T empty empty2
 %equal expect=T empty nontriv_empty
+%empty expect=T empty
+%empty expect=T empty2
+%empty expect=T nontriv_empty
 """
 unit_tests.append(("emptiness", code))
 
@@ -547,24 +550,56 @@ code = """
 (o=0 -> o.rt != 2) &
 (o=1 -> o.rt != 0) &
 (o=2 -> o.rt != 1)
+%SFT nil Ao o != o
 %compute_forbidden_patterns neq1
 %compute_forbidden_patterns neq2
 %compute_forbidden_patterns neq_gap
 %compute_forbidden_patterns shift
+%compute_forbidden_patterns nil
 %sofic1D sofic_neq1 neq1
 %sofic1D sofic_neq2 neq2
 %sofic1D sofic_neq_gap neq_gap
 %sofic1D sofic_shift shift
+%sofic1D sofic_nil nil
 %minimize sofic_neq1
 %minimize sofic_neq2
 %minimize sofic_neq_gap
 %minimize sofic_shift
+%minimize sofic_nil
 %equal expect=T sofic_neq1 sofic_neq2
 %equal expect=F sofic_neq1 sofic_neq_gap
 %equal expect=F sofic_neq1 sofic_shift
 %equal expect=F sofic_shift sofic_neq_gap
+%equal expect=F sofic_shift sofic_nil
+%empty expect=F sofic_neq1
+%empty expect=T sofic_nil
 """
 unit_tests.append(("1d sofic (SFT) equality", code))
+
+code = """
+%alphabet 0 1 2
+%SFT x Ao
+(o=1 -> o.up=o.up.rt=1) &
+(o=o.rt=1 -> o.lt=1 & o.rt.rt=1) &
+(o=2 -> o.up!=1)
+%trace tr x [1 1] [dir [[rad 0] [rad 1]]] extra_rad=1
+%load_environment tr
+%SFT f1 Ao o!=2 & (o=o.rt=1 -> o.lt=o.rt.rt=1)
+%compute_forbidden_patterns f1
+%sofic1D s1 f1
+%SFT f2 Ao o!=1
+%compute_forbidden_patterns f2
+%sofic1D s2 f2
+%union u s1 s2
+%equal expect=T tr u
+%trace tr2 x [1 1] [dir [per 2]] extra_rad=1
+%SFT f3 Ao o=1 -> o.lt=o.rt=1
+%compute_forbidden_patterns f3
+%sofic1D s3 f3
+%equal expect=T tr2 s3
+%equal expect=F tr tr2
+"""
+unit_tests.append(("approximate and periodic trace", code))
 
 
 

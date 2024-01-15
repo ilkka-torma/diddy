@@ -10,6 +10,7 @@ from frozendict import frozendict
 # Much of this is copied from period_automaton with minor modifications
 # TODO: unify the common parts?
 
+
 def words(length, trans_alph, nodes, forbs):
     if not length:
         yield tuple()
@@ -21,33 +22,51 @@ def words(length, trans_alph, nodes, forbs):
                            for (i, syms2) in enumerate(word2)
                            for (sym, node) in zip(syms2, nodes))
                        for forb in forbs
-                       if len(forb) <= length):
+                       if max(p[0] for p in forb) < length):
                     yield word2
-                    
-def remove_sinks(trans, alph, sources_too=False, verbose=False):
-    i = 1
-    if verbose:
-        print("Trimming automaton with {} transitions.".format(len(trans)))
-    
-    size = len(trans)
-    while True:
-        not_sink = set()
-        not_source = set()
-        for ((st, sym), st2) in trans.items():
-            not_sink.add(st)
-            not_source.add(st2)
-        trans = {(st, sym) : st2
-                 for ((st, sym), st2) in trans.items()
-                 if st in not_sink
-                 if not sources_too or st2 in not_source}
-        if verbose:
-            print("Round {}: {} transitions left.".format(i, len(trans)))
-            i += 1
-        new_size = len(trans)
-        if new_size == size:
-            break
-        size = new_size
-    return trans
+
+def connected(states, trans, trans_alph):
+    "Is this right-resolving transition graph strongly connected?"
+    init = min(states)
+    reachable = set() # reachables from init
+    frontier = set([init])
+    while frontier:
+        new_frontier = set()
+        for st in frontier:
+            for sym in trans_alph:
+                try:
+                    new_st = trans[st, sym]
+                except KeyError:
+                    continue
+                if new_st not in reachable:
+                    reachable.add(new_st)
+                    new_frontier.add(new_st)
+        frontier = new_frontier
+    if len(reachable) != len(states):
+        return False
+
+    flipped = dict()
+    for ((st, sym), st2) in trans.items():
+        try:
+            flipped[st2, sym].add(st)
+        except KeyError:
+            flipped[st2, sym] = set([st])
+    reachable = set() # reachables to init
+    frontier = set([init])
+    while frontier:
+        new_frontier = set()
+        for st in frontier:
+            for sym in trans_alph:
+                try:
+                    new_sts = flipped[st, sym]
+                except KeyError:
+                    continue
+                for new_st in new_sts:
+                    if new_st not in reachable:
+                        reachable.add(new_st)
+                        new_frontier.add(new_st)
+        frontier = new_frontier
+    return len(reachable) == len(states)
 
 class Sofic1D:
     """
@@ -58,100 +77,161 @@ class Sofic1D:
     sym here is a tuple of symbols, one for each node
     """
     
-    def __init__(self, nodes, alph, topology, trans, right_resolving=False, onesided=False):
+    def __init__(self, nodes, alph, topology, trans, right_resolving=False, onesided=False, trans_alph=None):
         self.dim = 1
         self.nodes = nodes
         self.alph = alph
-        self.trans_alph = list(iter_prod(*(iter(alph[node]) for node in nodes)))
+        if trans_alph is None:
+            trans_alph = list(iter_prod(*(iter(alph[node]) for node in nodes)))
+        self.trans_alph = trans_alph
         self.topology = topology
         self.trans = trans
-        self.states = set(tr[0] for tr in self.trans)
+        if right_resolving:
+            self.states = set(tr[0] for tr in self.trans) | set(self.trans.values())
+        else:
+            self.states = set(tr[0] for tr in self.trans) | set(st for sts in self.trans.values() for st in sts)
         self.right_resolving = right_resolving
         self.onesided = onesided
         self.minimal = False
+
+    def remove_sinks(self, verbose=False):
+        i = 1
+
+        if self.right_resolving:
+            size = len(self.trans)
+            if verbose:
+                print("Trimming right-resolving automaton with {} transitions.".format(size))
+            while True:
+                not_sink = set()
+                not_source = set()
+                for ((st, sym), st2) in self.trans.items():
+                    not_sink.add(st)
+                    not_source.add(st2)
+                self.trans = {(st, sym) : st2
+                              for ((st, sym), st2) in self.trans.items()
+                              if self.onesided or st in not_source
+                              if st2 in not_sink}
+                new_size = len(self.trans)
+                if verbose:
+                    print("Round {}: {} transitions left.".format(i, new_size))
+                    i += 1
+                if new_size == size:
+                    break
+                size = new_size
+        else:
+            size = sum(len(sts) for sts in self.trans.values())
+            if verbose:
+                print("Trimming automaton with {} transitions.".format(size))
+            while True:
+                not_sink = set()
+                not_source = set()
+                for ((st, sym), sts) in self.trans.items():
+                    if sts:
+                        not_sink.add(st)
+                    not_source |= sts
+                self.trans = {(st, sym) : set(st2
+                                              for st2 in sts
+                                              if st2 in not_sink)
+                              for ((st, sym), sts) in self.trans.items()
+                              if self.onesided or st in not_source}
+                new_size = sum(len(sts) for sts in self.trans.values())
+                if verbose:
+                    print("Round {}: {} transitions left.".format(i, new_size))
+                    i += 1
+                if new_size == size:
+                    break
+                size = new_size
+                
+        self.states = set(tr[0] for tr in self.trans)
         
     def equals(self, other, return_radius=True, method=None, verbose=False):
         "Is this 1d sofic equal to the other?"
-        assert self.minimal
-        assert isinstance(other, Sofic1D)
-        assert other.minimal
-        
-        # check number of states and transitions
-        if verbose:
-            print("checking sizes of automata")
-        if len(self.states) != len(other.states):
+        if not isinstance(other, Sofic1D):
+            raise Exception("Sofic shifts can only be compared to sofic shifts")
+        if self.onesided != other.onesided:
             if return_radius:
                 return False, None
             else:
                 return False
-        if len(self.trans) != len(other.trans):
+            
+        if not self.trans:
+            if return_radius:
+                return not other.trans, None
+            else:
+                return not other.trans
+        if not other.trans:
             if return_radius:
                 return False, None
             else:
                 return False
         
-        # compute separating words (positive and negative followers for each state)
-        if verbose:
-            print("computing followers")
-        followers = {st : [set(), set()] for st in self.states}
-        for (st1, st2) in combinations(self.states, 2):
-            # if the states are already separate, do nothing
-            if followers[st1][0] & followers[st2][1] or followers[st1][1] & followers[st2][0]:
-                continue
-            # separate these states
-            states1 = {tuple() : st1}
-            states2 = {tuple() : st2}
-            n = 0
-            while True:
-                n += 1
-                new_states1 = dict()
-                new_states2 = dict()
-                for (word, state1) in states1.items():
-                    state2 = states2[word]
-                    for sym in self.trans_alph:
-                        new1 = self.trans.get((state1, sym), None)
-                        new2 = self.trans.get((state2, sym), None)
-                        new_word = word + (sym,)
-                        if new1 is None:
-                            if new2 is not None:
-                                followers[st1][1].add(new_word)
-                                followers[st2][0].add(new_word)
-                                break
-                        elif new2 is None:
-                            followers[st1][0].add(new_word)
-                            followers[st2][1].add(new_word)
-                            break
-                        else:
-                            new_states1[new_word] = new1
-                            new_states2[new_word] = new2
-                    else:
-                        continue
-                    break
+        if self.minimal and connected(self.states, self.trans, self.trans_alph) and\
+           other.minimal and connected(other.states, other.trans, other.trans_alph):
+            # check number of states and transitions
+            if verbose:
+                print("checking sizes of automata")
+            if len(self.states) != len(other.states):
+                if return_radius:
+                    return False, None
                 else:
-                    states1.update(new_states1)
-                    states2.update(new_states2)
+                    return False
+            if len(self.trans) != len(other.trans):
+                if return_radius:
+                    return False, None
+                else:
+                    return False
+
+            # compute separating words (positive and negative followers for each state)
+            if verbose:
+                print("computing followers")
+            followers = {st : [set(), set()] for st in self.states}
+            for (st1, st2) in combinations(self.states, 2):
+                # if the states are already separate, do nothing
+                if followers[st1][0] & followers[st2][1] or followers[st1][1] & followers[st2][0]:
                     continue
-                break
-        
-        # match the states
-        if verbose:
-            print("matching states")
-        match = dict()
-        for other_st in other.states:
-            for (st, [poss, negs]) in followers.items():
-                if st not in match:
-                    for word in poss:
-                        cur = other_st
-                        for sym in word:
-                            try:
-                                cur = other.trans[cur, sym]
-                            except KeyError:
+                # separate these states
+                states1 = {tuple() : st1}
+                states2 = {tuple() : st2}
+                n = 0
+                while True:
+                    n += 1
+                    new_states1 = dict()
+                    new_states2 = dict()
+                    for (word, state1) in states1.items():
+                        state2 = states2[word]
+                        for sym in self.trans_alph:
+                            new1 = self.trans.get((state1, sym), None)
+                            new2 = self.trans.get((state2, sym), None)
+                            new_word = word + (sym,)
+                            if new1 is None:
+                                if new2 is not None:
+                                    followers[st1][1].add(new_word)
+                                    followers[st2][0].add(new_word)
+                                    break
+                            elif new2 is None:
+                                followers[st1][0].add(new_word)
+                                followers[st2][1].add(new_word)
                                 break
+                            else:
+                                new_states1[new_word] = new1
+                                new_states2[new_word] = new2
                         else:
                             continue
                         break
                     else:
-                        for word in negs:
+                        states1.update(new_states1)
+                        states2.update(new_states2)
+                        continue
+                    break
+
+            # match the states
+            if verbose:
+                print("matching states")
+            match = dict()
+            for other_st in other.states:
+                for (st, [poss, negs]) in followers.items():
+                    if st not in match:
+                        for word in poss:
                             cur = other_st
                             for sym in word:
                                 try:
@@ -159,33 +239,78 @@ class Sofic1D:
                                 except KeyError:
                                     break
                             else:
-                                break                                
-                        else:
-                            match[st] = other_st
+                                continue
                             break
-        
-        # check for isomorphism of automata (note that they have equally many transitions)
-        if verbose:
-            print("checking for isomorphism")
-        for ((st, sym), st2) in self.trans.items():
-            if other.trans.get((match[st],sym), None) != match[st2]:
-                if return_radius:
-                    return False, None
-                else:
-                    return False
-        if return_radius:
-            return True, None
-        else:
-            return True
+                        else:
+                            for word in negs:
+                                cur = other_st
+                                for sym in word:
+                                    try:
+                                        cur = other.trans[cur, sym]
+                                    except KeyError:
+                                        break
+                                else:
+                                    break                                
+                            else:
+                                match[st] = other_st
+                                break
+
+            # check for isomorphism of automata (note that they have equally many transitions)
+            if verbose:
+                print("checking for isomorphism")
+            for ((st, sym), st2) in self.trans.items():
+                if other.trans.get((match[st],sym), None) != match[st2]:
+                    if return_radius:
+                        return False, None
+                    else:
+                        return False
+            if return_radius:
+                return True, None
+            else:
+                return True
             
-    def contains(self, other):
+        else:
+            # We don't have minimal and connected graphs
+            # Then we construct auxiliary transitive sofic shifts and compare those
+            if verbose:
+                print("Constructing auxiliary graphs")
+            if self.right_resolving:
+                aux_trans1 = {tr : set([st]) for (tr, st) in self.trans.items()}
+            else:
+                aux_trans1 = self.trans.copy()
+            for st in self.states:
+                aux_trans1[st, None] = set([None])
+            aux_trans1[None, None] = self.states | set([None])
+            aux_sofic1 = Sofic1D(None, None, None, aux_trans1, onesided=self.onesided, trans_alph=self.trans_alph + [None])
+            aux_sofic1.determinize(verbose=verbose)
+            aux_sofic1.minimize(verbose=verbose)
+            assert connected(aux_sofic1.states, aux_sofic1.trans, aux_sofic1.trans_alph)
+            
+            if other.right_resolving:
+                aux_trans2 = {tr : set([st]) for (tr, st) in other.trans.items()}
+            else:
+                aux_trans2 = other.trans.copy()
+            for st in other.states:
+                aux_trans2[st, None] = set([None])
+            aux_trans2[None, None] = other.states | set([None])
+            aux_sofic2 = Sofic1D(None, None, None, aux_trans2, onesided=other.onesided, trans_alph=self.trans_alph + [None])
+            aux_sofic2.determinize(verbose=verbose)
+            aux_sofic2.minimize(verbose=verbose)
+
+            return aux_sofic1.equals(aux_sofic2, verbose=verbose, return_radius=return_radius)
+                    
+            
+    def contains(self, other, return_radius_and_sep=None, method=None, verbose=False):
         "Does this 1d sofic contain the other?"
         # TODO: make more efficient
         assert other.minimal
         inter = self.intersection(other)
-        inter.determinize()
-        inter.minimize()
-        return other.equals(inter)
+        inter.determinize(verbose=verbose)
+        inter.minimize(verbose=verbose)
+        if return_radius_and_sep:
+            return other.equals(inter), None, None
+        else:
+            return other.equals(inter)
         
     @classmethod
     def from_SFT(cls, the_sft, verbose=False):
@@ -194,41 +319,62 @@ class Sofic1D:
         assert the_sft.forbs is not None
         if verbose:
             print("Constructing sofic automaton.")
+
         trans_alph = list(iter_prod(*(iter(the_sft.alph[node]) for node in the_sft.nodes)))
         forbs = []
+        is_empty = False
         for forb_pat in the_sft.forbs:
+            if not forb_pat:
+                is_empty = True
+                break
             min_ix = min(nvec[0] for nvec in forb_pat)
             forbs.append({(i-min_ix, n) : c for ((i,n),c) in forb_pat.items()})
-        max_len = max(nvec[0] for forb in forbs for nvec in forb)
-        trans_words = set(words(max_len+1, trans_alph, the_sft.nodes, forbs))
-        trans = {(word[:-1], word[-1]) : word[1:]
-                 for word in trans_words}
-        trans = remove_sinks(trans, trans_alph, sources_too = 0 not in the_sft.onesided, verbose=verbose)
-        return cls(the_sft.nodes, the_sft.alph, the_sft.topology, trans, right_resolving=True, onesided = the_sft.onesided==[0])
+        if is_empty:
+            trans = {}
+        else:
+            max_len = max(nvec[0] for forb in forbs for nvec in forb)
+            trans_words = set(words(max_len+1, trans_alph, the_sft.nodes, forbs))
+            trans = {(word[:-1], word[-1]) : word[1:]
+                     for word in trans_words}
+        #trans = remove_sinks(trans, trans_alph, sources_too = 0 not in the_sft.onesided, verbose=verbose)
+        sofic = cls(the_sft.nodes, the_sft.alph, the_sft.topology, trans, right_resolving=True, onesided = the_sft.onesided==[0])
+        sofic.remove_sinks(verbose=verbose)
+        return sofic
     
     @classmethod
-    def trace(cls, the_sft, size, spec, onesided=False, verbose=False):
+    def trace(cls, the_sft, size, spec, verbose=False, extra_rad=0):
         """
         Compute the 1-dimensional trace of the given SFT of dimension >= 2.
-        Size is a the_sft.dim-length list of integers.
-        The trace alphabet consists of patterns (frozendicts) of this shape.
+        Size is a the_sft.dim-length list of integers,
+        which represents the size of the rectangular "trace alphabet".
+        The topology of the trace has nested tracks for the axes of the rectangle,
+        plus a track for the nodes of the SFT.
+        For example, if size is [2,3] and the SFT has nodes [a,b],
+        then the trace topology has 2*3*2 = 12 nodes, named 0.0.a, 0.0.b, 0.1.a, ..., 1.2.b.
         The spec is a list of length the_sft.dim.
         Each element of the spec is one of the following.
         * "dir", signifying the direction of the trace. There must be exactly one of these.
         * ("per", p), signifying a periodic direction of period p.
         * A pair (a, b), where each of a and b is one of the following.
-          - ("rad", r) for radius r.
+          - ("rad", r) for radius r (in addition to the size).
           - ("uper", t, p) for ultimately periodic with transient length t and ultimate period p.
-        The n gives the width of the trace in the corresponding direction.
+        extra_rad gives an additional non-presistent radius.
         """
+        if verbose:
+            print("Computing trace from SFT")
+        
         # TODO: add gluing to arbitrary 1D sofic in 2D case.
-        # TODO: rethink the nodes
-        trace_nodes = sft.Nodes([0])
-        trace_topology = [("rt", (0,0), (1,0)), ("lt", (0,0), (-1,0))]
+        trace_nodes = the_sft.nodes
+        for width in reversed(size):
+            trace_nodes = sft.Nodes({i : trace_nodes for i in range(width)})
+        trace_topology = []
+        for node in trace_nodes:
+            trace_topology.append(("rt", (0,node), (1,node)))
+            trace_topology.append(("lt", (0,node), (-1,node)))
         alph_domain = [vec + (node,)
                        for vec in hyperrect([(0,s) for s in size])
                        for node in the_sft.nodes]
-        trace_alph = {0 : [frozendict(pat) for pat in the_sft.all_patterns(alph_domain)]}
+        #trace_alph = {0 : [frozendict(pat) for pat in the_sft.all_patterns(alph_domain)]}
         
         # compute transition sizes from specification
         trans_bounds = []
@@ -236,7 +382,7 @@ class Sofic1D:
         period_structure = []
         for (ix, (width, struct)) in enumerate(zip(size, spec)):
             if struct == "dir":
-                trans_bounds.append((0, max(width, the_sft.radii()[ix])))
+                trans_bounds.append((0, max(width+1, the_sft.radii()[ix])))
                 period_structure.append((None, None))
                 if dir_ix is None:
                     dir_ix = ix
@@ -268,36 +414,64 @@ class Sofic1D:
                 period_structure.append((lper, rper))
         if dir_ix is None:
             raise Exception("No direction in trace spec")
+
+        if verbose:
+            print("Computing transitions")
         
         # compute transitions and states
         states = set()
         trans = dict()
-        for trans_pat in the_sft.all_hyperrect_patterns(trans_bounds, period_structure=period_structure):
+        trans_alph = set()
+        tr_vec = (0,)*dir_ix + (trans_bounds[dir_ix][1]-size[dir_ix],) + (0,)*(the_sft.dim-dir_ix-1)
+        proj_size = list(size)
+        proj_size[dir_ix] = trans_bounds[dir_ix][1]-size[dir_ix]+1
+        proj_nvecs = set(vec+(node,)
+                         for vec in hyperrect([(0,a) for a in proj_size])
+                         for node in the_sft.nodes)
+        #print("size", size, "trans_size", trans_bounds, "proj_size", proj_size)
+        i = 0
+        for trans_pat in the_sft.all_hyperrect_patterns(trans_bounds, period_structure=period_structure, extra_rad=extra_rad):
+            #print("got", trans_pat)
+            i += 1
             source = frozendict({nvec : sym
                                  for (nvec, sym) in trans_pat.items()
                                  if nvec[dir_ix] < trans_bounds[dir_ix][1]-1})
             target = frozendict({nvsub(nvec, char_vector(the_sft.dim, dir_ix)) : sym
                                  for (nvec, sym) in trans_pat.items()
                                  if nvec[dir_ix] > 0})
-            sym = frozendict({nvec : sym
-                              for (nvec, sym) in trans_pat.items()
-                              if all(0 <= nvec[ix] < size[ix] for ix in range(the_sft.dim))})
+            sym = tuple(trans_pat[nvadd(tr_node, tr_vec)] for tr_node in trace_nodes)
+            #sym = frozendict({nvec : sym
+            #                  for (nvec, sym) in trans_pat.items()
+            #                  if all(0 <= nvec[ix] < size[ix] for ix in range(the_sft.dim))})
             states.add(source)
             states.add(target)
-            trans[source, sym] = target
-            
-        trans = remove_sinks(trans, trace_alph, sources_too = onesided, verbose = verbose)
-            
-        return Sofic1D(trace_nodes, trace_alph, trace_topology, trans, right_resolving = True, onesided = onesided)
+            #print("trans", source, sym, "->", target)
+            try:
+                trans[source, sym].add(target)
+            except KeyError:
+                trans[source, sym] = set([target])
+            trans_alph.add(sym)
+            if verbose and i%10000 == 0:
+                print(i, "transitions handled")
         
-    def determinize(self, verbose=False, trim=True):
+        sofic_alph = {node : the_sft.alph[node[-1] if len(node) == the_sft.dim+1 else node[-1:]]
+                      for node in trace_nodes}
+
+        is_onesided = dir_ix in the_sft.onesided
+        #trans = remove_sinks(trans, trans_alph, sources_too = is_onesided, verbose = verbose)
+        
+        sofic = Sofic1D(trace_nodes, sofic_alph, trace_topology, trans, onesided = is_onesided)
+        sofic.remove_sinks(verbose=verbose)
+        return sofic
+        
+    def determinize(self, verbose=False):
         "Determinize this automaton using the powerset construction."
         if self.right_resolving:
             return
         
         # Maintain sets of seen and unprocessed state sets, and integer labels for seen sets
         if verbose:
-            print("Determinizing automaton with {} states and {} transitions".format(len(self.states), len(self.trans)))
+            print("Determinizing automaton with {} states and {} transitions".format(len(self.states), sum(len(sts) for sts in self.trans.values())))
         
         init_st = frozenset(self.states)
         seen = {init_st : 0}
@@ -332,14 +506,13 @@ class Sofic1D:
                         seen[new_st_set] = new_num
                     # Transitions are stored using the integer labels
                     det_trans[st_num, sym] = new_num
-        
-        # Trim the transitions
-        if trim:
-            det_trans = remove_sinks(det_trans, self.trans_alph, sources_too=not self.onesided)
 
         self.trans = det_trans
-        self.states = set(tr[0] for tr in det_trans)
+        self.states = set(tr[0] for tr in det_trans) | set(det_trans.values())
         self.right_resolving = True
+
+        # Trim the transitions
+        self.remove_sinks(verbose=verbose)
         
         if verbose:
             print("Determinized to {} states and {} transitions".format(len(self.states), len(self.trans)))
@@ -349,7 +522,7 @@ class Sofic1D:
         assert self.right_resolving
         if self.minimal:
             return
-
+        
         # Start with uniform color
         # 0 is the special "no state" color
         coloring = {st : 1 for st in self.states}

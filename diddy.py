@@ -178,6 +178,7 @@ class Diddy:
                 if type(defn) == list:
                     self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, self.topology, forbs=defn, onesided=onesided)
                 elif type(defn) == tuple:
+                    #print("defn", defn)
                     circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, defn, self.externals)
                     #vardict = dict()
                     #inst = circuit.circuit_to_sat_instance(circ, vardict)
@@ -207,7 +208,7 @@ class Diddy:
             elif cmd == "determinize":
                 name = args[0]
                 verbose = "verbose" in flags
-                self.SFTs[name].determinize(verbose=verbose, trim=True)
+                self.SFTs[name].determinize(verbose=verbose)
                 
             elif cmd == "minimize":
                 name = args[0]
@@ -306,10 +307,10 @@ class Diddy:
                 trace_size = args[2]
                 trace_spec = args[3]
                 verbose = "verbose" in flags
+                extra_rad = kwds.get("extra_rad", 0)
                 if verbose:
                     print("Extracting trace of size {} and spec {} from SFT {}".format(trace_size, trace_spec, sft_name))
-                onesided = "onesided" in flags
-                the_trace = sofic1d.Sofic1D.trace(the_sft, trace_size, trace_spec, onesided=onesided, verbose=verbose)
+                the_trace = sofic1d.Sofic1D.trace(the_sft, trace_size, trace_spec, verbose=verbose, extra_rad=extra_rad)
                 self.SFTs[trace_name] = the_trace
 
             elif cmd == "clopen":
@@ -529,6 +530,16 @@ class Diddy:
                 print(formula)
                 print()
 
+            elif cmd == "show_graph" and mode == "report":
+                name = args[0]
+                if name in self.SFTs and isinstance(self.SFTs[name], sofic1d.Sofic1D):
+                    trans = self.SFTs[name].trans
+                else:
+                    raise Exception("No sofic shift named %s" % name)
+                print("Showing transition graph of %s." % name)
+                print(trans)
+                print()
+
             elif cmd == "show_environment":
                 name = kwds.get("sft", None)
                 if name == None:
@@ -545,6 +556,20 @@ class Diddy:
                     raise Exception("No configuration named %s" % name)
                 print(conf.display_str(hide_contents=hide_contents))
                 print()
+                
+            elif cmd == "empty":
+                name = args[0]
+                expect = kwds.get("expect", None)
+                verb = "verbose" in flags
+                if name in self.SFTs:
+                    the_sft = self.SFTs[name]
+                    if isinstance(the_sft, sft.SFT):
+                        empty_sft = sft.SFT(the_sft.dim, the_sft.nodes, the_sft.alph, the_sft.topology, onesided=the_sft.onesided, circuit=circuit.F)
+                    else:
+                        empty_sft = sofic1d.Sofic1D(the_sft.nodes, the_sft.alph, the_sft.topology, dict(), onesided=the_sft.onesided)
+                    report_SFT_contains(("empty",empty_sft), (name,the_sft), verbose=verb, truth=None if expect is None else not expect, method="periodic")
+                else:
+                    raise Exception("No SFT or sofic shift named {}".format(name))
 
             elif cmd == "equal":
                 name1 = args[0]

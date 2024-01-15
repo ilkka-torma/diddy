@@ -202,11 +202,18 @@ commands = [
     Command("show_forbidden_patterns",
             [ArgType.LABEL],
             aliases = ["print_forbidden_patterns"]),
+    Command("show_graph",
+            [ArgType.LABEL],
+            aliases = ["print_graph"]),
     Command("show_environment",
             [],
             opts = ["sft"]),
 
     # Comparing objects
+    Command("empty",
+            [ArgType.LABEL],
+            opts = ["expect"],
+            flags = ["verbose"]),
     Command("equal",
             [ArgType.LABEL, ArgType.LABEL],
             opts = ["method", "expect"],
