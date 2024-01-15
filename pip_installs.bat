@@ -13,3 +13,15 @@ python -m pip install pulp
 
 :: The psutil module allows querying memory usage and such.
 python -m pip install psutil
+
+:: The pygame module is used when running tiler.
+:: If you don't use tiler, you can comment this out.
+python -m pip install pygame
+
+:: The pygame_gui module adds some ui components to pygame.
+:: If you don't use tiler, you can comment this out.
+python -m pip install pygame_gui
+
+:: The numpy module is currently only used to invert a matrix in tiler.
+:: If you don't use tiler, you can comment this out.
+python -m pip install numpy
