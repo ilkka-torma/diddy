@@ -622,4 +622,5 @@ if __name__ == "__main__":
     total_time = time.time() - t
     end_mem = process.memory_info().rss/1000
 
+    print("All tests were successful.")
     print("time", total_time, "memory", start_mem, "->", end_mem)
