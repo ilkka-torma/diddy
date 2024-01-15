@@ -354,10 +354,10 @@ class BlockMap:
                     neighborhood.add(vec)
         return neighborhood
 
-    def local_rule(self, pattern):
-        img_sym = ()
-        for n in self.from_nodes:
-            for a in self.from_alphabet[n]:
+    #def local_rule(self, pattern):
+    #    img_sym = ()
+    #    for n in self.from_nodes:
+    #        for a in self.from_alphabet[n]:
                 
 
     """
@@ -402,7 +402,7 @@ class BlockMap:
             result = self.evaluate_on(ptrn)
     """
 
-    def local rule(self):
+    #def local rule(self):
 
 # given a list of cellular automata, compute relations
 # among them up to radius rad as semigroup
@@ -494,12 +494,14 @@ which realizes the action from my paper.
 
 # basic testing, id, not, xors
 
+"""
 alphabet = {0 : [0, 1]}
 nodes = [0]
 dimension = 1
 id_CA_circuits = {(0,0) : NOT(V((0,0,0,1))), (0,1) : V((0,0,0,1))}
 a = BlockMap(alphabet, alphabet, nodes, nodes, dimension, id_CA_circuits, None, None)
 print(a.explicit_local_rule(contiguous = True))
+"""
 
 """
 
