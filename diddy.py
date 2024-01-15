@@ -1,6 +1,17 @@
+try:
+    import dparser
+    import parsy
+except ImportError as error:
+    print("It seems you have not installed the prerequisite modules for Diddy.")
+    print("The file pip_installs.bat contains a list of pip installs you should perform.")
+    import os
+    if os.name == 'nt':
+        print("You seem to be running Windows, so you can simply run pip_installs.bat directly.")
+    print("\n\n")
+        
+import sys
+
 from general import *
-import dparser
-import parsy
 
 import compiler
 import sft
@@ -1236,14 +1247,18 @@ CR4d8e2_topology = [('N', (0, 0, 'big'), (0, 1, 'small')),
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument("filename", metavar='f', type=str)
-    args = arg_parser.parse_args()
+    #print("moi")
+    arg_parser.add_argument("filename", type=str, nargs="+")
+    if len(sys.argv) == 1:
+        print("If you simply want to test that diddy is working correctly, run \"python unit_tests.py\".\n")
+            
+        #print("moi")
+        args = arg_parser.parse_args()
+        #print("moi")
 
-    with open(fix_filename(args.filename), 'r') as f:
-        code = f.read()
-
-    runner = Diddy()
-    runner.run(code)
-        
-
+        with open(fix_filename(args.filename), 'r') as f:
+            code = f.read()
+        #print("moi")
+        runner = Diddy()
+        runner.run(code)
     
