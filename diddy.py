@@ -1247,18 +1247,12 @@ CR4d8e2_topology = [('N', (0, 0, 'big'), (0, 1, 'small')),
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
-    #print("moi")
     arg_parser.add_argument("filename", type=str, nargs="+")
     if len(sys.argv) == 1:
         print("If you simply want to test that diddy is working correctly, run \"python unit_tests.py\".\n")
-            
-        #print("moi")
-        args = arg_parser.parse_args()
-        #print("moi")
-
-        with open(fix_filename(args.filename), 'r') as f:
-            code = f.read()
-        #print("moi")
-        runner = Diddy()
-        runner.run(code)
+    args = arg_parser.parse_args()
+    with open(fix_filename(args.filename), 'r') as f:
+        code = f.read()
+    runner = Diddy()
+    runner.run(code)
     
