@@ -1249,7 +1249,8 @@ if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("filename", type=str, nargs="+")
     if len(sys.argv) == 1:
-        print("If you simply want to test that diddy is working correctly, run \"python unit_tests.py\".\n")
+        print("""If you want to test that Diddy is installed correctly, run \"python unit_tests.py\".
+You can test that Tiler works by running \"python diddy.py tiler_test\" and pressing spacebar.\n""")
     args = arg_parser.parse_args()
     with open(fix_filename(args.filename[0]), 'r') as f:
         code = f.read()
