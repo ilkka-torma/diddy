@@ -484,7 +484,7 @@ def find_relations(CAs, rad):
 
 #def CA()
 
-"""
+r"""
 Given a cellular automaton, which is a tuple
 (alphabet, radius rule)
 return a new CA
