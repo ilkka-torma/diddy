@@ -1251,7 +1251,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 1:
         print("If you simply want to test that diddy is working correctly, run \"python unit_tests.py\".\n")
     args = arg_parser.parse_args()
-    with open(fix_filename(args.filename), 'r') as f:
+    with open(fix_filename(args.filename[0]), 'r') as f:
         code = f.read()
     runner = Diddy()
     runner.run(code)
