@@ -1,4 +1,3 @@
-
 from general import *
 import compiler
 import sft
@@ -108,6 +107,7 @@ def undecorate(conf, unfix_atoms=False, alph=None):
             undec_pat[nvec] = None
         else:
             sym, fix = tup
+            # the len(sym) == 1 things is technical and about different representations
             if (type(sym) != list or len(sym) == 1) and not fix:
                 undec_pat[nvec] = list(alph[nvec[-1]])
             elif type(sym) == list and len(sym) == 1:
@@ -188,6 +188,7 @@ class TilerBackend:
         Unfixed non-list nodes are set to unknown before deduction.
         Return a Boolean for success.
         """
+        
 
         #if self.conf().empty(): <- maybe smth like this is a good idea, since this fails with periodic right now.
         #    return
@@ -292,14 +293,57 @@ class TilerBackend:
         "Unfix all nodes, save if changes are made."
         pat = dict()
         for nvec in self.conf().pat:
+            #print(nvec, self.conf()[nvec])
+            if self.conf()[nvec] == None:
+                continue
             (sym, _) = self.conf()[nvec]
             pat[nvec] = (sym, False)
         self.replace_patch(pat)
+
+    def clear_deduced(self):
+        "Reset deduced nodes to unknown."
+        pat = dict()
+        for (nvec, tup) in self.conf().pat.items():
+            if tup is None:
+                continue
+            else:
+                sym, fix = tup
+                if fix == True:
+                    continue
+                # the len(sym) == 1 things is technical and about different representations
+                if (type(sym) != list or len(sym) == 1) and not fix:
+                    pat[nvec] = (list(self.sft.alph[nvec[-1]]), False)
+                elif type(sym) == list and len(sym) == 1:
+                    pat[nvec] = (sym[0], False)
+        self.replace_patch(pat)
+
+    """
+    # this seems to be a duplicate of the above, which is unfinished and broken, TODO: remove
+    def clear_deduced(self):
+        "Reset deduced nodes to unknown."
+        pat = dict()
+        for nvec in self.conf().pat:
+            if self.conf()[nvec] == None:
+                continue
+            (sym, fixed) = self.conf()[nvec]
+            if fixed: continue
+            pat[nvec] = (self.alpha, False)
+        self.replace_patch(pat)
+    """
         
-    def clear_all(self):
+    def clear_all(self, also_nonexisting):
         "Set all nodes to unknown, save if changes are made."
         pat = dict()
         for nvec in self.conf().pat:
+            if not also_nonexisting and self.conf().pat[nvec] is None:
+                continue
             syms = list(self.sft.alph[nvec[-1]])
             pat[nvec] = (syms, False)
+        self.replace_patch(pat)
+
+    def remove_all(self):
+        "Set all nodes to empty, save if changes are made."
+        pat = dict()
+        for nvec in self.conf().pat:
+            pat[nvec] = None
         self.replace_patch(pat)

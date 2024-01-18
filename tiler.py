@@ -96,6 +96,8 @@ class CursorState(Enum):
 
 def deduce_a_tiling(grid, the_SFT, x_period, y_period):
 
+    raise Exception("deduce_a_tiling should never be called, use backend.")
+
     global currentstate
     currentstate = TILING_UNKNOWN
 
@@ -104,8 +106,8 @@ def deduce_a_tiling(grid, the_SFT, x_period, y_period):
             grid[g] = UNKNOWN
 
     pat = {}
-    
-    #print("grid", grid)
+
+    # grid is a dict from (x, y, n) to v where n is actual name of node, and v actual symbol name
     for g in grid:
         if the_SFT.dim == 1 and g[1] != 0:
             continue
@@ -141,7 +143,7 @@ def deduce_a_tiling(grid, the_SFT, x_period, y_period):
 
     model = the_SFT.deduce_global(conf)
 
-    #print("model found", model.display_str())
+    print("model found", model.display_str())
 
     if model == None:
         currentstate = TILING_BAD
@@ -151,7 +153,7 @@ def deduce_a_tiling(grid, the_SFT, x_period, y_period):
         for g in grid:
             if grid[g] == UNKNOWN:
                 val = model[g]
-                #print("model maps", d, "to", val)
+                print("model maps", d, "to", val)
                 
                 if val != None:
                     # here b {(0, 0): ['a', 'b', 'c']} (10, 10, (0, 0))
@@ -328,7 +330,10 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
           }
         colors = {}
         for node in nodes:
+            
             for (i, sym) in enumerate(alphabets[node]):
+                print("coloring", node, sym, i, ix_colors[i % len(ix_colors)])
+                print(node, sym)
                 colors[node, sym] = ix_colors[i]
     deduced_colors = {}
     for c in colors:
@@ -496,7 +501,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
             #return A*st[0] + B*st[1], C*st[0] + D*st[1]
             return x, y
 
-    # given grid coords, find closest node
+    # given grid coords, find closest node; node is given as its index
+    # seems to assume that offset vectors not too large
     def get_node(x, y, debug_prints = False):
         if debug_prints:
             print()
@@ -561,8 +567,10 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
     moving_marker = None
     
     paint_fixity = True
+
     
-    
+    for nvec in backend.conf().pat:
+        print(nvec, backend.conf()[nvec])
     
     # -------- Main Program Loop -----------
     while not done:
@@ -676,7 +684,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                     drawcolor_set = True
                 if event.key == pygame.K_BACKSPACE:
                     if shift_modifier:
-                        TODO = TODO
+                        backend.remove_all()
                     else:
                         drawcolor = EMPTY
                         drawcolor_set = True
@@ -706,7 +714,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                             elif drawcolor == UNKNOWN:
                                 patch[x,y,n] = (list(the_SFT.alph[n]), False)
                             else:
-                                patch[x,y,n] = (the_SFT.alph[n][drawcolor[1]], True)
+                                if drawcolor[1] < len(the_SFT.alph[n]):
+                                    patch[x,y,n] = (the_SFT.alph[n][drawcolor[1]], True)
                     backend.replace_patch(patch)
                     currentstate = TILING_UNKNOWN
                     #backend.update_selection(set(), save=False)
@@ -730,10 +739,12 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                     show_labels = not show_labels
                     
                 if event.key == pygame.K_e:
-                    if shift_modifier:
-                        backend.clear_all()
+                    if shift_modifier and ctrl_modifier:
+                        backend.clear_all(True)
+                    elif shift_modifier:
+                        backend.clear_all(False)
                     else:
-                        backend.unfix_all()
+                        backend.clear_deduced()
                         
                 if event.key == pygame.K_d:
                     if cursor_state == CursorState.PAINT:
@@ -834,6 +845,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                 nodesize += 1
             if keys[pygame.K_x] and not any_modifier:
                 nodesize -= 1
+                if nodesize <= 1:
+                    nodesize = 1
 
         pos = cp_from_screen(mpos)
         #print(pos)
@@ -1011,7 +1024,10 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                             #sym = alphabets[nodes[n]][symidx]
                             #print(sym)
                             #color = colors[grid[(x,y,nodes[n])][1]]
-                            color = colors[nodes[n], sym]
+                            try:
+                                color = colors[nodes[n], sym]
+                            except:
+                                color = WHITE
                             white_circle = fixed
 
                         #if (x, y, n) in vemmel:
@@ -1128,6 +1144,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
             draw_msg.append("Deduce pattern: spacebar")
             draw_msg.append("Clear deduced nodes: e")
             draw_msg.append("Clear all nodes: shift-e")
+            draw_msg.append("Set all nodes to unknown: shift-ctrl-e")
             draw_msg.append("Remove all nodes: shift-backspace")
             draw_msg.append("Minimize markers: m")
             draw_msg.append("Copy selection: ctrl-c")

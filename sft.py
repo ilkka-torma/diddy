@@ -453,7 +453,7 @@ class SFT:
             if all(conf[var[:-1]] is not None for var in circ.get_variables()):
                 circuits[vec] = circ
                 
-        #print("circuits", list(sorted(circuits.keys())))
+        print("circuits", list(sorted(circuits.keys())))
         
         forceds = set()
         for (nvec, syms) in conf.pat.items():

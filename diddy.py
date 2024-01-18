@@ -52,6 +52,11 @@ class Diddy:
         self.weights = None
         self.externals = {}
 
+    def run_file(self, filename):
+        with open(fix_filename(filename), 'r') as f:
+            code = f.read()
+        self.run(code)
+
     def run(self, code, mode="report", print_parsed=False):
         #print(code)
         try:
@@ -557,6 +562,10 @@ class Diddy:
                     print (self.dim, self.nodes, self.topology, self.alphabet)
                 else:
                     print (self.SFTs[name].dim, self.SFTs[name].nodes, self.SFTs[name].topology, self.SFTs[name].alph)
+
+            elif cmd == "run":
+                filename = args[0]
+                self.run_file(filename)
 
             elif cmd == "show_conf" and mode == "report":
                 name = args[0]
@@ -1245,15 +1254,51 @@ CR4d8e2_topology = [('N', (0, 0, 'big'), (0, 1, 'small')),
                     ('W', (0, 0, 'small'), (0, 0, 'big'))]
 
 
+# You can toggle this to run a REPL without sending command line arguments.
+forced_repl = False
+
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument("filename", type=str, nargs="+")
-    if len(sys.argv) == 1:
+    arg_parser.add_argument("filename", type=str, nargs='*', help="Name of Diddy script to execute.")
+    arg_parser.add_argument('-r', '--repl', action='store_true', help="Open a basic read-eval-print-loop.")
+
+    if len(sys.argv) == 1 and not forced_repl:
         print("""If you want to test that Diddy is installed correctly, run \"python unit_tests.py\".
 You can test that Tiler works by running \"python diddy.py tiler_test\" and pressing spacebar.\n""")
-    args = arg_parser.parse_args()
-    with open(fix_filename(args.filename[0]), 'r') as f:
-        code = f.read()
-    runner = Diddy()
-    runner.run(code)
     
+    args = arg_parser.parse_args()
+
+    runner = Diddy()
+
+    
+    if len(args.filename) > 0:
+        runner.run_file(args.filename[0])
+
+    if args.repl or forced_repl:
+        print("Starting Diddy REPL mode.\nA command with ; at the end is run immediately.\nOtherwise a multiline input begins; then input an empty line to run and 'c' to cancel.\nInput 'quit' to quit.")
+        runner = Diddy()
+        running = True
+        while running:
+            command = ""
+            while running:
+                inp = input("> ")
+                if len(command) == 0 and len(inp) > 0 and inp[-1] == ";":
+                    runner.run(inp[:-1])
+                    command = ""
+                elif inp == "c":
+                    command = ""
+                    break
+                elif inp == "":
+                    print("(running command)")
+                    runner.run(command)
+                    command = ""
+                elif inp == "quit":
+                    running = False
+                    break
+                else:
+                    command += inp + "\n"
+            
+
+
+
+

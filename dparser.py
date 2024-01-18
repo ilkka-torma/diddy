@@ -130,6 +130,8 @@ commands = [
             [ArgType.LABEL]),
     Command("load_environment",
             [ArgType.LABEL]),
+    Command("run",
+            [ArgType.LABEL]),
 
     # Defining objects
     Command("sft",
