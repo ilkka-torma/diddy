@@ -133,7 +133,11 @@ class RecognizableConf(Conf):
 
     def __getitem__(self, nvec):
         #print("getting", nvec, "from", self.pat, "markers", self.markers)
-        return self.pat[nvwraps(self.markers, nvec)]
+        try:
+            return self.pat[nvwraps(self.markers, nvec)]
+        except KeyError:
+            print("getting", nvec, "wrapped to", nvwraps(self.markers, nvec), "from", self.pat, "markers", self.markers)
+            raise Exception()
         
     def can_be_equal_at(self, *nvecs):
         "Check if values are equal in these nodes; nonexistent nodes are equal."

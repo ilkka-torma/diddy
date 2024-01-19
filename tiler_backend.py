@@ -12,12 +12,12 @@ class AxisState(Enum):
     # Change markers to any
     RECOG = 2
     
-def replace_sym(conf, nvec, sym, axis_states):
-    "Replace the symbol at a single node of the configuration;"
+def replace_syms(conf, pat, axis_states):
+    "Replace a pattern in a configuration;"
     "return a new configuration and a boolean for changes."
-    if conf[nvec] == sym:
+    if all(conf[nvec] == sym for (nvec, sym) in pat.items()):
         return (False, conf)
-        
+
     new_markers = []
     for (i, marker) in enumerate(conf.markers):
         if axis_states[i] == AxisState.FIXED:
@@ -26,14 +26,12 @@ def replace_sym(conf, nvec, sym, axis_states):
             # markers are necessarily periodic
             (a, b, c, d) = marker
             #assert a == b and c == d <- this failed, I misunderstand something I guess
-            if nvec[i] < a:
-                new_a = a-((a-nvec[i])//(c-a)+1)*(c-a)
-                new_markers.append((new_a,new_a, c,c))
-            elif nvec[i] >= c:
-                new_c = c+((nvec[i]-c)//(c-a)+1)*(c-a)
-                new_markers.append((a,a, new_c,new_c))
-            else:
-                new_markers.append(marker)
+            for nvec in pat:
+                if nvec[i] < a:
+                    a = a-((a-nvec[i])//(c-a)+1)*(c-a)
+                elif nvec[i] >= c:
+                    c = c+((nvec[i]-c)//(c-a)+1)*(c-a)
+            new_markers.append((a,a, c,c))
         elif axis_states[i] == AxisState.RECOG:
             # markers can be anything
             (a, b, c, d) = marker
@@ -46,17 +44,18 @@ def replace_sym(conf, nvec, sym, axis_states):
                     a = a-(c-b)
             elif c == d:
                 d = c+(c-b)
-            if nvec[i] < b:
-                new_b = b-((b-nvec[i])//(b-a))*(b-a)
-                new_markers.append((new_b-(b-a),new_b, c,d))
-            elif nvec[i] >= c:
-                new_c = c+((nvec[i]-c)//(d-c)+1)*(d-c)
-                new_markers.append((a,b, new_c,new_c+(d-c)))
-            else:
-                new_markers.append(marker)
-                
+            for nvec in pat:
+                if nvec[i] < b:
+                    new_b = b-((b-nvec[i])//(b-a))*(b-a)
+                    a, b = new_b-(b-a), new_b
+                elif nvec[i] >= c:
+                    new_c = c+((nvec[i]-c)//(d-c)+1)*(d-c)
+                    c, d = new_c, new_c+(d-c)
+            new_markers.append((a,b,c,d))
+    
     new_conf = conf.remark(new_markers)
-    new_conf.pat[nvec] = sym
+    for (nvec, sym) in pat.items():
+        new_conf.pat[nvec] = sym
     min_markers = new_conf.minimized_markers()
     new_conf.remark(min_markers)
     return (True, new_conf)
@@ -231,10 +230,8 @@ class TilerBackend:
     def replace_patch(self, pat):
         "Replace patch in configuration, save the old state if changes were made."
         conf = self.conf()
-        changed = False
-        for (nvec, sym) in pat.items():
-            change_now, conf = replace_sym(conf, self.project(nvec), sym, self.axis_states)
-            changed = changed or change_now
+        proj_pat = {self.project(nvec) : sym for (nvec, sym) in pat.items()}
+        changed, conf = replace_syms(conf, proj_pat, self.axis_states)
         if changed:
             self.replace_conf(conf)
             
