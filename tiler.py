@@ -1106,28 +1106,29 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                     
         
                                
-        if show_help:                               
-            # Draw some helper text
-            if cursor_state == CursorState.PAINT:
-                if type(drawcolor) == tuple and drawcolor[0] == SET:
-                    draw_msg = ["Painting symbol {}".format(drawcolor[1])]
-                elif drawcolor == FIXITY:
-                    draw_msg = ["Painting {} {}".format(drawcolor, paint_fixity)]
-                else:
-                    draw_msg = ["Painting {}".format(drawcolor)]
-            elif cursor_state == CursorState.SELECT:
-                draw_msg = ["Selecting nodes"]
-            elif cursor_state == CursorState.MOVE_MARKERS:
-                if moving_marker is None:
-                    draw_msg = ["Select marker to move"]
-                else:
-                    axis, markers = moving_marker
-                    draw_msg = ["Place {} {} marker".format(["1st","2nd","3rd","4th"][len(markers)], ["vertical","horizontal"][axis])]
+        
+        # Draw some helper text
+        if cursor_state == CursorState.PAINT:
+            if type(drawcolor) == tuple and drawcolor[0] == SET:
+                draw_msg = ["Painting symbol {}".format(drawcolor[1])]
+            elif drawcolor == FIXITY:
+                draw_msg = ["Painting {} {}".format(drawcolor, paint_fixity)]
             else:
-                raise Exception("Unknown cursor state: {}".format(cursor_state))
-            draw_msg.append("x-axis state: %s" % backend.axis_states[0])
-            if dim == 2:
-                draw_msg.append("y-axis state: %s" % backend.axis_states[1])
+                draw_msg = ["Painting {}".format(drawcolor)]
+        elif cursor_state == CursorState.SELECT:
+            draw_msg = ["Selecting nodes"]
+        elif cursor_state == CursorState.MOVE_MARKERS:
+            if moving_marker is None:
+                draw_msg = ["Select marker to move"]
+            else:
+                axis, markers = moving_marker
+                draw_msg = ["Place {} {} marker".format(["1st","2nd","3rd","4th"][len(markers)], ["vertical","horizontal"][axis])]
+        else:
+            raise Exception("Unknown cursor state: {}".format(cursor_state))
+        draw_msg.append("x-axis state: %s" % backend.axis_states[0])
+        if dim == 2:
+            draw_msg.append("y-axis state: %s" % backend.axis_states[1])
+        if show_help:
             draw_msg.append("")
             draw_msg.append("Draw: left mouse button")
 
@@ -1154,12 +1155,14 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
             #draw_msg.append("Cancel deduction: escape")
             draw_msg.append("Toggle symbol labels: l")
             draw_msg.append("Toggle UI: h")
-            for (i, msg) in enumerate(draw_msg):
-                font_surf = msg_font.render(msg, False, GREEN, BLACK)
-                screen.blit(font_surf, (10, 10+i*15))
      
             #screen.blit(textinput.surface, (30, 30))
             manager.draw_ui(screen)
+
+        
+        for (i, msg) in enumerate(draw_msg):
+            font_surf = msg_font.render(msg, False, GREEN, BLACK)
+            screen.blit(font_surf, (10, 10+i*15))
 
         # Limit to 60 frames per second
         clock.tick(60)
