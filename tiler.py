@@ -566,6 +566,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
     
     moving_marker = None
     
+    moving_camera = False
+    
     paint_fixity = True
 
     
@@ -582,6 +584,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
         tim = new_tim
         
         nnn += 1
+
+        mouse_displacement = (0,0)
 
         #vemmel = set()
         #gimmel = {}
@@ -786,20 +790,28 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                         currentstate = TILING_BAD
 
                     print ("Tiling process finished in %s seconds." % (time.time() - tim)) # deduce_a_tiling returned (debug print)")
+
+            elif event.type == pygame.MOUSEMOTION and moving_camera:
+                mouse_displacement = event.rel
                     
             elif event.type == pygame.MOUSEBUTTONDOWN:
-
                 # even if using _START_PRESS in _gui, mouse events come one iteration later
                 # than in pygame, so we just do an explicit check...
                 if not mouse_on_ui(mpos):
-                    if not mouseisdown:
-                        mousechanged = True
-                    mouseisdown = True
+                    if event.button == 1: # left mouse button
+                        if not mouseisdown:
+                            mousechanged = True
+                        mouseisdown = True
+                    elif event.button == 2: # middle mouse button
+                        moving_camera = True
                     
             elif event.type == pygame.MOUSEBUTTONUP:
-                if mouseisdown:
-                    mousechanged = True
-                mouseisdown = False
+                if event.button == 1:
+                    if mouseisdown:
+                        mousechanged = True
+                    mouseisdown = False
+                elif event.button == 2:
+                    moving_camera = False
                 
             elif event.type == pygame.VIDEORESIZE:
                 # There's some code to add back window content here.
@@ -830,6 +842,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                 screenmove = (0, 1)
             if keys[pygame.K_DOWN]:
                 screenmove = (0, -1)
+        if moving_camera:
+            screenmove = (-mouse_displacement[0], mouse_displacement[1])
             
         #screenmove = smul(zoom*0.01, screenmove)
         screenmove = smul(4, screenmove)
