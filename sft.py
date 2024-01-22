@@ -385,10 +385,10 @@ class SFT:
         if fixed_axes is None:
             fixed_axes = []
         
-        print("deducing with", periodics, fixed_axes)
+        #print("deducing with", periodics, fixed_axes)
         
         markers = conf.minimized_markers(fixed_axes = fixed_axes)
-        print("markers minimized to", markers)
+        #print("markers minimized to", markers)
         
         marker_gens = []
         for (i, marker) in enumerate(markers):
@@ -397,7 +397,7 @@ class SFT:
             else:
                 marker_gens.append(gen_markers_from_minimal(marker, periodic=i in periodics))
                 
-        print("marker gens", marker_gens)
+        #print("marker gens", marker_gens)
         
         for (i, new_markers) in enumerate(iter_prod(*marker_gens)):
             print("deducing", i, "with markers", new_markers)
@@ -408,7 +408,7 @@ class SFT:
             # try to find a configuration with given structure
             ret_conf = self.deduce(conf.remark(list(new_markers)))
             if ret_conf is not None:
-                print("found", ret_conf.display_str())
+                #print("found", ret_conf.display_str())
                 return ret_conf
             
             # try to find a finite patch
@@ -428,7 +428,7 @@ class SFT:
     def deduce(self, conf):
         # Deduce a recognizable configuration with a fixed marker structure.
         
-        #print("markers", markers)
+        #print("deduce(", conf.display_str(), ")")
                 
         diff_vecs = set(var[:-2] for var in self.circuit.get_variables())
         vec_domain = set(vsub(nvec[:-1], dvec)
@@ -453,7 +453,7 @@ class SFT:
             if all(conf[var[:-1]] is not None for var in circ.get_variables()):
                 circuits[vec] = circ
                 
-        print("circuits", list(sorted(circuits.keys())))
+        #print("circuits", list(sorted(circuits.keys())))
         
         forceds = set()
         for (nvec, syms) in conf.pat.items():
@@ -484,6 +484,7 @@ class SFT:
         #print("model", model)
         pat = {}
         for nvec in conf.pat:
+            node = nvec[-1]
             if conf[nvec] is None:
                 pat[nvec] = None
             else:
