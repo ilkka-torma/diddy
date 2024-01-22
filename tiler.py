@@ -90,8 +90,7 @@ TILING_BAD = 2
 
 class CursorState(Enum):
     PAINT = 0
-    SELECT = 1
-    MOVE_MARKERS = 2
+    MOVE_MARKERS = 1
 
 
 def deduce_a_tiling(grid, the_SFT, x_period, y_period):
@@ -426,6 +425,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
     clock = pygame.time.Clock()
 
     mouseisdown = False
+    mouserisdown = False
     drawcolor = None
 
     thred = None
@@ -571,12 +571,13 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
     paint_fixity = True
 
     
-    for nvec in backend.conf().pat:
-        print(nvec, backend.conf()[nvec])
+    #for nvec in backend.conf().pat:
+    #    print(nvec, backend.conf()[nvec])
     
     # -------- Main Program Loop -----------
     while not done:
         mousechanged = False
+        mouserchanged = False
         pasting = False
         #print("main looppo")
         new_tim = time.time()
@@ -752,11 +753,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                         
                 if event.key == pygame.K_d:
                     if cursor_state == CursorState.PAINT:
-                        cursor_state = CursorState.SELECT
-                    elif cursor_state == CursorState.SELECT:
                         cursor_state = CursorState.MOVE_MARKERS
-                        selection = set()
-                        selection_anchor = None
                     else:
                         cursor_state = CursorState.PAINT
                         moving_marker = None
@@ -804,6 +801,10 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                         mouseisdown = True
                     elif event.button == 2: # middle mouse button
                         moving_camera = True
+                    elif event.button == 3: # right mouse button
+                        if not mouserisdown:
+                            mouserchanged = True
+                        mouserisdown = True
                     
             elif event.type == pygame.MOUSEBUTTONUP:
                 if event.button == 1:
@@ -812,6 +813,10 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                     mouseisdown = False
                 elif event.button == 2:
                     moving_camera = False
+                elif event.button == 3: # right mouse button
+                    if mouserisdown:
+                        mouserchanged = True
+                    mouserisdown = False
                 
             elif event.type == pygame.VIDEORESIZE:
                 # There's some code to add back window content here.
@@ -918,15 +923,15 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                     thred = None
                     print ("deduction cancelled")
                    
-        if cursor_state == CursorState.SELECT and not cancel_non_UI:
-            if mouseisdown:
-                if mousechanged:
+        if not cancel_non_UI:
+            if mouserisdown:
+                if mouserchanged:
                     selection_anchor = (mpos[0], screenheight-mpos[1])
                 if selection_anchor is not None:
                     u1, v1 = mpos
                     u2, v2 = selection_anchor
                     selection = set((x,y,nodes[n]) for (x,y,n) in get_nodes_in_rect(u1, screenheight-v1, u2, v2))
-            elif mousechanged:
+            elif mouserchanged:
                 if shift_modifier:
                     backend.update_selection(backend.selection() | selection)
                 elif ctrl_modifier:
@@ -1129,8 +1134,6 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                 draw_msg = ["Painting {} {}".format(drawcolor, paint_fixity)]
             else:
                 draw_msg = ["Painting {}".format(drawcolor)]
-        elif cursor_state == CursorState.SELECT:
-            draw_msg = ["Selecting nodes"]
         elif cursor_state == CursorState.MOVE_MARKERS:
             if moving_marker is None:
                 draw_msg = ["Select marker to move"]
@@ -1144,12 +1147,12 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
             draw_msg.append("y-axis state: %s" % backend.axis_states[1])
         if show_help:
             draw_msg.append("")
-            draw_msg.append("Draw: left mouse button")
+            draw_msg.append("Select nodes: right mouse button")
 
-            draw_msg.append("Select symbol: number keys")
-            draw_msg.append("Select <unknown symbol>: u")
-            draw_msg.append("Select <erase node>: backspace")
-            draw_msg.append("Select <fixity>: f")
+            draw_msg.append("Pick symbol: number keys")
+            draw_msg.append("Pick <unknown symbol>: u")
+            draw_msg.append("Pick <erase node>: backspace")
+            draw_msg.append("Pick <fixity>: f")
 
             draw_msg.append("Pan: arrow keys")
             draw_msg.append("Zoom: az")
