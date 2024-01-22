@@ -90,6 +90,7 @@ class Diddy:
                 self.dim = args[0]
                 self.tiler_gridmoves = [char_vector(self.dim, j) for j in range(self.dim)]
                 self.tiler_nodeoffsets = {0 : zero_vector(self.dim)}
+                self.topology = []
             elif cmd == "alphabet":
                 alph = args[0]
                 default = kwds.get("default", None)

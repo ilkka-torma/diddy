@@ -784,8 +784,8 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes, top=True):
             elif type(i) == tuple and len(i) == dim+1: # tuple of len dim+1 => both
                 pos = vadd(pos[:-1], i[:-1]) + (i[-1],)
             else:
-                return None
-                # raise Exception("Could not process transition {} from node {}".format(i, pos))
+                # return None
+                raise Exception("Could not process transition {} from node {}".format(i, pos))
         #print(pos)
     #print ("got 2 pos", pos)
     if top:
