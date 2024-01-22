@@ -84,6 +84,7 @@ class ArgType(Flag):
     LABEL = auto()
     NUMBER = auto()
     SIMPLE_LIST = auto()
+    SETTER_LIST = auto()
     PATTERN_LIST = auto()
     NESTED_LIST = auto()
     PATTERN = auto()
@@ -362,6 +363,7 @@ open_nested_list = nested_list.many().desc("list")
 # Parse a specific command based on its definition (do not parse the label)
 # TODO: finish
 # Once there are only list arguments left, it's possible to switch into "list mode" and read semicolon-separated open lists
+# The "setter list mode" also allows setter pairs in the list
 # If there is only one list argument left, it's possible to switch into "nested list mode" or "pattern mode" and read semicolon-separated open lists or open patterns, and pack them into a single list argument
 def command_args(cmd, index, args=None, opts=None, flags=None, mode="normal"):
     if args is None:
@@ -418,6 +420,8 @@ def command_args(cmd, index, args=None, opts=None, flags=None, mode="normal"):
             # If we only have simple list arguments left, try list mode
             if index < len(cmd.pos_args)-1 and all(ArgType.SIMPLE_LIST in typ or ArgType.MAPPING in typ for typ in cmd.pos_args[index+1:]):
                 next_modes.append(semicolon.optional() >> command_args(cmd, index+1, args.copy(), opts.copy(), flags.copy(), "list"))
+            if index < len(cmd.pos_args)-1 and all(ArgType.SETTER_LIST in typ for typ in cmd.pos_args[index+1:]):
+                next_modes.append(semicolon.optional() >> command_args(cmd, index+1, args.copy(), opts.copy(), flags.copy(), "setter_list"))
             # If we have only one list argument left, try nested list or pattern modes
             if index == len(cmd.pos_args)-2 and ArgType.NESTED_LIST in cmd.pos_args[index+1]:
                 next_modes.append(semicolon.optional() >> command_args(cmd, index+1, args.copy(), opts.copy(), flags.copy(), "nested_list"))
@@ -425,9 +429,9 @@ def command_args(cmd, index, args=None, opts=None, flags=None, mode="normal"):
                 next_modes.append(semicolon.optional() >> command_args(cmd, index+1, args.copy(), opts.copy(), flags.copy(), "pattern_list"))
             ret = yield p.alt(*next_modes)
             return ret
-        elif mode == "list":
+        elif mode == "list" or mode == "setter_list":
             # List mode: read remaining arguments as semicolon-separated open lists
-            # Flags can be read, but optional arguments cannot, as they're interpreted as assignments
+            # Flags and optional arguments can be read, but in setter list mode they're interpreted as assignments
             # May also read a mapping
             while index <= len(cmd.pos_args):
                 curr_collection = None
@@ -437,6 +441,12 @@ def command_args(cmd, index, args=None, opts=None, flags=None, mode="normal"):
                     if maybe_flag is not None:
                         flags.append(maybe_flag)
                         continue
+                    if mode == "list":
+                        maybe_opt = yield set_arg_value.optional()
+                        if maybe_opt is not None:
+                            name, value = maybe_opt
+                            opts[name] = value
+                            continue
                     # Semicolon: finish current list and begin the next one
                     # Also finish if we ran out of arguments
                     maybe_sep = yield semicolon.optional()
