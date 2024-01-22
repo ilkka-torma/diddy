@@ -2,7 +2,7 @@ try:
     import dparser
     import parsy
 except ImportError as error:
-    print("It seems you have not installed the prerequisite modules for Diddy.")
+    print("Perhaps you have not installed the prerequisite modules for Diddy.")
     print("The file pip_installs.bat contains a list of pip installs you should perform.")
     import os
     if os.name == 'nt':
