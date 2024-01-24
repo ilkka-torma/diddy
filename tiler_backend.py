@@ -67,12 +67,17 @@ class TilerState:
     The nodes of the configuration are decorated with fixedness information.
     """
     
-    def __init__(self, conf=None, selection=None, dim=None, nodes=None, alph=None, sizes=None):
-        if conf is None: # sizes used if no initial config
+    def __init__(self, conf=None, selection=None, dim=None, nodes=None, alph=None, sizes=None, periodic=None):
+        if conf is None: # sizes+periodic used if no initial config
             pat = {vec + (node,) : (list(alph[node]), False)
                    for vec in hyperrect([(0,sizes[d]) for d in range(dim)])
                    for node in nodes}
-            conf = RecognizableConf(None, pat, nodes, dim=dim)
+            if periodic is None:
+                markers = None
+            else:
+                markers = [(0,0, sizes[d],sizes[d]) if p else None
+                           for (d,p) in zip(range(dim),periodic)]
+            conf = RecognizableConf(markers, pat, nodes, dim=dim)
         self.conf = conf
         if selection is None:
             selection = set()
@@ -122,11 +127,11 @@ class TilerBackend:
     It contains the ambient SFT and settings, the current state, and a history of states.
     """
     
-    def __init__(self, sft, init_conf=None, sizes=None, project_to=None):
+    def __init__(self, sft, init_conf=None, sizes=None, periodic=None, project_to=None):
         self.sft = sft
         if init_conf is not None:
             init_conf = decorate_default(init_conf)
-        self.history = [TilerState(conf=init_conf, dim=sft.dim, nodes=sft.nodes, alph=sft.alph, sizes=sizes)]
+        self.history = [TilerState(conf=init_conf, dim=sft.dim, nodes=sft.nodes, alph=sft.alph, sizes=sizes, periodic=periodic)]
         self.history_index = 0
         self.axis_states = [AxisState.FIXED]*sft.dim
         self.clipboard = None

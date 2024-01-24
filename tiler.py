@@ -379,7 +379,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
     print("size", x_size, y_size)
     
     # initialize backend
-    backend = TilerBackend(the_SFT, init_conf=initial, sizes=[x_size,y_size])
+    backend = TilerBackend(the_SFT, init_conf=initial, sizes=[x_size,y_size], periodic=[x_periodic,y_periodic])
      
     # our grid is now just all initial_state
     #grid = {}
