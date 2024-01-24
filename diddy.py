@@ -581,14 +581,13 @@ class Diddy:
             elif cmd == "empty":
                 name = args[0]
                 expect = kwds.get("expect", None)
+                conf_name = kwds.get("conf_name", None)
                 verb = "verbose" in flags
                 if name in self.SFTs:
                     the_sft = self.SFTs[name]
-                    if isinstance(the_sft, sft.SFT):
-                        empty_sft = sft.SFT(the_sft.dim, the_sft.nodes, the_sft.alph, the_sft.topology, onesided=the_sft.onesided, circuit=circuit.F)
-                    else:
-                        empty_sft = sofic1d.Sofic1D(the_sft.nodes, the_sft.alph, the_sft.topology, dict(), onesided=the_sft.onesided)
-                    report_SFT_contains(("empty",empty_sft), (name,the_sft), verbose=verb, truth=None if expect is None else not expect, method="periodic")
+                    conf = report_SFT_empty((name,the_sft), verbose=verb, truth=expect, mode=mode)
+                    if conf_name is not None and conf is not None:
+                        self.confs[conf_name] = conf
                 else:
                     raise Exception("No SFT or sofic shift named {}".format(name))
 
@@ -1119,6 +1118,28 @@ def forbos_to_formula(fof):
     ret = preamble + (("AND",) + tuple(andeds),)
     #print(ret, "MIL")
     return ret
+    
+def report_SFT_empty(a, mode="report", truth=True, verbose=False):
+    name, the_sft = a
+    print("Testing whether %s is empty." % name)
+    if isinstance(the_sft, sft.SFT):
+        empty = sft.SFT(the_sft.dim, the_sft.nodes, the_sft.alph, the_sft.topology, onesided=the_sft.onesided, circuit=circuit.F)
+    else:
+        empty = sofic1d.Sofic1D(the_sft.nodes, the_sft.alph, the_sft.topology, dict(), onesided=the_sft.onesided)
+    tim = time.time()
+    res, rad, conf = empty.contains(the_sft, return_radius_and_sep = True, method="periodic", verbose=verbose)
+    tim = time.time() - tim
+    if res:
+        print("%s is EMPTY (radius %s, time %s)" % (name, rad, tim))
+    else:
+        print("%s is NONEMPTY (radius %s, time %s)" % (name, rad, tim))
+        if mode == "report":
+            print("Separated by " + conf.display_str())
+    if mode == "assert":
+        print(res, "=", (truth == "T"))
+        assert res == (truth == "T")
+    print()
+    return conf
 
 def report_SFT_contains(a, b, mode="report", truth=True, method=None, verbose=False):
     aname, aSFT = a
@@ -1133,10 +1154,10 @@ def report_SFT_contains(a, b, mode="report", truth=True, method=None, verbose=Fa
         print("%s DOES NOT CONTAIN %s (radius %s, time %s)" % (aname, bname, rad, tim))
         if mode == "report":
             print("Separated by " + conf.display_str())
-    print()
     if mode == "assert":
         print(res, "=", (truth == "T"))
         assert res == (truth == "T")
+    print()
     return conf
 
 def report_SFT_equal(a, b, mode="report", truth=True, method=None, verbose=False):

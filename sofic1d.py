@@ -307,10 +307,11 @@ class Sofic1D:
         inter = self.intersection(other)
         inter.determinize(verbose=verbose)
         inter.minimize(verbose=verbose)
+        res = other.equals(inter, return_radius=False)
         if return_radius_and_sep:
-            return other.equals(inter), None, None
+            return res, None, None
         else:
-            return other.equals(inter)
+            return res
         
     @classmethod
     def from_SFT(cls, the_sft, verbose=False):

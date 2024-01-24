@@ -397,12 +397,14 @@ code = """
 %sft nontriv_empty Ao
 (o=0 -> o.rt=0 & o.up=1) &
 (o=1 -> o.rt.rt=0)
+%sft nonempty Ao o!=o.rt
 %equal expect=F empty nonempty
 %equal expect=T empty empty2
 %equal expect=T empty nontriv_empty
 %empty expect=T empty
 %empty expect=T empty2
 %empty expect=T nontriv_empty
+%empty expect=F nonempty
 """
 unit_tests.append(("emptiness", code))
 

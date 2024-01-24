@@ -215,7 +215,7 @@ commands = [
     # Comparing objects
     Command("empty",
             [ArgType.LABEL],
-            opts = ["expect"],
+            opts = ["conf_name", "expect"],
             flags = ["verbose"]),
     Command("equal",
             [ArgType.LABEL, ArgType.LABEL],
