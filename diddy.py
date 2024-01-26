@@ -1299,7 +1299,6 @@ You can test that Tiler works by running \"python diddy.py tiler_test\" and pres
 
     if args.repl or forced_repl:
         print("Starting Diddy REPL mode.\nA command with ; at the end is run immediately.\nOtherwise a multiline input begins; then input an empty line to run and 'c' to cancel.\nInput 'quit' to quit.")
-        runner = Diddy()
         running = True
         while running:
             command = ""
