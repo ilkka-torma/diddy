@@ -1,0 +1,33 @@
+
+-- Continuing paths shift:
+-- 0 is background, UDLR are arrows.
+-- Each cell has at most one incoming arrow, and arrows can't point to 0s or opposite arrows.
+-- This means that a path of arrows must continue forward indefinitely.
+%alphabet 0 U D L R
+%SFT paths Ao 
+#[o.lt=R o.up=D o.rt=L o.dn=U] <= 1 &
+(o=R -> L!=o.rt!=0) &
+(o=U -> D!=o.up!=0) &
+(o=L -> R!=o.lt!=0) &
+(o=D -> U!=o.dn!=0)
+%tiler paths x_size=6 y_size=6 --@x_periodic @y_periodic
+
+-- Grid shift:
+-- 1 and 2 are two backgrounds.
+-- HVD are horizontal, vertical and diagonal lines that cross at C-cells.
+-- If present, they divide the configuration into a square grid (or a limit point of such).
+%alphabet 1 2 H V D C
+%SFT grid Ao
+(o=H -> (o.lt=H | o.lt=C) & (o.rt=H | o.rt=C) & H!=o.dn!=1 & H!=o.up!=2) &
+(o=V -> (o.up=V | o.up=C) & (o.dn=V | o.dn=C) & V!=o.rt!=1 & V!=o.lt!=2) &
+(o=D -> (o.up.rt=D | o.up.rt=C) & (o.dn.lt=D | o.dn.lt=C) & D!=o.up!=1 & D!=o.dn!=2) &
+(o=C -> o.up=o.dn=V & o.lt=o.rt=H & o.up.rt=o.dn.lt=D & o.up.lt=1 & o.dn.rt=2) &
+(o=1 -> Ap[o1] p!=2)
+
+%SFT sixper Ao o.(0,6) = o.(6,0) = o
+%SFT twoper Ao o.(0,2) = o.(2,0) = o
+%SFT threeper Ao o.(0,3) = o.(3,0) = o
+
+%intersection inter sixper grid
+%contains twoper inter  conf_name=c
+%tiler grid initial=c
