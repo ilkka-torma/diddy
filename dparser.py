@@ -144,6 +144,7 @@ commands = [
             aliases = ["sofic1d"]),
     Command("trace",
             [ArgType.LABEL, ArgType.LABEL, ArgType.SIMPLE_LIST, ArgType.NESTED_LIST],
+            opts = ["extra_rad"],
             flags = ["onesided", "verbose"]),
     Command("compute_forbidden_patterns",
             [ArgType.LABEL],
@@ -241,7 +242,7 @@ commands = [
     # Analyzing dynamical properties
     Command("minimum_density",
             [ArgType.LABEL, ArgType.SIMPLE_LIST],
-            opts = ["threads", "mode", "chunk_size", "symmetry", "print_freq_pop", "print_freq_cyc", "expect"],
+            opts = ["threads", "mode", "chunk_size", "symmetry", "print_freq_pop", "print_freq_cyc", "expect", "conf_name"],
             flags = ["verbose", "rotate"]),
     Command("density_lower_bound",
             [ArgType.LABEL, ArgType.SIMPLE_LIST, ArgType.SIMPLE_LIST],
@@ -382,10 +383,14 @@ def command_args(cmd, index, args=None, opts=None, flags=None, mode="normal"):
                 while True:
                     maybe_flag = yield (p.string('@') >> label).desc("flag").optional()
                     if maybe_flag is not None:
+                        if maybe_flag not in cmd.flags:
+                            return p.fail("valid flag for {}".format(cmd.name))
                         flags.append(maybe_flag)
                         continue
                     maybe_opt = yield set_arg_value.optional()
                     if maybe_opt is not None:
+                        if maybe_opt[0] not in cmd.opts:
+                            return p.fail("valid option for {}".format(cmd.name))
                         name, value = maybe_opt
                         opts[name] = value
                         continue
@@ -439,11 +444,15 @@ def command_args(cmd, index, args=None, opts=None, flags=None, mode="normal"):
                     # Optional argument
                     maybe_flag = yield (p.string('@') >> label).desc("flag").optional()
                     if maybe_flag is not None:
+                        if maybe_flag not in cmd.flags:
+                            return p.fail("valid flag for {}".format(cmd.name))
                         flags.append(maybe_flag)
                         continue
                     if mode == "list":
                         maybe_opt = yield set_arg_value.optional()
                         if maybe_opt is not None:
+                            if maybe_opt[0] not in cmd.opts:
+                                return p.fail("valid option for {}".format(cmd.name))
                             name, value = maybe_opt
                             opts[name] = value
                             continue
@@ -487,6 +496,8 @@ def command_args(cmd, index, args=None, opts=None, flags=None, mode="normal"):
                     # Optional argument
                     maybe_flag = yield (p.string('@') >> label).desc("flag").optional()
                     if maybe_flag is not None:
+                        if maybe_flag not in cmd.flags:
+                            return p.fail("valid flag for {}".format(cmd.name))
                         flags.append(maybe_flag)
                         continue
                     # Semicolon: finish current list and begin the next one
@@ -513,6 +524,8 @@ def command_args(cmd, index, args=None, opts=None, flags=None, mode="normal"):
                     # Optional argument
                     maybe_flag = yield (p.string('@') >> label).desc("flag").optional()
                     if maybe_flag is not None:
+                        if maybe_flag not in cmd.flags:
+                            return p.fail("valid flag for {}".format(cmd.name))
                         flags.append(maybe_flag)
                         continue
                     # Semicolon: finish current list and begin the next one
