@@ -93,6 +93,24 @@ class Sofic1D:
         self.right_resolving = right_resolving
         self.onesided = onesided
         self.minimal = False
+        
+    def info_string(self, name, verbose=False):
+        s = ["1-dimensional {} {}{}sofic shift {}".format(
+                "onesided" if self.onesided else "two-sided",
+                "right-resolving " if self.right_resolving else "",
+                "minimized " if self.minimal else "",
+                name)]
+        s.append("Nodes: {}".format(list(self.nodes)))
+        s.append("Alphabet: {}".format(self.alph))
+        if verbose:
+            s.append("Topology: {}".format(self.topology))
+            s.append("States: {}".format(self.states))
+            s.append("Transition graph: {}".format(self.trans))
+        elif self.right_resolving:
+            s.append("{} states, {} transitions".format(len(self.states), len(self.trans)))
+        else:
+            s.append("{} states, {} transitions".format(len(self.states), sum(len(tr) for tr in self.trans.values())))
+        return "\n".join(s)
 
     def remove_sinks(self, verbose=False):
         i = 1

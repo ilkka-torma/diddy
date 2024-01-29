@@ -59,6 +59,19 @@ class BlockMap:
                         if verbose:
                             print("Using {} as default symbol for node {} in block map".format(first_sym, n))
                         self.circuits[(n, first_sym)] = AND(*(NOT(circs[b]) for b in circs if b != first_sym))
+                        
+    def info_string(self, name, verbose=False):
+        s = ["{}-dimensional block map {}".format(self.dimension, name)]
+        s.append("Domain nodes: {}".format(list(self.from_nodes)))
+        s.append("Domain alphabet: {}".format(self.from_alphabet))
+        if verbose:
+            s.append("Domain topology: {}".format(self.from_topology))
+        s.append("Range nodes: {}".format(list(self.to_nodes)))
+        s.append("Range alphabet: {}".format(self.to_alphabet))
+        if verbose:
+            s.append("Range topology: {}".format(self.to_topology))
+            s.append("Circuits (of sizes {}): {}".format([circ.complexity for circ in self.circuits.values()], self.circuits))
+        return "\n".join(s)
 
     # we get a list of (node, sym, formula)
     # if overlaps is "remove", we should refine to disjoints:

@@ -212,6 +212,9 @@ commands = [
     Command("show_environment",
             [],
             opts = ["sft"]),
+    Command("info",
+            [ArgType.SIMPLE_LIST],
+            flags = ["verbose"]),
 
     # Comparing objects
     Command("empty",

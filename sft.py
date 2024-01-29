@@ -202,6 +202,23 @@ class SFT:
 
     def __str__(self):
         return "SFT(dim={}, nodes={}, alph={}{})".format(self.dim, self.nodes, self.alph, (", onesided="+str(self.onesided)) if self.onesided else "")
+        
+    def info_string(self, name, verbose=False):
+        s = ["{}-dimensional SFT {}".format(self.dim, name)]
+        s.append("Nodes: {}".format(list(self.nodes)))
+        s.append("Alphabet: {}".format(self.alph))
+        if verbose:
+            s.append("Topology: {}".format(self.topology))
+        s.append("Onesided along axes {}".format(self.onesided))
+        if self.forbs is None:
+            s.append("Forbidden patterns not computed")
+        elif verbose:
+            s.append("Forbidden patterns: {}".format(self.forbs))
+        else:
+            s.append("{} forbidden patterns".format(len(self.forbs)))
+        if verbose:
+            s.append("Circuit (of size {}): {}".format(self.circuit.complexity, self.circuit))
+        return "\n".join(s)
 
     def __contains__(self, conf):
         if not isinstance(conf, Conf):

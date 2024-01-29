@@ -563,6 +563,33 @@ class Diddy:
                     print (self.dim, self.nodes, self.topology, self.alphabet)
                 else:
                     print (self.SFTs[name].dim, self.SFTs[name].nodes, self.SFTs[name].topology, self.SFTs[name].alph)
+                    
+            elif cmd == "info":
+                names = args[0]
+                verbose = "verbose" in flags
+                if names:
+                    for name in names:
+                        print()
+                        if name in self.confs:
+                            print(self.confs[name].info_string(name, verbose=verbose))
+                        if name in self.SFTs:
+                            print(self.SFTs[name].info_string(name, verbose=verbose))
+                        if name in self.blockmaps:
+                            print(self.blockmaps[name].info_string(name, verbose=verbose))
+                else:
+                    print("Current environment")
+                    print("Dimension: {}".format(self.dim))
+                    print("Nodes: {}".format(list(self.nodes)))
+                    print("Topology: {}".format(self.topology))
+                    print("Alphabet: {}".format(self.alphabet))
+                    print("Symbol weights: {}".format(self.weights))
+                    if verbose:
+                        print("Named subshifts: {}".format(list(self.SFTs)))
+                        print("Named block maps: {}".format(list(self.blockmaps)))
+                        print("Named configurations: {}".format(list(self.confs)))
+                        print("Named environments: {}".format(list(self.environments)))
+                        print("Tiler vectors: {}".format(self.tiler_gridmoves))
+                        print("Tiler offsets: {}".format(self.tiler_nodeoffsets))
 
             elif cmd == "run":
                 filename = args[0]
@@ -676,7 +703,6 @@ class Diddy:
                         print("Computing forbidden patterns for {}{} using radius {}.".format(name, save_msg, rad))
                     if the_sft.forbs is not None:
                         print("It already had forbidden patterns; overwriting them.")
-                    print()
                 the_sft.deduce_forbs(rad)
                 print("Found {} patterns.".format(len(the_sft.forbs)))
                 

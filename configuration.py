@@ -248,3 +248,12 @@ class RecognizableConf(Conf):
         if not hide_contents:
             s += ":\n{" + ", ".join(["{}: {}".format(nvec, '_' if sym is None else sym) for (nvec, sym) in sorted(self.pat.items())]) + "}"
         return s
+
+    def info_string(self, name, verbose=False):
+        s = ["{}-dimensional recognizable configuration {}".format(self.dim, name)]
+        s.append("Nodes: {}".format(list(self.nodes)))
+        s.append("Markers: {}".format(self.markers))
+        s.append("Onesided along axes {}".format(self.onesided))
+        if verbose:
+            s.append("Contents: {" + ", ".join(["{}: {}".format(nvec, '_' if sym is None else sym) for (nvec, sym) in sorted(self.pat.items())]) + "}")
+        return "\n".join(s)
