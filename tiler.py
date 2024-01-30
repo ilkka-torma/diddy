@@ -506,7 +506,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
             #return A*st[0] + B*st[1], C*st[0] + D*st[1]
             return x, y
 
-    # given grid coords, find closest node; node is given as its index
+    # given grid coords, find closest (non-hidden) node; node is given as its index
     # seems to assume that offset vectors not too large
     def get_node(x, y, debug_prints = False):
         if debug_prints:
@@ -520,6 +520,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
         for x0 in range(math.floor(x) - rr, math.floor(x) + rr + 1):
             for y0 in list(range(math.floor(y) - rr, math.floor(y) + rr + 1)):
                 for n in range(len(nodes)):
+                    if nodes[n] in hidden_nodes:
+                        continue
                     d = distance(vadd(to_screen(x0, y0), vmul(zoom, nodeoffsets[nodes[n]])), to_screen(x, y))
                     #if debug_prints:
                     #    print(x0, y0, n, vadd(to_screen(x0, y0), smul(zoom,nodeoffsets[nodes[n]]), d, x, y)
@@ -529,7 +531,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
         return closest
         
         
-    # given corners of screen rectangle, find all nodes inside
+    # given corners of screen rectangle, find all (non-hidden) nodes inside
     def get_nodes_in_rect(u1, v1, u2, v2):
         # screen corners to grid
         xmin, ymin = to_grid(min(u1,u2), min(v1,v2))
@@ -544,6 +546,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
         for x in range(xmin, xmax+1):
             for y in range(ymin, ymax+1):
                 for n in range(len(nodes)):
+                    if nodes[n] in hidden_nodes:
+                        continue
                     nodeu, nodev = vadd(to_screen(x, y), vmul(zoom, nodeoffsets[nodes[n]]))
                     if min(u1,u2) <= nodeu <= max(u1,u2) and min(v1,v2) <= nodev <= max(v1,v2):
                         res.append((x,y,n))
@@ -745,7 +749,10 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                     backend.minimize_markers()
                     
                 if event.key == pygame.K_h:
-                    show_help = not show_help
+                    if not ctrl_modifier:
+                        show_help = not show_help
+                    else:
+                        draw_grid_lines = not draw_grid_lines
                 if event.key == pygame.K_l:
                     show_labels = not show_labels
                     
@@ -907,9 +914,15 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
             currentstate = TILING_UNKNOWN
             node = node[:-1] + (nodes[node[-1]],)
             if drawcolor == EMPTY:
-                backend.replace_patch({node : None})
+                patch = {node : None}
+                for n in hidden_nodes: # TODO: this is repeated many times
+                    patch[node[:-1] + (n,)] = None
+                backend.replace_patch(patch)
             elif drawcolor == UNKNOWN:
-                backend.replace_patch({node : (list(alphabets[node[-1]]), False)})
+                patch = {node : (list(alphabets[node[-1]]), False)}
+                for n in hidden_nodes: # TODO: this is repeated many times
+                    patch[node[:-1] + (n,)] = (alphabets[n], False)
+                backend.replace_patch(patch)
             elif drawcolor == FIXITY:
                 conf = backend.conf()
                 if mousechanged:
@@ -921,7 +934,12 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                 if paint_fixity is not None and conf[node] is not None:
                     backend.replace_patch({node : (conf[node][0], paint_fixity)})
             elif drawcolor[0] == SET and drawcolor[1] < len(alphabets[node[-1]]):
-                backend.replace_patch({node : (alphabets[node[-1]][drawcolor[1]], True)})
+                
+                patch = {node : (alphabets[node[-1]][drawcolor[1]], True)}
+                for n in hidden_nodes:
+                    patch[node[:-1] + (n,)] = (alphabets[n], False)
+                backend.replace_patch(patch)
+                    
 
                 #print(node, drawcolor)
                 if thred != None:
@@ -946,7 +964,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                     backend.update_selection(selection)
                 selection_anchor = None
                 selection = set()
-                
+
         if node is not None and mouseisdown and mousechanged and cursor_state == CursorState.MOVE_MARKERS and not cancel_non_UI:
             x, y, _ = node
             if moving_marker is None:
@@ -1017,7 +1035,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                                     pp = vadd(to_screen(xx, yy), vmul(zoom, nodeoffsets[nn]))
                                     pygame.draw.line(screen, GRAY, cp_to_screen(p), cp_to_screen(pp), 1)
                                 
-        # Draw the nodes
+        # Draw the nodes, draw nodes, draw_nodes
         for x in range(xmin, xmax + 1):
             for y in range(ymin, ymax + 1):
                 if dimension == 1 and y != 0:
@@ -1183,6 +1201,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
             draw_msg.append("Paste selection: ctrl-v")
             draw_msg.append("Undo: ctrl-z")
             draw_msg.append("Redo: ctrl-y")
+            draw_msg.append("Toggle grid lines: ctrl-h")
             #draw_msg.append("Cancel deduction: escape")
             draw_msg.append("Toggle symbol labels: l")
             draw_msg.append("Toggle UI: h")
