@@ -1,0 +1,28 @@
+%alphabet 0 1 n e w s N F W S -- upper case means what is missing
+%SFT even_pre Ao
+	let has_n a := a = n | a = F | a = W | a = S in
+	let has_s a := a = s | a = N | a = W | a = F in
+	let has_w a := a = w | a = F | a = N | a = S in
+	let has_e a := a = e | a = N | a = W | a = S in
+	
+	let has_n_inverse a b := !has_n a | has_s b in
+	let has_s_inverse a b := !has_s a | has_n b in
+	let has_e_inverse a b := !has_e a | has_w b in
+	let has_w_inverse a b := !has_w a | has_e b in
+	
+	(has_n_inverse o o.up) &
+	(has_s_inverse o o.dn) &
+	(has_w_inverse o o.lt) &
+	(has_e_inverse o o.rt) &
+	o != 1
+	
+%CA put_ones
+0 1 Ao o != 0;
+0 0 Ao o = 0
+
+%SFT fullshift Ao 0=0
+%product prod even_pre fullshift
+%relation rel put_ones
+%intersection int rel prod
+%nodes {0:[0] 1:[0]}
+%tiler int hidden=[(0,0)]
