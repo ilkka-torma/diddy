@@ -301,6 +301,10 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
     nodes = list(the_SFT.nodes) #list(n for n in the_SFT.nodes)
     if any(node in nodeoffsets for node in nodes) and any(node not in nodeoffsets for node in nodes):
         raise Exception("All or none of nodes should have offsets specified")
+    for node in nodeoffsets:
+        if node not in nodes:
+            print("Unknown node in offsets ({}); using default offsets instead".format(node))
+    nodeoffsets = {node : (i/(len(nodes)+1), i/(len(nodes)+1)) for (i, node) in enumerate(nodes)}
     runningoffset = 0
     for n in nodes:
         if n not in nodeoffsets:
