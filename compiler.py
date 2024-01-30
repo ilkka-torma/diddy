@@ -267,6 +267,13 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, exte
     elif op == "VALEQ":
         
         ret = None
+        
+        if type(formula[1]) in [int, str] and formula[1] in variables and isinstance(variables[formula[1]][0], moc.MOCircuit):
+            # We have a numeric variable instead of a node
+            raise Exception("Cannot compare numeric variable {} with =".format(formula[1]))
+            
+        if type(formula[2]) in [int, str] and formula[2] in variables and isinstance(variables[formula[2]][0], moc.MOCircuit):
+            raise Exception("Cannot compare numeric variable {} with =".format(formula[2]))
 
         p1ispos = True
         try: # horrible hack
