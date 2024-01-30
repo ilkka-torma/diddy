@@ -50,12 +50,15 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, exte
             for a in closure:
                 variables_new[a] = closure[a]
             for i,a in enumerate(arg_names):
+                #print("arg", i, "is", a)
                 if type(args[i]) != tuple:
                     #variables_new[a] = args[i]
                     try:
                         pos = eval_to_position(dim, topology, args[i], variables, nodes)
                     except KeyError:
                         pos = args[i] # it's actually a value... hopefully!
+                        while pos in variables:
+                            pos = variables[pos]
                     variables_new[a] = pos
                 elif args[i][0] == "ADDR":
                     pos = eval_to_position(dim, topology, args[i], variables, nodes)
@@ -736,7 +739,6 @@ def var_of_pos_expr(f):
 def eval_to_position(dim, topology, expr, pos_variables, nodes, top=True):
     #print("EVALTOPOS", expr, pos_variables, nodes)
     if type(expr) != tuple:
-        #print("not tup")
         #print("tking", pos_variables[expr])
         pos = pos_variables[expr]
         if type(pos) != tuple:
