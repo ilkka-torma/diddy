@@ -12,19 +12,28 @@ def add_track(track, node):
 class Nodes:
     "A hierarchical set of nodes"
 
-    # nodes can be either a flat list of labels
+    # nodes can be either a single label, a flat list of labels
     # or a recursive dict from labels
     # in symbols: nodes = list(label) | dict(label : nodes)
+    # labels must be strings or integers
     def __init__(self, nodes):
         if type(nodes) == Nodes:
             self.flat = nodes.flat
             self.nodes = nodes.nodes
         elif type(nodes) == list:
+            for x in nodes:
+                if type(x) not in [int, str]:
+                    raise Exception("Node label must be integer or string, not {}".format(x))
             self.nodes = nodes
             self.flat = True
-        else:
+        elif type(nodes) == dict:
             self.nodes = {label : Nodes(track) for (label, track) in nodes.items()}
             self.flat = False
+        elif type(nodes) in [int, str]:
+            self.nodes = [nodes]
+            self.flat = True
+        else:
+            raise Exception("Bad node specification: {}".format(nodes))
 
     def __iter__(self):
         if self.flat:

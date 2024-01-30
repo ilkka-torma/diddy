@@ -579,7 +579,7 @@ class Diddy:
                 else:
                     print("Current environment")
                     print("Dimension: {}".format(self.dim))
-                    print("Nodes: {}".format(list(self.nodes)))
+                    print("Nodes: {}".format("[" + ", ".join(self.nodes.str_nodes()) + "]"))
                     print("Topology: {}".format(self.topology))
                     print("Alphabet: {}".format(self.alphabet))
                     print("Symbol weights: {}".format(self.weights))
