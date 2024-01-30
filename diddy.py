@@ -293,13 +293,16 @@ class Diddy:
                     try:
                         sfts.append(self.SFTs[name])
                     except KeyError:
-                        raise Exception("{} is not an SFT".format(name))
-                if any((sft.dim, sft.onesided) != (sfts[0].dim, sfts[0].onesided) for sft in sfts[1:]):
-                    raise Exception("Incompatible SFTs")
+                        raise Exception("{} is not an SFT or sofic shift".format(name))
+                if any((sft.dim, sft.onesided, type(sft)) != (sfts[0].dim, sfts[0].onesided, type(sfts[0])) for sft in sfts[1:]):
+                    raise Exception("Incompatible SFTs or sofic shifts")
                 track_names = kwds.get("tracks", None)
                 # where do we put the environment of the product
                 env = kwds.get("env", None)
-                prod = sft.product(*sfts, track_names=track_names)
+                if isinstance(sfts[0], sft.SFT):
+                    prod = sft.product(*sfts, track_names=track_names)
+                else:
+                    prod = sofic1d.product(*sfts, track_names=track_names)
                 self.SFTs[prod_name] = prod
                 if env != None:
                     env_dim = prod.dim

@@ -715,7 +715,9 @@ class Sofic1D:
                      for ((st1, sym), ress) in self.trans.items()
                      for st2 in other.states
                      if (st2, sym) in other.trans}
-        return Sofic1D(self.nodes, self.alph, self.topology, trans, right_resolving=self.right_resolving and other.right_resolving, onesided=self.onesided)
+        res = Sofic1D(self.nodes, self.alph, self.topology, trans, right_resolving=self.right_resolving and other.right_resolving, onesided=self.onesided)
+        res.remove_sinks()
+        return res
         
     def union(self, other):
         "Union of two 1D sofic shifts."
@@ -754,3 +756,32 @@ def union(*sofics):
     for nxt in sofics[1:]:
         cur = cur.union(nxt)
     return cur
+
+def product(*sofics, track_names=None):
+    if track_names is None:
+        track_names = list(range(len(sofics)))
+    nodes = sft.Nodes({tr:sof.nodes for (tr, sof) in zip(track_names, sofics)})
+    alph = {sft.add_track(tr,node) : sof.alph[node]
+            for (tr, sof) in zip(track_names, sofics)
+            for node in sof.nodes}
+    topology = []
+    for (tr, sof) in zip(track_names, sofics):
+        for t in sof.topology:
+            # t[:1] is the name of an edge. We make a copy with track added.
+            topology.append(t[:1] + tuple(vec[:-1] + (sft.add_track(tr, vec[-1]),) for vec in t[1:]))
+            
+    # build product transition graph
+    if all(sof.right_resolving for sof in sofics):
+        tr_vecs = iter_prod(*(iter(sof.trans.items()) for sof in sofics))
+        trans = {(tuple(tr[0][0] for tr in tr_vec), tuple(c for tr in tr_vec for c in tr[0][1])) : 
+                 tuple(tr[1] for tr in tr_vec)
+                 for tr_vec in tr_vecs}
+        right_resolving = True
+    else:
+        tr_vecs = iter_prod(*(((a, {b}) for (a,b) in sof.trans.items()) if sof.right_resolving else iter(sof.trans.items()) for sof in sofics))
+        trans = {(tuple(tr[0][0] for tr in tr_vec), tuple(c for tr in tr_vec for c in tr[0][1])) : 
+                 set(iter_prod(*(iter(sts) for sts in tr_vec[1])))
+                 for tr_vec in tr_vecs}
+        right_resolving = False
+        
+    return Sofic1D(nodes, alph, topology, trans, right_resolving=right_resolving, onesided=sofics[1].onesided)

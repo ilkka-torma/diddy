@@ -603,6 +603,26 @@ code = """
 """
 unit_tests.append(("approximate and periodic trace", code))
 
+code = """
+%topology line
+%SFT neq Ao o=1 -> o.rt=0
+%compute_forbidden_patterns neq
+%sofic1d neq_s neq
+%product p neq_s neq_s
+%load_environment p
+%SFT eq ACo o.0.0 = 0 -> o.1.0 = 0
+%compute_forbidden_patterns eq
+%sofic1d eq_s eq
+%intersection int eq_s p
+%minimize int
+%SFT int2 ACo (o.0.0 = 0 -> o.1.0 = 0) & (o.0.0 = 1 -> o.rt.0.0 = 0) & (o.1.0 = 1 -> o.rt.1.0 = 0)
+%compute_forbidden_patterns int2
+%sofic1d int2_s int2
+%minimize int2_s
+%equal expect=T int int2_s
+"""
+unit_tests.append(("1D sofic product and intersection", code))
+
 
 
 
