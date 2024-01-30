@@ -232,13 +232,18 @@ class TilerBackend:
         if mins != conf.markers:
             self.replace_conf(conf.remark(mins))
 
-    def replace_patch(self, pat):
+    def replace_patch(self, pat, keep_markers=False):
         "Replace patch in configuration, save the old state if changes were made."
         conf = self.conf()
         proj_pat = {self.project(nvec) : sym for (nvec, sym) in pat.items()}
+        if keep_markers:
+            old_axes = self.axis_states
+            self.axis_states = [AxisState.FIXED]*self.sft.dim
         changed, conf = replace_syms(conf, proj_pat, self.axis_states)
         if changed:
             self.replace_conf(conf)
+        if keep_markers:
+            self.axis_states = old_axes
             
     def copy_selection(self):
         """
@@ -341,7 +346,7 @@ class TilerBackend:
                 continue
             syms = list(self.sft.alph[nvec[-1]])
             pat[nvec] = (syms, False)
-        self.replace_patch(pat)
+        self.replace_patch(pat, keep_markers=True)
 
     def remove_all(self):
         "Set all nodes to empty, save if changes are made."
