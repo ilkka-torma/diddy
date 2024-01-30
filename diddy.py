@@ -863,6 +863,7 @@ class Diddy:
             elif cmd == "tiler":
                 import tiler
                 name = args[0]
+                print(kwds)
                 x_size = kwds.get("x_size", 10)
                 y_size = kwds.get("y_size", 10)
                 x_periodic = "x_periodic" in flags
@@ -879,6 +880,8 @@ class Diddy:
                         raise Exception("No configuration named {}".format(conf_name))
                 else:
                     conf = None
+                hidden_nodes = kwds.get("hidden", [])
+                print(hidden_nodes)
                 print(gridmoves)
                 print(self.tiler_gridmoves)
                 SFT = self.SFTs[name]
@@ -888,7 +891,7 @@ class Diddy:
                 else:
                     topology = self.environments[topo_name][2]
                 colors = kwds.get("colors", None)
-                tiler.run(SFT, topology, gridmoves, node_offsets, x_size, y_size, x_periodic, y_periodic, pictures, colors, initial=conf)
+                tiler.run(SFT, topology, gridmoves, node_offsets, x_size, y_size, x_periodic, y_periodic, pictures, colors, initial=conf, hidden_nodes=hidden_nodes)
                 #tiler.run(SFT, self.topology, gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic, pictures)
             
             elif cmd == "entropy_upper_bound":

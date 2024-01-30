@@ -261,7 +261,7 @@ def Noneish(a):
 
 def run(the_SFT, topology, gridmoves, nodeoffsets,
         x_size=10, y_size=10, x_periodic=False, y_periodic=False,
-        pictures=None, the_colors=None, initial=None):
+        pictures=None, the_colors=None, initial=None, hidden_nodes=[]):
     #print(topology)
 
     # check dimension in the first command of topology
@@ -283,7 +283,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
     if initial is not None and dimension != initial.dim:
         raise Exception("Dimension mismatch between tiler and initial configuration: {} vs {}".format(dimension, initial.dim))
         
-    
+
+    print("hidden nodes", hidden_nodes)
 
     #if dimension == 2:
     #y_range = list(range(-r, r+1))
@@ -307,7 +308,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
     nodeoffsets = {node : (i/(len(nodes)+1), i/(len(nodes)+1)) for (i, node) in enumerate(nodes)}
     runningoffset = 0
     for n in nodes:
-        if n not in nodeoffsets:
+        if n not in nodeoffsets and n not in hidden_nodes:
             # this only makes sense if either all or none are set
             nodeoffsets[n] = (0, runningoffset)
             runningoffset += 1/len(nodes)
@@ -558,6 +559,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                 return True
         return False
 
+    draw_grid_lines = True
     nnn = 0
 
     tim = time.time()
@@ -989,33 +991,40 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
         #if nnn%10 == 0:
         #    print("backend conf", conf.display_str())
         
-        # Draw the grid lines
-        for x in range(xmin, xmax + 1):
-            for y in range(ymin, ymax + 1):
-                if dimension == 1 and y != 0: # we need not draw in this case
-                    continue
-                for n in range(len(nodes)):
-
-                    #print("apbara", conf.display_str(), x, y, nodes[n])
-                    if Noneish(conf[x, y, nodes[n]]):
+        # Draw the grid lines i.e. draw the edges
+        if draw_grid_lines:
+            for x in range(xmin, xmax + 1):
+                for y in range(ymin, ymax + 1):
+                    if dimension == 1 and y != 0: # we need not draw in this case
                         continue
-                    for t in topology:
-                        a, b = t[1], t[2]
-                        if a[-1] == nodes[n]:
-                            xx, yy, nn = vadd((x, y), vsub(b[:-1], a[:-1])) + (b[2],)
-                            #print(xx,yy,nn,nodes,conf)
-                            if not Noneish(conf[xx, yy, nn]):
-                                p = vadd(to_screen(x, y), vmul(zoom, nodeoffsets[nodes[n]]))
-                                #pp = to_screen(*vadd((xx, yy), nodeoffsets[nn]))
-                                pp = vadd(to_screen(xx, yy), vmul(zoom, nodeoffsets[nn]))
-                                pygame.draw.line(screen, GRAY, cp_to_screen(p), cp_to_screen(pp), 1)
-                            
+                    for n in range(len(nodes)):
+                        if nodes[n] in hidden_nodes:
+                            continue
+
+                        #print("apbara", conf.display_str(), x, y, nodes[n])
+                        if Noneish(conf[x, y, nodes[n]]):
+                            continue
+                        for t in topology:
+                            a, b = t[1], t[2]
+                            if a[-1] in hidden_nodes:
+                                continue
+                            if a[-1] == nodes[n]:
+                                xx, yy, nn = vadd((x, y), vsub(b[:-1], a[:-1])) + (b[2],)
+                                #print(xx,yy,nn,nodes,conf)
+                                if not Noneish(conf[xx, yy, nn]):
+                                    p = vadd(to_screen(x, y), vmul(zoom, nodeoffsets[nodes[n]]))
+                                    #pp = to_screen(*vadd((xx, yy), nodeoffsets[nn]))
+                                    pp = vadd(to_screen(xx, yy), vmul(zoom, nodeoffsets[nn]))
+                                    pygame.draw.line(screen, GRAY, cp_to_screen(p), cp_to_screen(pp), 1)
+                                
         # Draw the nodes
         for x in range(xmin, xmax + 1):
             for y in range(ymin, ymax + 1):
                 if dimension == 1 and y != 0:
                     continue
                 for n in range(len(nodes)):
+                    if nodes[n] in hidden_nodes:
+                        continue
                     p = vadd(to_screen(x, y), vmul(zoom, nodeoffsets[nodes[n]]))
                     # highlight selected nodes and nodes currently being selected
                     if (x,y,nodes[n]) in selection:

@@ -263,7 +263,7 @@ commands = [
     # Visualization / finding individual tilings in SFT
     Command("tiler",
             [ArgType.LABEL],
-            opts = ["x_size", "y_size", "node_offsets", "pictures", "gridmoves", "topology", "initial"],
+            opts = ["x_size", "y_size", "node_offsets", "pictures", "gridmoves", "topology", "initial", "hidden"],
             flags = ["x_periodic", "y_periodic"]),
     Command("tile_box",
             [ArgType.LABEL, ArgType.NUMBER]),
