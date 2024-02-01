@@ -263,7 +263,7 @@ commands = [
     # Visualization / finding individual tilings in SFT
     Command("tiler",
             [ArgType.LABEL],
-            opts = ["x_size", "y_size", "node_offsets", "pictures", "gridmoves", "topology", "initial", "hidden"],
+            opts = ["x_size", "y_size", "node_offsets", "pictures", "gridmoves", "topology", "initial", "colors", "hidden"],
             flags = ["x_periodic", "y_periodic"]),
     Command("tile_box",
             [ArgType.LABEL, ArgType.NUMBER]),
@@ -297,7 +297,7 @@ def fraction():
 
 # Labels (of commands, alphabets, nodes etc.)
 label = lexeme(keyword.should_fail("keyword") >> p.regex(r'[a-zA-Z]\w*')).desc("label")
-topology_keyword = lexeme(p.regex(r'line|grid|square|squaregrid|king|kinggrid|triangle|trianglegrid|hex|hexgrid|CR')).desc("topology name")
+topology_keyword = lexeme(p.regex(r'line|grid|square|squaregrid|king[0-9]*|kinggrid|triangle|trianglegrid|hex|hexgrid|CR')).desc("topology name")
 
 # Optional argument / setter; value is a signed number or label
 # Type checking is not done at parse time

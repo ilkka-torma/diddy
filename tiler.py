@@ -305,7 +305,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
     for node in nodeoffsets:
         if node not in nodes:
             print("Unknown node in offsets ({}); using default offsets instead".format(node))
-    nodeoffsets = {node : (i/(len(nodes)+1), i/(len(nodes)+1)) for (i, node) in enumerate(nodes)}
+    #if nodeoffsets == {} or nodeoffsets == None:
+    #    nodeoffsets = {node : (i/(len(nodes)+1), i/(len(nodes)+1)) for (i, node) in enumerate(nodes)}
     runningoffset = 0
     for n in nodes:
         if n not in nodeoffsets and n not in hidden_nodes:

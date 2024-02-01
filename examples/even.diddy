@@ -17,7 +17,7 @@
 	o != 1
 	
 %CA put_ones
-0 1 Ao o != 0;
+0 1 Ao o != 0
 0 0 Ao o = 0
 
 %SFT fullshift Ao 0=0
