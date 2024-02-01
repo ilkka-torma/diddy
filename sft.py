@@ -233,7 +233,7 @@ class SFT:
         if not isinstance(conf, Conf):
             raise TypeError("Expected Conf, not {}".format(type(conf)))
         elif isinstance(conf, RecognizableConf):
-            print("testing containment of", conf.display_str())
+            #print("testing containment of", conf.display_str())
             if conf.dim != self.dim or conf.onesided != self.onesided:
                 return False
             conf_vecs = set(hyperrect([(a, d) for (a, b, c, d) in conf.markers]))
@@ -278,7 +278,7 @@ class SFT:
     # Some directions can be declared fully periodic instead of eventually periodic
     # For a onesided non-periodic direction, only consider translates of the formula whose variables are on the nonnegative part of the axis
     def exists_recognizable_not_in(self, other, radii, periodics=None, return_conf=False):
-        #print("koko", self, other)
+        #print("radii", radii, "periodics", periodics)
 
         if periodics is None:
             periodics = []
@@ -289,11 +289,12 @@ class SFT:
         other_vecs = set(var[:-2] for var in other.circuit.get_variables())
         if not other_vecs:
             other_vecs.add((0,)*self.dim)
-        #print("sfts", self, other, "vecs", my_vecs, other_vecs)
+        #print("my_vecs", my_vecs, "other_vecs", other_vecs)
         conf_bounds = [(0 if i in self.onesided+periodics else -rad,
                         rad if i in periodics else 2*rad)
                        for (i, rad) in enumerate(radii)]
         all_vecs = set(hyperrect(conf_bounds))
+        #print("all_vecs", all_vecs)
         tr_bounds = []
         for (i, rad) in enumerate(radii):
             if i in self.onesided+periodics:
@@ -328,14 +329,16 @@ class SFT:
         circuits = []
         others = []
         for vec in hyperrect(tr_bounds):
-            if any(vadd(vec, my_vec) in all_vecs for my_vec in my_vecs) and\
-               all(vec[i]+my_vec[i] >= 0 for my_vec in my_vecs for i in self.onesided):
+            #if any(vadd(vec, my_vec) in all_vecs for my_vec in my_vecs) and\
+            if all(vec[i]+my_vec[i] >= 0 for my_vec in my_vecs for i in self.onesided):
+                #print("adding my circ")
                 circ = self.circuit.copy()
                 transform(circ, lambda var: wrap(nvadd(var[:-1], vec) + var[-1:]))
                 circuits.append(circ)
             if any(vadd(vec, other_vec) in all_vecs for other_vec in other_vecs) and\
                all(vec[i]+other_vec[i] >= 0 for other_vec in other_vecs for i in self.onesided) and\
                all(vec[i] == 0 or i not in periodics for i in range(self.dim)):
+                #print("adding other circ")
                 not_other = NOT(other.circuit.copy())
                 transform(not_other, lambda var: wrap(nvadd(var[:-1], vec) + var[-1:]))
                 others.append(not_other)
@@ -830,6 +833,7 @@ class SFT:
 
     def contains(self, other, limit = None, return_radius_and_sep = False, method="periodic", verbose=False):
         "Test containment using forced allowed patterns or special configurations"
+        #print("containment method", method)
         test = self.inconsistent_with(other, verbose=verbose)
         if test:
             if return_radius_and_sep:

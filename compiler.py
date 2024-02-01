@@ -270,50 +270,60 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, exte
     elif op == "VALEQ":
         
         ret = None
+        arg1 = formula[1]
+        arg2 = formula[2]
         
-        if type(formula[1]) in [int, str] and formula[1] in variables and isinstance(variables[formula[1]][0], moc.MOCircuit):
-            # We have a numeric variable instead of a node
-            raise Exception("Cannot compare numeric variable {} with =".format(formula[1]))
-            
-        if type(formula[2]) in [int, str] and formula[2] in variables and isinstance(variables[formula[2]][0], moc.MOCircuit):
-            raise Exception("Cannot compare numeric variable {} with =".format(formula[2]))
-
+        while arg1 in variables:
+            val = variables[arg1]
+            if type(val) == tuple and isinstance(val[0], moc.MOCircuit):
+                # We have a numeric variable instead of a node
+                raise Exception("Cannot compare numeric variable {} with =".format(formula[1]))
+            arg1 = val
+        
+        while arg2 in variables:
+            val = variables[arg2]
+            if type(val) == tuple and isinstance(val[0], moc.MOCircuit):
+                # We have a numeric variable instead of a node
+                raise Exception("Cannot compare numeric variable {} with =".format(formula[1]))
+            arg2 = val
+        
         p1ispos = True
         try: # horrible hack
-            p1 = eval_to_position(dim, topology, formula[1], variables, nodes)
+            p1 = eval_to_position(dim, topology, arg1, variables, nodes)
+            #print("computed p1", p1)
             if p1 == None:
                 # return None and not a circuit at all; soft error handling to simulate lazy evaluation
                 return None # = F
-            # evaluates to cell
-            elif len(p1) != dim+1:
+            # evaluates to cell or symbol
+            elif type(p1) == tuple and len(p1) != dim+1:
                 raise Exception("Cannot compare value of cell, only node.")
         except KeyError:
-            #print("eval to pos failed")
+            #print("eval to pos failed for arg1", arg1)
             p1ispos = False
             #print(formula[1], "formula 1 fast")
-            if any(formula[1] in local_alph for local_alph in alphabet.values()):
-                p1val = formula[1]
+            if any(arg1 in local_alph for local_alph in alphabet.values()):
+                p1val = arg1
             else:
-                p1val = variables[formula[1]] # we assume the keyerror is because this is symbol variable
-        #all_vars.add(var_of_pos_expr(formula[1]))
+                raise Exception("Could not handle argument {} for =".format(arg1))
 
         p2ispos = True
         try: # horrible hack #2
-            p2 = eval_to_position(dim, topology, formula[2], variables, nodes)
+            p2 = eval_to_position(dim, topology, arg2, variables, nodes)
             if p2 == None:
                 # return None and not a circuit at all; soft error handling to simulate lazy evaluation
                 return None
-            elif len(p2) != dim+1:
+            elif type(p2) == tuple and len(p2) != dim+1:
                 raise Exception("Cannot compare value of cell, only node.")
         except KeyError:
             #print("eval to pos failed")
             p2ispos = False
-            if any(formula[2] in local_alph for local_alph in alphabet.values()):
-                p2val = formula[2]
+            if any(arg2 in local_alph for local_alph in alphabet.values()):
+                p2val = arg2
             else:
-                p2val = variables[formula[2]] # we assume the keyerror is because this is symbol variable
-        #all_vars.add(var_of_pos_expr(formula[2]))
+                raise Exception("Could not handle argument {} for =".format(arg2))
 
+        #print("arg1", arg1, "p1ispos", p1ispos, "arg2", arg2, "p2ispos", p2ispos)
+        
         if not p1ispos and not p2ispos:
             if p1val == p2val:
                 return T
@@ -361,6 +371,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, exte
         else:
             if not p1ispos and p2ispos:
                 p1, p2val = p2, p1val
+            #print("here p1", p1, "p2val", p2val)
             local_alph = alphabet[p1[-1]]
             if p2val not in local_alph:
                 ret = F
@@ -748,7 +759,8 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes, top=True):
         return pos
     if expr[0] != "ADDR":
         # we have a node with tracks
-        return expr[0]
+        #print("expr is node:", expr)
+        return expr
     pos = pos_variables[expr[1]]
     #print(pos, "ke")
     if type(pos) != tuple:

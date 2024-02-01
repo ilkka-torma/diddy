@@ -623,6 +623,30 @@ code = """
 """
 unit_tests.append(("1D sofic product and intersection", code))
 
+code = """
+%SFT x1 Ao
+let f a b := a.rt = b in
+f o.rt 0
+%SFT x2 Ao
+let f a b := b = a.rt in
+f o.rt 0
+%SFT x3 Ao o=0
+%equal expect=T x1 x2
+%equal expect=T x2 x3
+"""
+unit_tests.append(("symbols in let", code))
+
+code = """
+%SFT x1 Ao o.rt.rt=0
+%SFT x2 Ao o.up.up=0
+%SFT x3 Ao o=0
+%equal expect=T x1 x2
+%equal expect=T x1 x3
+%equal expect=T method=recognizable x1 x2
+%equal expect=T method=recognizable x1 x3
+"""
+unit_tests.append(("disjoint supports", code))
+
 
 
 
