@@ -20,4 +20,4 @@
 %compute_forbidden_patterns gol_fp
 %minimum_density conf_name=c gol_fp (0,1)
 -- Uncomment to view the extremal configuration in tiler
--- %tiler gol_fp initial=c
+%tiler gol_fp initial=c

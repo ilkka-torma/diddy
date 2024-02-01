@@ -87,10 +87,19 @@ class Diddy:
                 #self.tiler_skew = 1
                 self.tiler_nodeoffsets = {node : (2*j/(3*len(self.nodes)), 2*j/(3*len(self.nodes))) for (j,node) in enumerate(self.nodes)}
             elif cmd == "dim":
-                self.dim = args[0]
+                dim = args[0]
+                self.dim = dim
                 self.tiler_gridmoves = [char_vector(self.dim, j) for j in range(self.dim)]
                 self.tiler_nodeoffsets = {0 : zero_vector(self.dim)}
+
+                # let's have this set a basic topology with ell_1
                 self.topology = []
+                for d in range(dim):
+                    for dr in [-1, 1]:
+                        if dr == -1: s = "M"
+                        else: s = "P"
+                        self.topology.append(("Z"*d+s+"Z"*(dim-d-1), (0,)*(dim+1), (0,)*d + (dr,) + (0,)*(dim-d-1) + (0,)))
+                
             elif cmd == "alphabet":
                 alph = args[0]
                 default = kwds.get("default", None)
@@ -137,6 +146,22 @@ class Diddy:
                 elif top in ["king", "kinggrid"]:
                     self.dim = 2
                     self.topology = kinggrid
+                    self.nodes = sft.Nodes([0])
+                    self.tiler_gridmoves = [(1,0), (0,1)]
+                    #self.tiler_skew = 1
+                    self.tiler_nodeoffsets = {0 : (0,0)}
+                elif top[:4] in ["king"]:
+                    dim = int(top[4:])
+                    self.dim = dim                    
+                    self.topology = []
+                    for w in words(dim, "MZP"):
+                        if w != "Z"*dim:
+                            v = ()
+                            for i in w:
+                                if i == "M": v += (-1,)
+                                if i == "Z": v += (0,)
+                                if i == "P": v += (1,)
+                            self.topology.append((w, (0,)*(dim+1), v+(0,)))
                     self.nodes = sft.Nodes([0])
                     self.tiler_gridmoves = [(1,0), (0,1)]
                     #self.tiler_skew = 1
@@ -668,7 +693,7 @@ class Diddy:
                     clopen2 = self.clopens[item2]
                     raise Exception("Comparison of clopen sets not implemented.")
 
-            elif cmd == "compare_SFT_pairs" and mode == "report":
+            elif cmd == "compare_sft_pairs" and mode == "report":
                 method = kwds.get("method", "periodic")
                 for a in self.SFTs:
                     for b in self.SFTs:
@@ -863,6 +888,7 @@ class Diddy:
             elif cmd == "tiler":
                 import tiler
                 name = args[0]
+                print(kwds)
                 x_size = kwds.get("x_size", 10)
                 y_size = kwds.get("y_size", 10)
                 x_periodic = "x_periodic" in flags
@@ -879,6 +905,8 @@ class Diddy:
                         raise Exception("No configuration named {}".format(conf_name))
                 else:
                     conf = None
+                hidden_nodes = kwds.get("hidden", [])
+                print(hidden_nodes)
                 print(gridmoves)
                 print(self.tiler_gridmoves)
                 SFT = self.SFTs[name]
@@ -888,7 +916,7 @@ class Diddy:
                 else:
                     topology = self.environments[topo_name][2]
                 colors = kwds.get("colors", None)
-                tiler.run(SFT, topology, gridmoves, node_offsets, x_size, y_size, x_periodic, y_periodic, pictures, colors, initial=conf)
+                tiler.run(SFT, topology, gridmoves, node_offsets, x_size, y_size, x_periodic, y_periodic, pictures, colors, initial=conf, hidden_nodes=hidden_nodes)
                 #tiler.run(SFT, self.topology, gridmoves, node_offsets, self.tiler_skew, x_size, y_size, x_periodic, y_periodic, pictures)
             
             elif cmd == "entropy_upper_bound":
@@ -963,7 +991,6 @@ class Diddy:
                     print("Tiling %s-hypercube of SFT %s." % (rad, name))
                     self.SFTs[name].tile_box(rad, verbose=verbose)
                     rad += 1
-                    
                                         
             elif mode == "report":
                 raise Exception("Unknown command %s." % cmd)
