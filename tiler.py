@@ -839,6 +839,10 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                 
                 screen = pygame.display.set_mode(WINDOW_SIZE, pygame.RESIZABLE)
                 # should probably also tell UI?
+
+            if event.type == pygame.MOUSEWHEEL:
+                #print(event.x, event.y)
+                zoom = smul(1.01 ** event.y, zoom)
                 
             # end of event loop
 
@@ -870,7 +874,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
         
         camera = vadd(camera, gridmove)
         if not cancel_non_UI:
-            if keys[pygame.K_a] and not any_modifier:
+            if (keys[pygame.K_a] and not any_modifier):
                 zoom = smul(1.01, zoom)
             if keys[pygame.K_z] and not any_modifier:
                 zoom = smul(1/1.01, zoom)
