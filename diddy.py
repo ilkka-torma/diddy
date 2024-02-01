@@ -221,7 +221,7 @@ class Diddy:
                     self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, self.topology, forbs=defn, onesided=onesided)
                 elif type(defn) == tuple:
                     #print("defn", defn)
-                    circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, defn, self.externals)
+                    circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, defn, self.externals, simplify="simplify" in flags)
                     #vardict = dict()
                     #inst = circuit.circuit_to_sat_instance(circ, vardict)
                     #import abstract_SAT_simplify
@@ -816,7 +816,7 @@ class Diddy:
                                 print("Maybe you forgot a semicolon?")
                             continue
                         node, sym, formula = rule
-                        circ = compiler.formula_to_circuit(dom_nodes, dom_dim, dom_top, dom_alph, formula, self.externals)
+                        circ = compiler.formula_to_circuit(dom_nodes, dom_dim, dom_top, dom_alph, formula, self.externals, simplify="simplify" in flags)
                         circuits.append((node, sym, circ))
                 #print(circuits)
                 self.blockmaps[name] = blockmap.BlockMap(dom_alph, cod_alph, dom_nodes, cod_nodes, dom_dim, circuits, dom_top, cod_top, overlaps=overlaps, verbose=verbose)

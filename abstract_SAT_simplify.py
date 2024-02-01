@@ -100,6 +100,10 @@ def circuit_eq_rel_and_inv(circ):
     circ_rel = {name_to_var[var] : frozenset(name_to_var[var2] for var2 in cls)
                 for cls in rel
                 for var in cls}
+    for node in circ.internal_nodes(vars_too=True):
+        the_id = node.get_id()
+        if the_id not in circ_rel:
+            circ_rel[the_id] = {node.get_id()}
     circ_inv = {name_to_var[var] : (None if inv is None else frozenset(name_to_var[var2] for var2 in inv))
                 for (cls, inv) in inv.items()
                 for var in cls}
@@ -116,6 +120,10 @@ def simplify_circ_eqrel(circ, seen=None, circ_rel=None, circ_inv=None, idmap=Non
         for node in circ.internal_nodes(vars_too=True):
             idmap[node.get_id()] = node
     the_id = circ.get_id()
+    # idmap is dict[id] -> set(circ)
+    # circ_rel is dict[id] -> set[id]
+    # seen is dict[id] -> circ
+    #print("circ", circ, "the id", the_id, "idmap", idmap, "circ rel", circ_rel, "seen", seen)
     if the_id in seen:
         return the_id, seen[the_id]
     #seen[the_id] = circ

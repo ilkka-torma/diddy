@@ -2,6 +2,7 @@
 import circuit
 from circuit import NOT, V, AND, OR, T, F, IMP, IFF, tech_simp, Circuit
 import mocircuits as moc
+import abstract_SAT_simplify as ass
 import sft
 from general import *
 
@@ -478,12 +479,15 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, exte
     #print("ret", ret)
     return ret
 
-def formula_to_circuit(nodes, dim, topology, alphabet, formula, externals):
+def formula_to_circuit(nodes, dim, topology, alphabet, formula, externals, simplify=True):
     variables = {}
     global_restr = []
     form = formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, externals, global_restr)
     #return tech_simp(form)
-    return tech_simp(AND(*([form]+global_restr)))
+    form = tech_simp(AND(*([form]+global_restr)))
+    if simplify:
+        _, form = ass.simplify_circ_eqrel(form)
+    return form
     
 def sum_circuit(summands, global_restr):
     # Separate constants
