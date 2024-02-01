@@ -32,4 +32,8 @@ x 0 0 1 0 1 1 1 |
 x 1 1 1 0 1 1 1 |
 x 0 0 0 1 1 1 1 |
 x 0 1 1 1 1 1 1
-%calculate_CA_ball 10 kekki K -- calculate ball of radius 10 with generators {K} into file kekki.output
+--%calculate_CA_ball 10 kekki K -- calculate ball of radius 10 with generators {K} into file kekki.output
+%compose K7 K K K K K K K
+%CA trivial
+0 0 Ao o=o
+%equal trivial K7
