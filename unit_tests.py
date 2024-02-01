@@ -647,6 +647,16 @@ code = """
 """
 unit_tests.append(("disjoint supports", code))
 
+code = """
+%nodes a b
+%topology
+rt (0,0,a) (1,0,a)
+%sft x Ao has o rt -> o=0
+%sft y ACo o.a=0
+%equal x y expect=T
+"""
+unit_tests.append(("edge existence", code))
+
 
 
 
