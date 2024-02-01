@@ -869,7 +869,10 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
             screenmove = (-mouse_displacement[0], mouse_displacement[1])
             
         #screenmove = smul(zoom*0.01, screenmove)
-        screenmove = smul(4, screenmove)
+        shiftcoeff = 1
+        if shift_modifier:
+            shiftcoeff = 4
+        screenmove = smul(shiftcoeff * 4, screenmove)
         gridmove = vsub(to_grid(*screenmove), to_grid(0, 0))
         
         camera = vadd(camera, gridmove)
