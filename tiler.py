@@ -842,7 +842,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
 
             if event.type == pygame.MOUSEWHEEL:
                 #print(event.x, event.y)
-                zoom = smul(1.01 ** event.y, zoom)
+                zoom = smul(1.01 ** event.y, zoom) # note that there is also zoom code elsewhere
                 
             # end of event loop
 
@@ -874,6 +874,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
         
         camera = vadd(camera, gridmove)
         if not cancel_non_UI:
+            # note that there is also zoom code elsewhere
             if (keys[pygame.K_a] and not any_modifier):
                 zoom = smul(1.01, zoom)
             if keys[pygame.K_z] and not any_modifier:
