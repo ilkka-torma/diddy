@@ -562,6 +562,7 @@ def last_diff_and_count(circs, count):
 # same sa LDAC, but the alphabet size (or set) is a function
 # that gives alphabets or their cardinalities
 def LDAC2(alphabet_func):
+    #print("LDAC2 called with", alphabet_func)
     def leng(a):
         if type(a) == int:
             return a
@@ -575,6 +576,7 @@ def LDAC2(alphabet_func):
 # be true
 # of course very specific to our coding of 
 def last_diff_and_count2(circs, count):
+    #print("ldac2 called with count", count)
     #print(count, list(map(str, circs)))
     # lasts is a dict of nvec -> set(var)
     lasts = {}
