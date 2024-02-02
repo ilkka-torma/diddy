@@ -197,6 +197,7 @@ WangConstraint o &
 %SFT empty Ao 0=1
 %contains empty JeandelRao
 """
+# not appended because it's aperiodic and would not work
 
 code_locdomrad2 = """
 -- using a cache multiplies time usage by up to 5

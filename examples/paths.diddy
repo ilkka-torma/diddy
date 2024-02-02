@@ -9,4 +9,7 @@
 (o=U -> D!=o.up!=0) &
 (o=L -> R!=o.lt!=0) &
 (o=D -> U!=o.dn!=0)
-%tiler paths x_size=6 y_size=6 @x_periodic @y_periodic
+
+
+%tiler paths x_size=15 y_size=15 -- @x_periodic @y_periodic
+pictures={0:[empty arrow_r90 arrow_r270 arrow_r180 arrow]}
