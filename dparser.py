@@ -311,14 +311,15 @@ def set_arg_value():
     return (arg_name, arg_value)
     
 # Node name: period-separated sequence of labels
-node_name = (label | natural).sep_by(period, min=1).map(lambda items: items[0] if len(items) == 1  else tuple(items))
+node_name = (label | natural).sep_by(period, min=1).map(lambda items: tuple(items))
+#node_name = (label | natural).sep_by(period, min=1).map(lambda items: items[0] if len(items) == 1  else tuple(items))
 
 # Vector or node vector
 @p.generate("vector")
 def vector():
     yield lparen
-    nums = yield integer.sep_by(comma << p.peek(integer >> (comma | rparen)))
-    maybe_node = yield (comma >> node_name).optional()
+    nums = yield integer.sep_by(comma << p.peek(integer >> (comma | semicolon | rparen)))
+    maybe_node = yield (semicolon >> node_name).optional()
     yield rparen
     if maybe_node is None:
         return tuple(nums)

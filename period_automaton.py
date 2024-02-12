@@ -580,9 +580,9 @@ class PeriodAutomaton:
             proc.terminate()
             
         # check path length and weight
-        #print(path)
-        #print(self.trans.keys())
-        #print(self.trans)
+        print("path", path)
+        print("trans keys", self.trans.keys())
+        print("trans", self.trans)
         assert len(path) == m+1
         assert sum(self.trans[path[k]][path[k+1]] for k in range(m)) == sparse_mins[n*(len(sparse_rows)-1)+path[0]]
 

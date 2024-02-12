@@ -12,50 +12,84 @@ def add_track(track, node):
 class Nodes:
     "A hierarchical set of nodes"
 
-    # nodes can be either a single label, a flat list of labels
-    # or a recursive dict from labels
-    # in symbols: nodes = list(label) | dict(label : nodes)
+    # nodes can be either a single label, a flat list of labels,
+    # a recursive dict from labels, or None
+    # in symbols: nodes = label | list(label) | dict(label : nodes) | None
     # labels must be strings or integers
-    def __init__(self, nodes):
-        if type(nodes) == Nodes:
-            self.flat = nodes.flat
+    # internally, a Nodes stores a dict with Nones for flat labels
+    def __init__(self, nodes=None):
+        print("Nodes", nodes)
+        if nodes is None:
+            self.nodes = None
+        elif type(nodes) == Nodes:
             self.nodes = nodes.nodes
         elif type(nodes) == list:
             for x in nodes:
                 if type(x) not in [int, str]:
                     raise Exception("Node label must be integer or string, not {}".format(x))
-            self.nodes = nodes
-            self.flat = True
+            self.nodes = {x : None for x in nodes}
         elif type(nodes) == dict:
-            self.nodes = {label : Nodes(track) for (label, track) in nodes.items()}
-            self.flat = False
+            self.nodes = {label : None if track is None else Nodes(track) for (label, track) in nodes.items()}
         elif type(nodes) in [int, str]:
-            self.nodes = [nodes]
-            self.flat = True
+            self.nodes = {nodes : none}
         else:
             raise Exception("Bad node specification: {}".format(nodes))
+            
+    @classmethod
+    def from_list(cls, node_list):
+        #print("from list", node_list)
+        nodes = dict()
+        for node in node_list:
+            if not node:
+                raise Exception("Bad node list: {}".format(node_list))
+            head = node[0]
+            if head in nodes:
+                if nodes[head] is None or len(node) == 1:
+                    raise Exception("Bad node list: {}".format(node_list))
+                nodes[head].append(node[1:])
+            elif len(node) == 1:
+                nodes[head] = None
+            else:
+                nodes[head] = [node[1:]]
+        #print("computed", nodes)
+        return cls({label : rest if rest is None else Nodes.from_list(rest)
+                    for (label, rest) in nodes.items()})
+            
+    def __bool__(self):
+        return self.nodes is not None
 
     def __iter__(self):
-        if self.flat:
-            return iter(self.nodes)
+        if self:
+            def the_iter():
+                for (label, track) in self.nodes.items():
+                    if track is None:
+                        yield (label,)
+                    else:
+                        for node in track:
+                            yield (label,) + node
+            return the_iter()
         else:
-            return (((label, node) if track.flat else (label,) + node) for (label, track) in self.nodes.items() for node in track)
+            return iter([()])
 
     def __len__(self):
-        if self.flat:
-            return len(self.nodes)
+        #print("len", self, self.nodes)
+        if self:
+            return sum(1 if track is None else len(track) for track in self.nodes.values())
         else:
-            return sum(len(track) for track in self.nodes.values())
+            return 1
             
     def __in__(self, item):
-        if self.flat:
-            return item in self.nodes
-        else:
+        if type(item) != tuple:
+            return False
+        if self:
+            if item == ():
+                return False
             track = self.nodes[item[0]]
-            if len(item) == 2:
-                return item[1] in track
-            else:
-                return item[1:] in track
+            if track is None:
+                return len(item) == 1
+            return item[1:] in track
+        else:
+            return item == ()
 
     def track(self, label):
         if self.flat:
@@ -67,9 +101,11 @@ class Nodes:
         #print("compatible", self, items)
         if not items:
             return True
+        if not self:
+            return False
         if items[0] not in self.nodes:
             return False
-        if self.flat:
+        if self.nodes[items[0]] is None:
             return len(items) == 1
         return self.nodes[items[0]].compatible(items[1:])
         
@@ -87,17 +123,13 @@ class Nodes:
         return "Nodes[" + ", ".join(self.str_nodes()) + "]"
 
     def str_nodes(self):
-        if self.flat:
-            for node in self.nodes:
-                yield str(node)
-        else:
-            for node in self:
-                yield '.'.join(str(part) for part in node)
+        for node in self:
+            yield '.'.join(str(part) for part in node)
 
     def __eq__(self, other):
         if type(other) != Nodes:
             return False
-        return self.flat == other.flat and self.nodes == other.nodes
+        return self.nodes == other.nodes
 
 # check that circuit is forced to be true when variable set
 def forced_by(circuit, vals_as_list):

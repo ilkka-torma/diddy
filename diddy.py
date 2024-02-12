@@ -41,16 +41,24 @@ class Diddy:
         self.clopens = {}
         self.confs = {}
         self.environments = {}
-        self.nodes = sft.Nodes([0])
-        self.alphabet = {node : [0, 1] for node in self.nodes}
+        self.nodes = sft.Nodes()
+        self.alphabet = {() : [0, 1] for node in self.nodes}
         self.dim = 2
         self.topology = grid
         #self.tiler_skew = 1 # actually skew is completely useless
         self.tiler_gridmoves = [(1,0), (0,1)]
-        self.tiler_nodeoffsets = {0 : (0,0)}
+        self.tiler_nodeoffsets = {() : (0,0)}
         self.formulae = []
         self.weights = None
         self.externals = {}
+        
+    def has_nodes(self):
+        return self.nodes != sft.Nodes()
+        
+    def process_nvec(self, nvec):
+        if not self.has_nodes() and len(nvec) == self.dim:
+            return nvec + ((),)
+        return nvec
 
     def run_file(self, filename):
         with open(fix_filename(filename), 'r') as f:
@@ -78,14 +86,25 @@ class Diddy:
             cmd, args, kwds, flags = parsed_line
             #print("cmd", cmd)
             #print("parsed line", parsed_line)
+            
             if cmd == "nodes":
-                self.nodes = sft.Nodes(args[0])
+                #print("nodes", args[0])
+                if type(args[0]) == list:
+                    self.nodes = sft.Nodes.from_list(args[0])
+                elif type(args[0]) == dict:
+                    def clean(arg):
+                        if type(arg) == dict:
+                            return {key[0] if type(key) == tuple else key : clean(val) for (key, val) in arg.items()}
+                        elif type(arg) == list:
+                            return [val[0] if type(val) == tuple else val for val in arg]
+                    self.nodes = sft.Nodes(clean(args[0]))
                 alph0 = list(self.alphabet.values())[0]
                 if all(alph == alph0 for alph in self.alphabet.values()):
                     self.alphabet = {node : alph0 for node in self.nodes}
                 self.tiler_gridmoves = [(1,0), (0,1)] # why is this here? TODO
                 #self.tiler_skew = 1
                 self.tiler_nodeoffsets = {node : (2*j/(3*len(self.nodes)), 2*j/(3*len(self.nodes))) for (j,node) in enumerate(self.nodes)}
+                
             elif cmd == "dim":
                 dim = args[0]
                 self.dim = dim
@@ -101,7 +120,7 @@ class Diddy:
                         self.topology.append(("Z"*d+s+"Z"*(dim-d-1), (0,)*(dim+1), (0,)*d + (dr,) + (0,)*(dim-d-1) + (0,)))
                 
             elif cmd == "alphabet":
-                alph = args[0]
+                alph = [arg[0] if type(arg) == tuple else arg for arg in args[0]]
                 default = kwds.get("default", None)
                 if type(alph) == list and default is None:
                     default = alph
@@ -119,37 +138,38 @@ class Diddy:
                             self.alphabet[node] = local_alph
                 if None in self.alphabet.values():
                     raise Exception("Incomplete alphabet definition")
+                    
             elif cmd == "topology":
                 top = args[0]
                 if top in ["line"]:
                     self.dim = 1
                     self.topology = line
-                    self.nodes = sft.Nodes([0])
+                    self.nodes = sft.Nodes()
                     # only the first will be used
                     self.tiler_gridmoves = [(1, 0), (0, 1)]
                     #self.tiler_skew = 1
-                    self.tiler_nodeoffsets = {0 : (0,0)}
+                    self.tiler_nodeoffsets = {() : (0,0)}
                 elif top in ["square", "grid", "squaregrid"]:
                     self.dim = 2
                     self.topology = grid
-                    self.nodes = sft.Nodes([0])
+                    self.nodes = sft.Nodes()
                     self.tiler_gridmoves = [(1,0), (0,1)]
                     #self.tiler_skew = 1
-                    self.tiler_nodeoffsets = {0 : (0,0)}
+                    self.tiler_nodeoffsets = {() : (0,0)}
                 elif top in ["hex", "hexgrid"]:
                     self.dim = 2
                     self.topology = hexgrid
                     self.nodes = sft.Nodes([0,1])
                     self.tiler_gridmoves = [(1,0), (-0.5,0.8)]
                     #self.tiler_skew = 1
-                    self.tiler_nodeoffsets = {0 : (0,0.15), 1 : (0.5,-0.15)}
+                    self.tiler_nodeoffsets = {(0,) : (0,0.15), (1,) : (0.5,-0.15)}
                 elif top in ["king", "kinggrid"]:
                     self.dim = 2
                     self.topology = kinggrid
-                    self.nodes = sft.Nodes([0])
+                    self.nodes = sft.Nodes()
                     self.tiler_gridmoves = [(1,0), (0,1)]
                     #self.tiler_skew = 1
-                    self.tiler_nodeoffsets = {0 : (0,0)}
+                    self.tiler_nodeoffsets = {() : (0,0)}
                 elif top[:4] in ["king"]:
                     dim = int(top[4:])
                     self.dim = dim                    
@@ -161,18 +181,18 @@ class Diddy:
                                 if i == "M": v += (-1,)
                                 if i == "Z": v += (0,)
                                 if i == "P": v += (1,)
-                            self.topology.append((w, (0,)*(dim+1), v+(0,)))
-                    self.nodes = sft.Nodes([0])
+                            self.topology.append((w, (0,)*dim + ((),), v+((),)))
+                    self.nodes = sft.Nodes()
                     self.tiler_gridmoves = [(1,0), (0,1)]
                     #self.tiler_skew = 1
-                    self.tiler_nodeoffsets = {0 : (0,0)}
+                    self.tiler_nodeoffsets = {() : (0,0)}
                 elif top in ["triangle", "trianglegrid"]:
                     self.dim = 2
                     self.topology = trianglegrid
-                    self.nodes = sft.Nodes([0])
+                    self.nodes = sft.Nodes()
                     self.tiler_gridmoves = [(1,0), (-0.5,0.6)]
                     #self.tiler_skew = 1
-                    self.tiler_nodeoffsets = {0 : (0,0)}
+                    self.tiler_nodeoffsets = {() : (0,0)}
                 elif top in ["CR"]:
                     self.dim = 2
                     self.topology = CR4d8e2_topology
@@ -183,12 +203,13 @@ class Diddy:
                 else:
                     self.topology = []
                     for edge in top:
+                        #print("edge", edge)
                         if edge:
                             if len(edge) != 3:
                                 print("Bad topology edge, ignoring: {}".format(edge))
                             if len(edge) > 3:
                                 print("Maybe you forgot a semicolon?")
-                            self.topology.append(tuple(edge))
+                            self.topology.append(edge[0] + tuple(self.process_nvec(nvec) for nvec in edge[1:]))
                 if type(top) == str:
                     alph0 = list(self.alphabet.values())[0]
                     if all(alph == alph0 for alph in self.alphabet.values()):
@@ -218,7 +239,9 @@ class Diddy:
                     print("Defining SFT named", name)
                 # Definition is either a list of forbidden patterns or a formula
                 if type(defn) == list:
-                    self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, self.topology, forbs=defn, onesided=onesided)
+                    forbs = [{self.process_nvec(nvec) : sym for (nvec, sym) in forb.items()} for forb in defn]
+                    print("defn", defn, "forbs", forbs)
+                    self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, self.topology, forbs=forbs, onesided=onesided)
                 elif type(defn) == tuple:
                     #print("defn", defn)
                     circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, defn, self.externals, simplify="simplify" in flags)
@@ -525,13 +548,14 @@ class Diddy:
                 tim = time.time()
                 the_sft = self.SFTs[sft_name]
                 rad = kwds.get("radius", 0)
-                specs = [(args[1], args[2])]
+                dirs = args[1]
+                nhood = [self.process_nvec(nvec) for nvec in args[2]]
                 print_freq = kwds.get("print_freq", 5000)
                 verb = "verbose" in flags
                 show_rules = "show_rules" in flags
-                print("Computing lower bound for density in {} using specs {} and additional radius {}".format(sft_name, specs, rad))
+                print("Computing lower bound for density in {} using directions {}, neighborhood {} and additional radius {}".format(sft_name, dirs, nhood, rad))
                 #patterns = list(the_sft.all_patterns(nhood))
-                data = density_linear_program.optimal_density(the_sft, specs, rad, weights=self.weights, verbose=verb, print_freq=print_freq, ret_shares=show_rules)
+                data = density_linear_program.optimal_density(the_sft, [(dirs, nhood)], rad, weights=self.weights, verbose=verb, print_freq=print_freq, ret_shares=show_rules)
                 if show_rules:
                     dens, rules = data
                     print("Discharging rules")
@@ -593,7 +617,7 @@ class Diddy:
                     print (self.SFTs[name].dim, self.SFTs[name].nodes, self.SFTs[name].topology, self.SFTs[name].alph)
                     
             elif cmd == "info":
-                names = args[0]
+                names = [arg[0] for arg in args[0]]
                 verbose = "verbose" in flags
                 if names:
                     for name in names:
@@ -750,7 +774,7 @@ class Diddy:
                 the_sft.forbs = forbs
 
             elif cmd == "set_weights":
-                self.weights = args[0]
+                self.weights = {arg[0] : w for (arg, w) in args[0].items()}
                 print("Weights set to", self.weights)
 
             elif cmd == "wang":
@@ -810,12 +834,22 @@ class Diddy:
                 circuits = [] #dict()
                 for rule in rules:
                     if rule:
-                        if len(rule) != 3:
-                            print("Bad block map rule, ignoring: {}".format(rule))
+                        if self.has_nodes() and len(rule) != 3:
                             if len(rule) > 3:
-                                print("Maybe you forgot a semicolon?")
-                            continue
-                        node, sym, formula = rule
+                                raise Exception("Bad block map rule: {}\nMaybe you forgot a semicolon?".format(rule))
+                            else:
+                                raise Exception("Bad block map rule: {}".format(rule))
+                        elif not self.has_nodes() and len(rule) != 2:
+                            if len(rule) > 2:
+                                raise Exception("Bad block map rule: {}\nMaybe you forgot a semicolon?".format(rule))
+                            else:
+                                raise Exception("Bad block map rule: {}".format(rule))
+                        if self.has_nodes():
+                            node, sym, formula = rule
+                        else:
+                            sym, formula = rule
+                            node = ()
+                        print("CA rule", node, sym, formula)
                         circ = compiler.formula_to_circuit(dom_nodes, dom_dim, dom_top, dom_alph, formula, self.externals, simplify="simplify" in flags)
                         circuits.append((node, sym, circ))
                 #print(circuits)
@@ -846,7 +880,7 @@ class Diddy:
 
             elif cmd == "compose":
                 name = args[0]
-                composands = args[1]
+                composands = [arg[0] for arg in args[1]]
                 print("Composing block maps %s." % composands)#, self.CAs)
                 """
                 result_CA = self.CAs[composands[1]]
@@ -1273,12 +1307,12 @@ def fix_filename(filename):
     return filename
 
 
-line = [("rt", (0,0), (1,0)),
-        ("lt", (0,0), (-1,0))]
-grid = [("up", (0,0,0), (0,1,0)),
-        ("dn", (0,0,0), (0,-1,0)),
-        ("rt", (0,0,0), (1,0,0)),
-        ("lt", (0,0,0), (-1,0,0))]
+line = [("rt", (0,()), (1,())),
+        ("lt", (0,()), (-1,()))]
+grid = [("up", (0,0,()), (0,1,())),
+        ("dn", (0,0,()), (0,-1,())),
+        ("rt", (0,0,()), (1,0,())),
+        ("lt", (0,0,()), (-1,0,()))]
 """
 hexgrid = [("up", (0,0,0), (0,1,1)),
            ("dn", (0,0,1), (0,-1,0)),
@@ -1287,27 +1321,27 @@ hexgrid = [("up", (0,0,0), (0,1,1)),
            ("rt", (0,0,1), (1,0,0)),
            ("lt", (0,0,1), (0,0,0))]
 """
-hexgrid = [("N", (0,0,0), (0,1,1)),
-           ("S", (0,0,1), (0,-1,0)),
-           ("sE", (0,0,0), (0,0,1)),
-           ("sW", (0,0,0), (-1,0,1)),
-           ("nE", (0,0,1), (1,0,0)),
-           ("nW", (0,0,1), (0,0,0))]
+hexgrid = [("N", (0,0,(0,)), (0,1,(1,))),
+           ("S", (0,0,(1,)), (0,-1,(0,))),
+           ("sE", (0,0,(0,)), (0,0,(1,))),
+           ("sW", (0,0,(0,)), (-1,0,(1,))),
+           ("nE", (0,0,(1,)), (1,0,(0,))),
+           ("nW", (0,0,(1,)), (0,0,(0,)))]
 
-kinggrid = [("E", (0,0,0), (1,0,0)),
-            ("NW", (0,0,0), (1,1,0)),
-            ("N", (0,0,0), (0,1,0)),
-            ("NW", (0,0,0), (-1,1,0)),
-            ("W", (0,0,0), (-1,0,0)),
-            ("SW", (0,0,0), (-1,-1,0)),
-            ("S", (0,0,0), (0,-1,0)),
-            ("SE", (0,0,0), (1,-1,0))]
-trianglegrid = [("E", (0,0,0), (1,0,0)),
-            ("Ne", (0,0,0), (1,1,0)),
-            ("Nw", (0,0,0), (0,1,0)),
-            ("W", (0,0,0), (-1,0,0)),
-            ("Sw", (0,0,0), (-1,-1,0)),
-            ("Se", (0,0,0), (0,-1,0))]
+kinggrid = [("E", (0,0,()), (1,0,())),
+            ("NW", (0,0,()), (1,1,())),
+            ("N", (0,0,()), (0,1,())),
+            ("NW", (0,0,()), (-1,1,())),
+            ("W", (0,0,()), (-1,0,())),
+            ("SW", (0,0,()), (-1,-1,())),
+            ("S", (0,0,()), (0,-1,())),
+            ("SE", (0,0,()), (1,-1,()))]
+trianglegrid = [("E", (0,0,()), (1,0,())),
+            ("Ne", (0,0,()), (1,1,())),
+            ("Nw", (0,0,()), (0,1,())),
+            ("W", (0,0,()), (-1,0,())),
+            ("Sw", (0,0,()), (-1,-1,())),
+            ("Se", (0,0,()), (0,-1,()))]
 
 Wang_nodes = ["E", "N", "W", "S"]
 Wang_topology = [("up", (0,0,"N"), (0,1,"S")),

@@ -23,7 +23,7 @@ circuit_variables are aa little tricky... they should be functions
 
 
 def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, externals, global_restr):
-    #print("to_circuit", formula)
+    #print("to_circuit", formula, "variables", variables)
     #print("nodes", nodes)
     if type(nodes) == list:
         nodes = sft.Nodes(nodes)
@@ -316,7 +316,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, exte
             elif type(p2) == tuple and len(p2) != dim+1:
                 raise Exception("Cannot compare value of cell, only node.")
         except KeyError:
-            #print("eval to pos failed")
+            #print("eval to pos failed, alphabet", alphabet)
             p2ispos = False
             if any(arg2 in local_alph for local_alph in alphabet.values()):
                 p2val = arg2
@@ -752,7 +752,7 @@ def var_of_pos_expr(f):
 # then a bunch of edges. we will go forward along
 # those edges
 def eval_to_position(dim, topology, expr, pos_variables, nodes, top=True):
-    #print("EVALTOPOS", expr, pos_variables, nodes)
+    #print("EVALTOPOS", expr, pos_variables, nodes, topology)
     if type(expr) != tuple:
         #print("tking", pos_variables[expr])
         pos = pos_variables[expr]
@@ -770,22 +770,23 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes, top=True):
     if type(pos) != tuple:
         #print("temp recurse")
         pos = eval_to_position(dim, topology, pos, pos_variables, nodes, top=False)
-    #print("ini", pos)
+    #print("pos", pos)
     #print(topology)
     for i in expr[2:]:
+        #print("i", i)
         # empty string means go to cell level
         if i == '_':
-            pos = pos[:-1] + (None,)
+            pos = pos[:-1] + ((),)
             continue
         for t in topology:
             if len(t) == 3:
-                #print(t)
+                #print("test edge", t)
                 a, b = t[1], t[2]
-                if t[0] == i and (pos[dim] is None or a[dim] == pos[dim]):
+                if t[0] == i and (pos[dim] == () or a[dim] == pos[dim]):
                     #print("found edge", t)
-                    if pos[dim] is None:
+                    if pos[dim] == ():
                         #print("cell")
-                        pos = vadd(vsub(pos[:-1], a[:-1]), b[:-1]) + (None,)
+                        pos = vadd(vsub(pos[:-1], a[:-1]), b[:-1]) + ((),)
                     else:
                         #print("node")
                         pos = vadd(vsub(pos[:-1], a[:-1]), b[:-1]) + (b[dim],)
@@ -795,7 +796,7 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes, top=True):
             if i in nodes: # single thing => change node
                 pos = pos[:-1] + (i,)
                 continue
-            if pos[-1] is None:
+            if pos[-1] == ():
                 items = (i,)
             elif type(pos[-1]) == tuple:
                 items = pos[-1] + (i,)
@@ -814,7 +815,7 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes, top=True):
         #print(pos)
     #print ("got 2 pos", pos)
     if top:
-        assert pos[-1] is None or pos[-1] in nodes
+        assert pos[-1] == () or pos[-1] in nodes
     return pos
 
 # given topology, positions of variables and bound dict
@@ -829,7 +830,7 @@ def get_area(dim, topology, pos_variables, bound, typ, nodes):
             for n in nodes:
                 ret.add((0,)*dim + (n,))
         else:
-            ret.add((0,)*dim + (None,))
+            ret.add((0,)*dim + ((),))
         return ret
     area = set()
     for u in pos_variables:
@@ -842,7 +843,7 @@ def get_area(dim, topology, pos_variables, bound, typ, nodes):
             continue
         for t in get_ball(dim, topology, p, bound[u], nodes):
             if typ == "CELL":
-                t = t[:-1] + (None,)
+                t = t[:-1] + ((),)
             area.add(t)
     #print(area)
     return area

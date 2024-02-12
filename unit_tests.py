@@ -8,17 +8,13 @@ unit_tests = []
 
 # just some basic checks
 code_basic_comparisons = """
-%nodes 0
-%dim 2
-%topology grid
-%alphabet 0 1
 %SFT full_shift             Ao 0 = 0
 %SFT ver_golden_mean_shift  Ao o = 1 -> o.dn = 0
 %SFT ver_golden_mean_shift2 Ao o.dn = 1 -> o = 0
 %SFT hor_golden_mean_shift  Ao o = 1 -> o.rt = 0
 %SFT golden_mean_shift      Ao o = 1 -> o.up = 0 & o.rt = 0
 %SFT hor_golden_mean_shift2
-(0,0,0):1 (1,0,0):1
+(0,0):1 (1,0):1
 %contains conf_name=c1 expect=F ver_golden_mean_shift hor_golden_mean_shift
 %contains expect=T hor_golden_mean_shift c1
 %contains expect=F ver_golden_mean_shift c1
@@ -39,10 +35,10 @@ unit_tests.append(("basic comparisons", code_basic_comparisons))
 code_crazy_gms = """
 %SFT hor_golden_mean_shift  Ao (o.rt.rt = 1 -> o.rt = 0) & Ae[o3] e.up = 0 | e.lt.up != e.rt.up.lt
 %SFT hor_golden_mean_shift2
-(0,0,0):1 (1,0,0):1 (0,3,0):0;
-(0,0,0):1 (1,0,0):1 (0,3,0):1;
-(0,0,0):1 (1,0,0):1 (2,2,0):0;
-(0,0,0):1 (1,0,0):1 (2,2,0):1
+(0,0):1 (1,0):1 (0,3):0;
+(0,0):1 (1,0):1 (0,3):1;
+(0,0):1 (1,0):1 (2,2):0;
+(0,0):1 (1,0):1 (2,2):1
 %SFT hor_golden_mean_shift3 Ao (o.(2,0) = 1 -> o.(1,0) = 0) & Ae[o3] e.(0,1) = 0 | e.(-1,1) != e.(0,1)
 %show_formula hor_golden_mean_shift
 %show_formula hor_golden_mean_shift2
@@ -63,9 +59,9 @@ code_hex_gms = """
 %SFT all_zero Ao o=0
 %SFT fullshift Ao 0=0
 %SFT byforbs
-(0,0,0):1 (0,0,1):1;
-(0,0,0):1 (-1,0,1):1;
-(0,0,0):1 (0,1,1):1
+(0,0;0):1 (0,0;1):1;
+(0,0;0):1 (-1,0;1):1;
+(0,0;0):1 (0,1;1):1
 -- %compare_SFT_pairs_equality
 %equal expect=T gms gms2
 %equal expect=F gms broken_gms2
@@ -80,17 +76,17 @@ code_hex_idcodes = """
 %SFT idcode Ao let c u v := v = 1 & u ~ v in
 (Ed[o1] c o d) & (Ap[o2] p !@ o -> Eq[o1p1] (c o q & ! c p q) | (c p q & !c o q))
 %SFT idcode2
-(0,0,1):0 (0,0,0):0 (1,0,0):0 (0,-1,0):0;
-(0,0,1):0 (1,1,1):0 (2,0,0):0 (1,-1,0):0;
-(0,0,1):0 (1,1,0):0 (1,0,1):0 (2,1,0):0;
-(0,0,0):0 (0,0,1):0 (0,-1,0):0 (1,1,0):0 (1,1,1):0 (2,1,0):0;
-(0,0,0):0 (0,0,1):0 (1,0,0):0 (0,-1,1):0 (1,-1,0):0 (0,-2,0):0;
-(0,0,0):0 (0,0,1):0 (0,-1,0):0 (1,0,1):0 (2,0,0):0 (1,-1,0):0;
-(0,0,1):0 (1,0,0):0 (1,0,1):0 (1,1,1):0;
-(0,0,0):0 (0,-1,0):0 (1,0,1):0 (1,1,1):0;
-(0,0,1):0 (1,0,0):0 (1,1,1):0 (0,-1,1):0 (1,-1,0):0 (1,-1,1):0;
-(0,0,1):0 (1,0,0):0 (1,0,1):0 (2,1,0):0 (2,1,1):0 (2,2,1):0;
-(0,0,1):0 (1,0,0):0 (1,1,1):0 (2,0,0):0 (2,0,1):0 (2,1,1):0
+(0,0;1):0 (0,0;0):0 (1,0;0):0 (0,-1;0):0;
+(0,0;1):0 (1,1;1):0 (2,0;0):0 (1,-1;0):0;
+(0,0;1):0 (1,1;0):0 (1,0;1):0 (2,1;0):0;
+(0,0;0):0 (0,0;1):0 (0,-1;0):0 (1,1;0):0 (1,1;1):0 (2,1;0):0;
+(0,0;0):0 (0,0;1):0 (1,0;0):0 (0,-1;1):0 (1,-1;0):0 (0,-2;0):0;
+(0,0;0):0 (0,0;1):0 (0,-1;0):0 (1,0;1):0 (2,0;0):0 (1,-1;0):0;
+(0,0;1):0 (1,0;0):0 (1,0;1):0 (1,1;1):0;
+(0,0;0):0 (0,-1;0):0 (1,0;1):0 (1,1;1):0;
+(0,0;1):0 (1,0;0):0 (1,1;1):0 (0,-1;1):0 (1,-1;0):0 (1,-1;1):0;
+(0,0;1):0 (1,0;0):0 (1,0;1):0 (2,1;0):0 (2,1;1):0 (2,2;1):0;
+(0,0;1):0 (1,0;0):0 (1,1;1):0 (2,0;0):0 (2,0;1):0 (2,1;1):0
 -- %compare_SFT_pairs
 --%calculate_forbidden_patterns idcode idcode3 3
 --%show_formula idcode2
@@ -142,10 +138,10 @@ code_trivial_WangTest = """
 %nodes N E S W
 %alphabet 0 1 2 3
 %topology
-up (0,0,N) (0,1,S);
-dn (0,0,S) (0,-1,N);
-rt (0,0,E) (1,0,W);
-lt (0,0,W) (-1,0,E);
+up (0,0;N) (0,1;S);
+dn (0,0;S) (0,-1;N);
+rt (0,0;E) (1,0;W);
+lt (0,0;W) (-1,0;E);
 %SFT WangTest ACo
 let WangConstraint o := o.N = o.up.S & o.E = o.rt.W in
 WangConstraint o.rt.up &
@@ -229,7 +225,7 @@ unit_tests.append(("loc dom rad 2", code_locdomrad2))
 
 code = """
 %CA a
-0 1 Ao o!=o.rt
+1 Ao o!=o.rt
 %equal expect=T a a
 %compose aa a a
 %compose aa_a aa a
@@ -243,10 +239,10 @@ code = """
 %nodes top bot -- two tracks, top and bottom
 %dim 1
 %topology
-rt (0, top) (1, top);
-rt (0, bot) (1, bot);
-lt (0, top) (-1, top);
-lt (0, bot) (-1, bot)
+rt (0; top) (1; top);
+rt (0; bot) (1; bot);
+lt (0; top) (-1; top);
+lt (0; bot) (-1; bot)
 %CA R -- partial right shift on the top track
 top 1 ACo o.rt.top=1;
 bot 1 ACo o.bot=1
@@ -287,7 +283,7 @@ code = """
 %alphabet a b
 %SFT goldenmean Ao o=a -> o.rt=b & o.up=b
 %set_weights a:0 b:2
-%density_lower_bound expect=1 goldenmean (0,1) (1,0); (0,0,0) (1,0,0) (-1,0,0) (0,1,0) (0,-1,0)
+%density_lower_bound expect=1 goldenmean (0,1) (1,0); (0,0) (1,0) (-1,0) (0,1) (0,-1)
 """
 unit_tests.append(("golden mean lower density", code))
 
@@ -324,10 +320,9 @@ unit_tests.append(("onesided comparison", code))
 
 code = """
 %dim 1
-%nodes 0
-%topology succ (0,0) (1,0)
+%topology succ (0) (1)
 %CA xor
-0 1 Ao o!=o.succ
+1 Ao o!=o.succ
 %spacetime_diagram diagram xor
 %show_environment
 %show_environment sft=diagram
@@ -355,25 +350,25 @@ unit_tests.append(("distance", code))
 code = """
 %nodes {t1 : [a] t2 : {t21:[0 1] t22:[a b]}}
 %topology
-e1 (0,0,t1.a) (0,0,t2.t21.0);
-e2 (0,0,t1.a) (0,0,t2.t21.1);
-e3 (0,0,t1.a) (0,0,t2.t22.a);
-e4 (0,0,t1.a) (0,0,t2.t22.b);
-e5 (0,0,t2.t21.0) (0,0,t1.a);
-e6 (0,0,t2.t21.1) (0,0,t1.a);
-e7 (0,0,t2.t22.a) (0,0,t1.a);
-e8 (0,0,t2.t22.b) (0,0,t1.a)
+e1 (0,0;t1.a) (0,0;t2.t21.0);
+e2 (0,0;t1.a) (0,0;t2.t21.1);
+e3 (0,0;t1.a) (0,0;t2.t22.a);
+e4 (0,0;t1.a) (0,0;t2.t22.b);
+e5 (0,0;t2.t21.0) (0,0;t1.a);
+e6 (0,0;t2.t21.1) (0,0;t1.a);
+e7 (0,0;t2.t22.a) (0,0;t1.a);
+e8 (0,0;t2.t22.b) (0,0;t1.a)
 %SFT a0 Ao o._.t1.a=0 <-> o=0
 %SFT a1 Ao Ax[o1] o=x
 %SFT a2
-(0,0,t1.a):0 (0,0,t2.t21.0):1;
-(0,0,t1.a):0 (0,0,t2.t21.1):1;
-(0,0,t1.a):0 (0,0,t2.t22.a):1;
-(0,0,t1.a):0 (0,0,t2.t22.b):1;
-(0,0,t1.a):1 (0,0,t2.t21.0):0;
-(0,0,t1.a):1 (0,0,t2.t21.1):0;
-(0,0,t1.a):1 (0,0,t2.t22.a):0;
-(0,0,t1.a):1 (0,0,t2.t22.b):0
+(0,0;t1.a):0 (0,0;t2.t21.0):1;
+(0,0;t1.a):0 (0,0;t2.t21.1):1;
+(0,0;t1.a):0 (0,0;t2.t22.a):1;
+(0,0;t1.a):0 (0,0;t2.t22.b):1;
+(0,0;t1.a):1 (0,0;t2.t21.0):0;
+(0,0;t1.a):1 (0,0;t2.t21.1):0;
+(0,0;t1.a):1 (0,0;t2.t22.a):0;
+(0,0;t1.a):1 (0,0;t2.t22.b):0
 %equal expect=T a0 a1
 %equal expect=T a0 a2
 """
