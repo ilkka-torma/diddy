@@ -17,12 +17,12 @@
 	o != 1
 	
 %CA put_ones
-0 1 Ao o != 0
-0 0 Ao o = 0
+1 Ao o != 0;
+0 Ao o = 0
 
 %SFT fullshift Ao 0=0
 %product prod even_pre fullshift
 %relation rel put_ones
 %intersection int rel prod
-%nodes {0:[0] 1:[0]}
-%tiler int hidden=[(0,0)]
+%nodes 0 1
+%tiler int hidden=[0]

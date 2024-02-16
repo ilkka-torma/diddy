@@ -324,12 +324,12 @@ code = """
 %CA xor
 1 Ao o!=o.succ
 %spacetime_diagram diagram xor
-%show_environment
-%show_environment sft=diagram
+--%show_environment
+--%show_environment sft=diagram
 %dim 2
 %topology grid
 %SFT var onesided=[1] Ao o!=o.rt <-> o.up=1
-%show_environment sft=var
+--%show_environment sft=var
 %equal expect=T diagram var @verbose
 """
 unit_tests.append(("spacetime diagram", code))
@@ -348,7 +348,7 @@ o.(0,1)=2 | o.(1,0)=2 | o.(0,-1)=2 | o.(-1,0)=2
 unit_tests.append(("distance", code))
 
 code = """
-%nodes {t1 : [a] t2 : {t21:[0 1] t22:[a b]}}
+%nodes {t1 : {a} t2 : {t21:{0 1} t22:{a b}}}
 %topology
 e1 (0,0;t1.a) (0,0;t2.t21.0);
 e2 (0,0;t1.a) (0,0;t2.t21.1);
@@ -405,9 +405,9 @@ unit_tests.append(("emptiness", code))
 
 code = """
 %CA a
-0 0 Ao o=o.rt=0
+0 Ao o=o.rt=0
 %CA b
-0 0 Ao o=o.up=0
+0 Ao o=o.up=0
 %calculate_CA_ball 3 a b
 """
 unit_tests.append(("CA ball", code))
@@ -415,23 +415,23 @@ unit_tests.append(("CA ball", code))
 code = """
 %nodes a b
 %topology
-sw (0,0,a) (0,0,b);
-sw (0,0,b) (0,0,a)
+sw (0,0;a) (0,0;b);
+sw (0,0;b) (0,0;a)
 %alphabet X Y
 %save_environment env
 %topology grid
 %alphabet 0 1
 %block_map domain=env b1
-0 0 Ao o=o.sw
+0 Ao o=o.sw
 %block_map domain=env b2
-0 0 ACo o.a=o.b
+0 ACo o.a=o.b
 %equal expect=T b1 b2
 """
 unit_tests.append(("environments and block maps", code))
 
 code = """
 %CA f
-0 0 Ao o=o.up=0
+0 Ao o=o.up=0
 %SFT domino Ao o!=o.rt
 %preimage preim f domino
 %SFT alternative Ao o=o.up=0 <-> (o.rt=1 | o.rt.up=1)
@@ -452,7 +452,7 @@ unit_tests.append(("node lists", code))
 
 code = """
 %CA xor
-0 0 Ao o=o.up=o.rt=0 | o=o.up!=o.rt=0 | 0=o!=o.up=o.rt | o=o.rt!=o.up=0
+0 Ao o=o.up=o.rt=0 | o=o.up!=o.rt=0 | 0=o!=o.up=o.rt | o=o.rt!=o.up=0
 %fixed_points fps xor
 %SFT diag Ao o.up=o.rt
 %equal expect=T fps diag
@@ -466,8 +466,8 @@ code = """
 %SFT b1 Ao o=o.rt=o.up
 %equal expect=T a3 b1
 %product tracks=[a b] a4 a1 a2
-%nodes {a:[0] b:[0]}
-%SFT b2 ACo o.a.0=o.(1,0).a.0 & o.b.0=o.(0,1).b.0
+%nodes {a b}
+%SFT b2 ACo o.a=o.(1,0).a & o.b=o.(0,1).b
 %equal expect=T a4 b2
 """
 unit_tests.append(("intersection and product", code))
@@ -476,20 +476,20 @@ code = """
 %save_environment bin
 %alphabet a b c
 %block_map codomain=bin f
-0 1 Ao o=o.rt=a | o=o.up=b
+1 Ao o=o.rt=a | o=o.up=b
 %relation tracks=[D C] rel f
-%nodes {D:[0] C:[0]}
+%nodes D C
 %alphabet {D:[a b c] C:[0 1]}
-%SFT a ACo o.C.0=1 <-> (o.D.0=o.(1,0).D.0=a | o.D.0=o.(0,1).D.0=b)
+%SFT a ACo o.C=1 <-> (o.D=o.(1,0).D=a | o.D=o.(0,1).D=b)
 %equal expect=T rel a
 """
 unit_tests.append(("relation", code))
 
 code = """
 %CA f
-0 1 Ao o=1 | o.rt=1
+1 Ao o=1 | o.rt=1
 %CA g
-0 1 Ao o=1 | o.up=1
+1 Ao o=1 | o.up=1
 %compose fg f g
 %compose gf g f
 %equal expect=T fg gf
@@ -605,12 +605,12 @@ code = """
 %sofic1d neq_s neq
 %product p neq_s neq_s
 %load_environment p
-%SFT eq ACo o.0.0 = 0 -> o.1.0 = 0
+%SFT eq ACo o.0 = 0 -> o.1 = 0
 %compute_forbidden_patterns eq
 %sofic1d eq_s eq
 %intersection int eq_s p
 %minimize int
-%SFT int2 ACo (o.0.0 = 0 -> o.1.0 = 0) & (o.0.0 = 1 -> o.rt.0.0 = 0) & (o.1.0 = 1 -> o.rt.1.0 = 0)
+%SFT int2 ACo (o.0 = 0 -> o.1 = 0) & (o.0 = 1 -> o.rt.0 = 0) & (o.1 = 1 -> o.rt.1 = 0)
 %compute_forbidden_patterns int2
 %sofic1d int2_s int2
 %minimize int2_s
@@ -645,12 +645,53 @@ unit_tests.append(("disjoint supports", code))
 code = """
 %nodes a b
 %topology
-rt (0,0,a) (1,0,a)
+rt (0,0;a) (1,0;a)
 %sft x Ao has o rt -> o=0
 %sft y ACo o.a=0
 %equal x y expect=T
 """
 unit_tests.append(("edge existence", code))
+
+code = """
+%dim 1
+%nodes a b.0 b.1.X b.1.Y
+%topology
+rt (0;a) (1;a);
+rt (0;b.0) (1;b.0);
+rt (0;b.1.X) (1;b.1.X);
+rt (0;b.1.Y) (1;b.1.Y);
+rt (0;c) (1;c)
+%SFT a1 Ao o.a = o.rt._.b.0
+%nodes {a b:{0 1:{X Y}}}
+%topology
+rt (0;a) (1;a);
+rt (0;b.0) (1;b.0);
+rt (0;b.1.X) (1;b.1.X);
+rt (0;b.1.Y) (1;b.1.Y);
+rt (0;c) (1;c)
+%SFT a2 Ao o.a = o.rt._.b.0
+%equal expect=T a1 a2
+
+%product tracks=[t1 t2] a3 a1 a2
+%load_environment a3
+%info
+%SFT a4 ACo o.t1.a = o.rt.t1.b.0 & o.t2.a = o.rt.t2.b.0
+%equal expect=T a3 a4
+
+%compute_forbidden_patterns a1
+%sofic1d s1 a1
+%minimize s1
+%compute_forbidden_patterns a2
+%sofic1d s2 a2
+%minimize s2
+%compute_forbidden_patterns a3
+%sofic1d s3 a3
+%minimize s3
+%product s3a s1 s2
+%minimize s3a
+%equal expect=T s3 s3a
+"""
+unit_tests.append(("tracks of varying depths", code))
 
 
 

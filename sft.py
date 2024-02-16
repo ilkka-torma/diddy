@@ -3,11 +3,6 @@ from circuit import *
 from configuration import *
 from itertools import chain
 
-def add_track(track, node):
-    if type(node) == tuple:
-        return (track,) + node
-    else:
-        return (track, node)
 
 class Nodes:
     "A hierarchical set of nodes"
@@ -18,8 +13,7 @@ class Nodes:
     # labels must be strings or integers
     # internally, a Nodes stores a dict with Nones for flat labels
     def __init__(self, nodes=None):
-        print("Nodes", nodes)
-        if nodes is None:
+        if nodes is None or nodes == [] or nodes == dict():
             self.nodes = None
         elif type(nodes) == Nodes:
             self.nodes = nodes.nodes
@@ -29,7 +23,8 @@ class Nodes:
                     raise Exception("Node label must be integer or string, not {}".format(x))
             self.nodes = {x : None for x in nodes}
         elif type(nodes) == dict:
-            self.nodes = {label : None if track is None else Nodes(track) for (label, track) in nodes.items()}
+            self.nodes = {label : Nodes(track) or None
+                          for (label, track) in nodes.items()}
         elif type(nodes) in [int, str]:
             self.nodes = {nodes : none}
         else:
@@ -112,8 +107,8 @@ class Nodes:
     def subtrack(self, items):
         if not items:
             return self
-        if self.flat:
-            if len(items) == 1 and items[0] in self:
+        if len(items) == 1:
+            if items in self:
                 return [()]
             else:
                 return False
@@ -411,6 +406,8 @@ class SFT:
     def ball_forces_allowed(self, other, r):
         all_positions = set()
         circuits = []
+
+
 
         bounds = [(0 if i in self.onesided else -r, r) for i in range(self.dim)]
         
@@ -1032,13 +1029,13 @@ def product(*sfts, track_names=None):
     if track_names is None:
         track_names = list(range(len(sfts)))
     nodes = Nodes({tr:sft.nodes for (tr, sft) in zip(track_names, sfts)})
-    alph = {add_track(tr,node) : sft.alph[node]
+    alph = {(tr,) + node : sft.alph[node]
             for (tr, sft) in zip(track_names, sfts)
             for node in sft.nodes}
     anded = []
     for (tr, sft) in zip(track_names, sfts):
         circ = sft.circuit.copy()
-        transform(circ, lambda var: var[:-2] + (add_track(tr,var[-2]),) + var[-1:])
+        transform(circ, lambda var: var[:-2] + ((tr,) + var[-2],) + var[-1:])
         anded.append(circ)
     #for sft in sfts:
     #    print(sft)
@@ -1048,7 +1045,7 @@ def product(*sfts, track_names=None):
     for (tr, sft) in zip(track_names, sfts):
         for t in sft.topology:
             # t[:1] is the name of an edge. We make a copy with track added.
-            topology.append(t[:1] + tuple(vec[:-1] + (add_track(tr, vec[-1]),) for vec in t[1:]))
+            topology.append(t[:1] + tuple(vec[:-1] + ((tr,) + vec[-1],) for vec in t[1:]))
     #print(topology)
     return SFT(sfts[0].dim, nodes, alph, topology, circuit=AND(*anded), onesided=sfts[0].onesided)
 

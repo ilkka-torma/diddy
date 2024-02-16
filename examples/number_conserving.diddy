@@ -10,7 +10,7 @@
 
 -- The new state is a1 iff the formula is true.
 %block_map domain=nums traffic
-0 a1 Ao (o=0 -> o.rt=1 | [o.rt o.up o.up.lt] = [0 1 1]) & (o=1 -> o.lt=1 & (o.dn=1 | (o.dn=0 & o.dn.rt=1)))
+a1 Ao (o=0 -> o.rt=1 | [o.rt o.up o.up.lt] = [0 1 1]) & (o=1 -> o.lt=1 & (o.dn=1 | (o.dn=0 & o.dn.rt=1)))
 
 -- Compute the SFT containing the relation of the CA, i.e. pairs (x, traffic(x)).
 %relation tracks=[D C] traffic_rel traffic
@@ -21,7 +21,7 @@
   a0:0 a1:-1 }
 %density_lower_bound traffic_rel
 (1,0) (0,1);
-(0,0,D.0) (0,0,C.0) (1,0,D.0) (0,1,D.0) (-1,0,D.0) (0,-1,D.0)
+(0,0;D) (0,0;C) (1,0;D) (0,1;D) (-1,0;D) (0,-1;D)
 
 -- Then do the same with inverted weights.
 %set_weights
@@ -29,6 +29,6 @@
   a0:0 a1:1  }
 %density_lower_bound traffic_rel
 (1,0) (0,1);
-(0,0,D.0) (0,0,C.0) (1,0,D.0) (0,1,D.0) (-1,0,D.0) (0,-1,D.0)
+(0,0;D) (0,0;C) (1,0;D) (0,1;D) (-1,0;D) (0,-1;D)
 
 -- Both give 0.0, which means that every configuration pair has asymptotic mean weight 0.

@@ -4,7 +4,7 @@
 -- Define the Game of Life rule
 %topology king
 %CA gol
-0 1 Av letnum lives := #n[v1] n!@v & n=1 in
+1 Av letnum lives := #n[v1] n!@v & n=1 in
   lives == 3 | (v=1 & lives == 2)
 -- Define the SFT of its fixed points
 %fixed_points gol_fp gol
@@ -13,9 +13,9 @@
 %set_weights 0:1 1:0
 -- First compute lower bound for density of 0s
 %density_lower_bound gol_fp (0,1) (1,0);
-  (-1,1,0)  (0,1,0)  (1,1,0)
-  (-1,0,0)  (0,0,0)  (1,0,0)
-  (-1,-1,0) (0,-1,0) (1,-1,0)
+  (-1,1)  (0,1)  (1,1)
+  (-1,0)  (0,0)  (1,0)
+  (-1,-1) (0,-1) (1,-1)
 -- Then reach that bound with a (0,1)-periodic configuration
 %compute_forbidden_patterns gol_fp
 %minimum_density conf_name=c gol_fp (0,1)

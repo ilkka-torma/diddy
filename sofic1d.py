@@ -386,14 +386,18 @@ class Sofic1D:
         trace_nodes = the_sft.nodes
         for width in reversed(size):
             trace_nodes = sft.Nodes({i : trace_nodes for i in range(width)})
+        #print("sft nodes", the_sft.nodes)
+        #print("trace nodes", trace_nodes)
         trace_topology = []
         for node in trace_nodes:
             trace_topology.append(("rt", (0,node), (1,node)))
             trace_topology.append(("lt", (0,node), (-1,node)))
+        #print("trace topology", trace_topology)
         alph_domain = [vec + (node,)
                        for vec in hyperrect([(0,s) for s in size])
                        for node in the_sft.nodes]
         #trace_alph = {0 : [frozendict(pat) for pat in the_sft.all_patterns(alph_domain)]}
+        #print("alph domain", alph_domain)
         
         # compute transition sizes from specification
         trans_bounds = []
@@ -447,10 +451,10 @@ class Sofic1D:
         proj_nvecs = set(vec+(node,)
                          for vec in hyperrect([(0,a) for a in proj_size])
                          for node in the_sft.nodes)
-        #print("size", size, "trans_size", trans_bounds, "proj_size", proj_size)
+        #print("size", size, "trans_size", trans_bounds, "proj_size", proj_size, "tr_vec", tr_vec, "proj_nvecs form", min(proj_nvecs), max(proj_nvecs))
         i = 0
         for trans_pat in the_sft.all_hyperrect_patterns(trans_bounds, period_structure=period_structure, extra_rad=extra_rad):
-            #print("got", trans_pat)
+            #print("trans pat", trans_pat)
             i += 1
             source = frozendict({nvec : sym
                                  for (nvec, sym) in trans_pat.items()
@@ -458,7 +462,8 @@ class Sofic1D:
             target = frozendict({nvsub(nvec, char_vector(the_sft.dim, dir_ix)) : sym
                                  for (nvec, sym) in trans_pat.items()
                                  if nvec[dir_ix] > 0})
-            sym = tuple(trans_pat[nvadd(tr_node, tr_vec)] for tr_node in trace_nodes)
+            sym = tuple(trans_pat[vadd(tr_node[:the_sft.dim], tr_vec) + (tr_node[the_sft.dim:],)]
+                        for tr_node in trace_nodes)
             #sym = frozendict({nvec : sym
             #                  for (nvec, sym) in trans_pat.items()
             #                  if all(0 <= nvec[ix] < size[ix] for ix in range(the_sft.dim))})
@@ -473,7 +478,7 @@ class Sofic1D:
             if verbose and i%10000 == 0:
                 print(i, "transitions handled")
         
-        sofic_alph = {node : the_sft.alph[node[-1] if len(node) == the_sft.dim+1 else node[-1:]]
+        sofic_alph = {node : the_sft.alph[node[the_sft.dim:]]
                       for node in trace_nodes}
 
         is_onesided = dir_ix in the_sft.onesided
@@ -761,14 +766,14 @@ def product(*sofics, track_names=None):
     if track_names is None:
         track_names = list(range(len(sofics)))
     nodes = sft.Nodes({tr:sof.nodes for (tr, sof) in zip(track_names, sofics)})
-    alph = {sft.add_track(tr,node) : sof.alph[node]
+    alph = {(tr,) + node : sof.alph[node]
             for (tr, sof) in zip(track_names, sofics)
             for node in sof.nodes}
     topology = []
     for (tr, sof) in zip(track_names, sofics):
         for t in sof.topology:
             # t[:1] is the name of an edge. We make a copy with track added.
-            topology.append(t[:1] + tuple(vec[:-1] + (sft.add_track(tr, vec[-1]),) for vec in t[1:]))
+            topology.append(t[:1] + tuple(vec[:-1] + ((tr,)+vec[-1],) for vec in t[1:]))
             
     # build product transition graph
     if all(sof.right_resolving for sof in sofics):

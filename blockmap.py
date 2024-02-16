@@ -267,17 +267,18 @@ class BlockMap:
         cod_nodes = self.to_nodes
         dim = self.dimension
         nodes = Nodes({tr:nodes for (tr, nodes) in zip(tracks, (dom_nodes, cod_nodes))})
-        alph = {add_track(tr,node) : alph[node]
+        alph = {(tr,)+node : alph[node]
                 for (tr, nodes, alph) in zip(tracks, (dom_nodes, cod_nodes), (dom_alph, cod_alph))
                 for node in nodes}
         anded = []
         for ((node, sym), circ) in self.circuits.items():
             new_circ = circ.copy()
-            transform(new_circ, lambda var: var[:-2] + (add_track(tracks[0], var[-2]),) + var[-1:])
+            transform(new_circ, lambda var: var[:-2] + ((tracks[0],) + var[-2],) + var[-1:])
             if sym != cod_alph[node][0]:
-                anded.append(IFF(V((0,)*dim + (add_track(tracks[1],node), sym)), new_circ))
+                anded.append(IFF(V((0,)*dim + ((tracks[1],) + node, sym)), new_circ))
             else:
-                not_others = AND(*(NOT(V((0,)*dim + (add_track(tracks[1],node), sym2))) for sym2 in cod_alph[node][1:]))
+                not_others = AND(*(NOT(V((0,)*dim + ((tracks[1],) + node, sym2)))
+                                   for sym2 in cod_alph[node][1:]))
                 anded.append(IFF(not_others, new_circ))
                 
         #for sft in sfts:
@@ -292,7 +293,7 @@ class BlockMap:
                 topo = self.to_topology
             for t in topo:
                 # t[:1] is the name of an edge. We make a copy with track added.
-                topology.append(t[:1] + tuple(vec[:-1] + (add_track(tr, vec[-1]),) for vec in t[1:]))
+                topology.append(t[:1] + tuple(vec[:-1] + ((tr,) + vec[-1],) for vec in t[1:]))
         #print(topology)
         
         return SFT(dim, nodes, alph, topology, circuit=AND(*anded))

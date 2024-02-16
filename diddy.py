@@ -84,7 +84,7 @@ class Diddy:
         #a = bbb
         for parsed_line in parsed:
             cmd, args, kwds, flags = parsed_line
-            #print("cmd", cmd)
+            #print("cmd", cmd, args, kwds, flags)
             #print("parsed line", parsed_line)
             
             if cmd == "nodes":
@@ -120,21 +120,18 @@ class Diddy:
                         self.topology.append(("Z"*d+s+"Z"*(dim-d-1), (0,)*(dim+1), (0,)*d + (dr,) + (0,)*(dim-d-1) + (0,)))
                 
             elif cmd == "alphabet":
-                alph = [arg[0] if type(arg) == tuple else arg for arg in args[0]]
+                alph = args[0]
                 default = kwds.get("default", None)
                 if type(alph) == list and default is None:
                     default = alph
                 self.alphabet = {node:default for node in self.nodes}
                 if type(alph) == dict:
                     for (labels, local_alph) in alph.items():
-                        if type(labels) != tuple:
-                            labels = (labels,)
-                        for subnode in self.nodes.subtrack(labels):
-                            if type(subnode) != tuple:
-                                subnode = (subnode,)
+                        subtr = self.nodes.subtrack(labels)
+                        if subtr == False:
+                            raise Exception("Invalid subtrack for {}: {}".format(self.nodes, labels))
+                        for subnode in subtr:
                             node = labels + subnode
-                            if len(node) == 1:
-                                node = node[0]
                             self.alphabet[node] = local_alph
                 if None in self.alphabet.values():
                     raise Exception("Incomplete alphabet definition")
@@ -205,11 +202,11 @@ class Diddy:
                     for edge in top:
                         #print("edge", edge)
                         if edge:
-                            if len(edge) != 3:
-                                print("Bad topology edge, ignoring: {}".format(edge))
                             if len(edge) > 3:
-                                print("Maybe you forgot a semicolon?")
-                            self.topology.append(edge[0] + tuple(self.process_nvec(nvec) for nvec in edge[1:]))
+                                raise Exception("Bad topology edge: {}; maybe you forgot a semicolon?".format(edge))
+                            if len(edge) < 3:
+                                raise Exception("Bad topology edge: {}".format(edge))
+                            self.topology.append((edge[0],) + tuple(self.process_nvec(nvec) for nvec in edge[1:]))
                 if type(top) == str:
                     alph0 = list(self.alphabet.values())[0]
                     if all(alph == alph0 for alph in self.alphabet.values()):
@@ -240,7 +237,7 @@ class Diddy:
                 # Definition is either a list of forbidden patterns or a formula
                 if type(defn) == list:
                     forbs = [{self.process_nvec(nvec) : sym for (nvec, sym) in forb.items()} for forb in defn]
-                    print("defn", defn, "forbs", forbs)
+                    #print("defn", defn, "forbs", forbs)
                     self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, self.topology, forbs=forbs, onesided=onesided)
                 elif type(defn) == tuple:
                     #print("defn", defn)
@@ -617,17 +614,23 @@ class Diddy:
                     print (self.SFTs[name].dim, self.SFTs[name].nodes, self.SFTs[name].topology, self.SFTs[name].alph)
                     
             elif cmd == "info":
-                names = [arg[0] for arg in args[0]]
+                names = args[0]
                 verbose = "verbose" in flags
                 if names:
                     for name in names:
                         print()
+                        found = False
                         if name in self.confs:
                             print(self.confs[name].info_string(name, verbose=verbose))
+                            found = True
                         if name in self.SFTs:
                             print(self.SFTs[name].info_string(name, verbose=verbose))
+                            found = True
                         if name in self.blockmaps:
                             print(self.blockmaps[name].info_string(name, verbose=verbose))
+                            found = True
+                        if not found:
+                            raise Exception("Unknown object: {}".format(name))
                 else:
                     print("Current environment")
                     print("Dimension: {}".format(self.dim))
@@ -849,7 +852,7 @@ class Diddy:
                         else:
                             sym, formula = rule
                             node = ()
-                        print("CA rule", node, sym, formula)
+                        #print("CA rule", node, sym, formula)
                         circ = compiler.formula_to_circuit(dom_nodes, dom_dim, dom_top, dom_alph, formula, self.externals, simplify="simplify" in flags)
                         circuits.append((node, sym, circ))
                 #print(circuits)

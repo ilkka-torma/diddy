@@ -78,7 +78,11 @@ def natural_range():
 # Set of nonnegative integers (union of ranges)
 natural_set = natural_range.sep_by(comma, min=1)
 
-### Command parser
+# FO formula, to be defined later
+formula = p.forward_declaration()
+quantified = p.forward_declaration()
+
+### Command arguments
 
 class ArgType(Flag):
     LABEL = auto()
@@ -91,195 +95,6 @@ class ArgType(Flag):
     MAPPING = auto() # mainly for weights
     FORMULA = auto()
     TOPOLOGY_KEYWORD = auto()
-                  
-class Command:
-    "A container for a Diddy command definition."
-    
-    def __init__(self, name, pos_args, opts=None, flags=None, aliases=None):
-        self.name = name
-        self.pos_args = pos_args
-        if opts is None:
-            opts = []
-        self.opts = opts
-        if flags is None:
-            flags = []
-        self.flags = flags
-        if aliases is None:
-            aliases = []
-        self.aliases = aliases
-
-# List of commands
-# Each entry has command names, positional arguments and types, optional arguments (whose values are flat), and flags
-commands = [
-    # Setting up the environment
-    Command("alphabet",
-            [ArgType.SIMPLE_LIST | ArgType.MAPPING],
-            opts = ["default"],
-            aliases = ["alph"]),
-    Command("topology",
-            [ArgType.TOPOLOGY_KEYWORD | ArgType.NESTED_LIST]),
-    Command("dim",
-            [ArgType.NUMBER],
-            opts = ["onesided"],
-            aliases = ["dimension"]),
-    Command("nodes",
-            [ArgType.SIMPLE_LIST | ArgType.MAPPING],
-            aliases = ["vertices"]),
-    Command("set_weights",
-            [ArgType.MAPPING]),
-    Command("save_environment",
-            [ArgType.LABEL]),
-    Command("load_environment",
-            [ArgType.LABEL]),
-    Command("run",
-            [ArgType.LABEL]),
-
-    # Defining objects
-    Command("sft",
-            [ArgType.LABEL, ArgType.FORMULA | ArgType.PATTERN_LIST],
-            aliases = ["SFT"],
-            opts = ["onesided"],
-            flags = ["simplify", "verbose"]),
-    Command("sofic1D",
-            [ArgType.LABEL, ArgType.LABEL],
-            aliases = ["sofic1d"]),
-    Command("trace",
-            [ArgType.LABEL, ArgType.LABEL, ArgType.SIMPLE_LIST, ArgType.NESTED_LIST],
-            opts = ["extra_rad"],
-            flags = ["onesided", "verbose"]),
-    Command("compute_forbidden_patterns",
-            [ArgType.LABEL],
-            opts = ["radius", "filename"],
-            aliases = ["calculate_forbidden_patterns"]),
-    Command("load_forbidden_patterns",
-            [ArgType.LABEL, ArgType.LABEL]),
-    Command("determinize",
-            [ArgType.LABEL]), 
-    Command("minimize",
-            [ArgType.LABEL]),        
-    Command("wang",
-            [ArgType.LABEL, "tiles", ArgType.NESTED_LIST],
-            opts = ["inverses"],
-            flags = ["topology", "use_topology", "custom_topology"],
-            aliases = ["Wang"]),
-    Command("intersection",
-            [ArgType.LABEL, ArgType.SIMPLE_LIST]),
-    Command("union",
-            [ArgType.LABEL, ArgType.SIMPLE_LIST]),
-    Command("product",
-            [ArgType.LABEL, ArgType.SIMPLE_LIST],
-            opts = ["tracks", "env"]),
-    Command("block_map",
-            [ArgType.LABEL, ArgType.NESTED_LIST],
-            opts = ["domain", "codomain"],
-            flags = ["simplify", "verbose"],
-            aliases = ["blockmap", "CA"]),
-    Command("compose",
-            [ArgType.LABEL, ArgType.SIMPLE_LIST]),
-    Command("relation",
-            [ArgType.LABEL, ArgType.LABEL],
-            opts = ["tracks"]),
-    Command("preimage",
-            [ArgType.LABEL, ArgType.LABEL, ArgType.LABEL]),
-    Command("fixed_points",
-            [ArgType.LABEL, ArgType.LABEL]),
-    Command("spacetime_diagram",
-            [ArgType.LABEL, ArgType.LABEL],
-            opts = ["time_axis"],
-            flags = ["twosided"],
-            aliases = ["spacetime"]),
-    
-    # TFG stuff not implemented yet
-    Command("TFG",
-            [ArgType.LABEL, ArgType.NESTED_LIST],
-            aliases = ["topological_full_group_element"]),
-
-    # Printing objects' basic properties
-    Command("show_conf",
-            [ArgType.LABEL],
-            flags = ["hide_contents"],
-            aliases = ["print_conf"]),
-    Command("show_formula",
-            [ArgType.LABEL],
-            aliases = ["print_formula"]),
-    Command("show_parsed",
-            [ArgType.LABEL],
-            aliases = ["print_parsed"]),
-    Command("show_forbidden_patterns",
-            [ArgType.LABEL],
-            aliases = ["print_forbidden_patterns"]),
-    Command("show_graph",
-            [ArgType.LABEL],
-            aliases = ["print_graph"]),
-    Command("show_environment",
-            [],
-            opts = ["sft"]),
-    Command("info",
-            [ArgType.SIMPLE_LIST],
-            flags = ["verbose"]),
-
-    # Comparing objects
-    Command("empty",
-            [ArgType.LABEL],
-            opts = ["conf_name", "expect"],
-            flags = ["verbose"]),
-    Command("equal",
-            [ArgType.LABEL, ArgType.LABEL],
-            opts = ["method", "expect"],
-            flags = ["verbose"],
-            aliases = ["equals"]),
-    Command("contains",
-            [ArgType.LABEL, ArgType.LABEL],
-            opts = ["method", "expect", "conf_name"],
-            flags = ["verbose"],
-            aliases = ["contain"]),
-    Command("compare_sft_pairs", [],
-            opts = ["method"],
-            aliases = ["compare_SFT_pairs"]),
-    Command("compare_sft_pairs_equality", [],
-            opts = ["method"],
-            aliases = ["compare_SFT_pairs_equality"]),
-    Command("compute_CA_ball",
-            [ArgType.NUMBER, ArgType.SIMPLE_LIST],
-            opts = ["filename"],
-            aliases = ["calculate_CA_ball"]),
-
-    # Analyzing dynamical properties
-    Command("minimum_density",
-            [ArgType.LABEL, ArgType.SIMPLE_LIST],
-            opts = ["threads", "mode", "chunk_size", "symmetry", "print_freq_pop", "print_freq_cyc", "expect", "conf_name"],
-            flags = ["verbose", "rotate"]),
-    Command("density_lower_bound",
-            [ArgType.LABEL, ArgType.SIMPLE_LIST, ArgType.SIMPLE_LIST],
-            opts = ["radius", "print_freq", "expect"],
-            flags = ["verbose", "show_rules"]),
-    Command("entropy_upper_bound",
-            [ArgType.LABEL, ArgType.SIMPLE_LIST],
-            opts = ["radius"]),
-    Command("entropy_lower_bound",
-            [ArgType.LABEL, ArgType.SIMPLE_LIST, ArgType.SIMPLE_LIST]),
-    Command("TFG_loops",
-            [ArgType.LABEL, ArgType.LABEL],
-            aliases = ["topological_full_group_element_loops"]),
-
-    # Visualization / finding individual tilings in SFT
-    Command("tiler",
-            [ArgType.LABEL],
-            opts = ["x_size", "y_size", "node_offsets", "pictures", "gridmoves", "topology", "initial", "colors", "hidden"],
-            flags = ["x_periodic", "y_periodic"]),
-    Command("tile_box",
-            [ArgType.LABEL, ArgType.NUMBER]),
-    Command("keep_tiling",
-            [ArgType.LABEL],
-            opts = ["min", "max"]),
-
-    # Technical commands
-    Command("start_cache",
-            [ArgType.NUMBER, ArgType.NUMBER]),
-    Command("end_cache", [])
-]
-
-command_dict = {alias : cmd for cmd in commands for alias in [cmd.name] + cmd.aliases}
 
 # Unsigned integer (can be used as label)
 natural = lexeme(p.regex(r'0|[1-9]\d*').map(int))
@@ -309,9 +124,20 @@ def set_arg_value():
     yield lexeme(p.string('='))
     arg_value = yield fraction | label | nested_list | nested_mapping(node_name | label | integer, flat_value | nested_list)
     return (arg_name, arg_value)
+
+# Optinal argument / setter from given names
+def set_arg_value_of(name_dict):
+    @p.generate
+    def setter():
+        arg_name, kind = yield p.alt(*(lexeme(p.string(name)) >> p.success((name, item))
+                                       for (name, item) in name_dict.items()))
+        yield lexeme(p.string('='))
+        arg_value = yield kind
+        return (arg_name, arg_value)
+    return setter
     
 # Node name: period-separated sequence of labels
-node_name = (label | natural).sep_by(period, min=1).map(lambda items: tuple(items))
+node_name = (label | natural).sep_by(period, min=1).map(tuple)
 #node_name = (label | natural).sep_by(period, min=1).map(lambda items: items[0] if len(items) == 1  else tuple(items))
 
 # Vector or node vector
@@ -331,8 +157,10 @@ def mapping_pair(key, value):
     @p.generate("mapping pair")
     def part():
         the_key = yield key
+        #print("the key", the_key)
         yield colon
         val = yield value
+        #print("val", val)
         return (the_key, val)
     return part
 
@@ -348,6 +176,16 @@ def nested_mapping(key, value):
 # Mapping without braces
 def open_mapping(key, value):
     return mapping_pair(key, value).many().map(dict).desc("mapping")
+# Nested mapping with default value
+def nested_default_mapping(key, value, default=None):
+    @p.generate
+    def nested():
+        yield lbrace
+        elems = yield (mapping_pair(key, nested_default_mapping(key, value, default) | value) | key.map(lambda k: (k, default))).many().map(dict)
+        yield rbrace
+        return elems
+    return nested
+        
 
 # Pattern: vector:label/number mapping
 pattern = mapping(vector, label|fraction)
@@ -355,6 +193,27 @@ open_pattern = open_mapping(vector, label|fraction)
 
 # Flat value
 flat_value = vector | set_arg_value.desc("setter") | fraction | node_name | pattern
+
+# List of specified items
+def list_of(item):
+    @p.generate
+    def lst_of():
+        yield lbracket
+        vals = yield item.many()
+        yield rbracket
+        return vals
+    return lst_of
+
+# Possibly open list of specified items
+def olist_of(item):
+    @p.generate
+    def olst_of():
+        br = yield lbracket.optional()
+        vals = yield item.many()
+        if br:
+            yield rbracket
+        return vals
+    return olst_of
 
 # List (possibly nested) of numbers, vectors, labels, setters and patterns
 @p.generate("list")
@@ -367,192 +226,393 @@ def nested_list():
 # List without braces
 open_nested_list = nested_list.many().desc("list")
 
-# Parse a specific command based on its definition (do not parse the label)
-# TODO: finish
-# Once there are only list arguments left, it's possible to switch into "list mode" and read semicolon-separated open lists
-# The "setter list mode" also allows setter pairs in the list
-# If there is only one list argument left, it's possible to switch into "nested list mode" or "pattern mode" and read semicolon-separated open lists or open patterns, and pack them into a single list argument
-def command_args(cmd, index, args=None, opts=None, flags=None, mode="normal"):
-    if args is None:
-        args = []
+# Command argument parser
+# An argument spec is either:
+# a) a parser, to be used as such;
+# b) ("LIST", a1, ..., an), to be parsed as a possibly heterogenous list of length n; or
+# c) ("MANY", a), to be parsed as a list of a's of arbitrary length.
+# Trailing lists of depth 1 can be parsed in "list mode" as semicolon-separated open lists.
+# A trailing list of depth 2 can be parsed in "nested list mode" as semicolon-separated open lists.
+# Setting opts=flags=False prevents their parsing.
+
+# TODO: fix this
+# add separate modes for top level and list item
+def cmd_args(cmd, opts, flags, arg_specs, mode="normal", depth=0):
+    if opts is None:
         opts = dict()
-        flags = []
-    #print("command", cmd.name, "index", index, "mode", mode, "prev", args)
-    
+    if flags is None:
+        flags = set()
+    #print("cmdargs outer", cmd.name, arg_specs, mode)
     @p.generate
-    def parse_args():
-        nonlocal index
-        if mode == "normal":
-            # We are actually reading arguments
-            if index >= 0:
-                # Normal mode: parse options and keywords until a positional argument appears
-                while True:
-                    maybe_flag = yield (p.string('@') >> label).desc("flag").optional()
-                    if maybe_flag is not None:
-                        if maybe_flag not in cmd.flags:
-                            return p.fail("valid flag for {}".format(cmd.name))
-                        flags.append(maybe_flag)
-                        continue
-                    maybe_opt = yield set_arg_value.optional()
-                    if maybe_opt is not None:
-                        if maybe_opt[0] not in cmd.opts:
-                            return p.fail("valid option for {}".format(cmd.name))
-                        name, value = maybe_opt
-                        opts[name] = value
-                        continue
-                    break
-                # No more optional, keyword or positional arguments: return all data
-                if index == len(cmd.pos_args):
-                    return (cmd.name, args, opts, flags)
-                # Choose the argument parser(s) based on its expected type and try to apply each
-                # Accept the first one that succeeds
-                arg_type = cmd.pos_args[index]
-                arg_parsers = []
-                if ArgType.TOPOLOGY_KEYWORD in arg_type:
-                    arg_parsers.append(topology_keyword)
-                if ArgType.LABEL in arg_type:
-                    arg_parsers.append(label)
-                if ArgType.NUMBER in arg_type:
-                    arg_parsers.append(fraction)
-                if ArgType.SIMPLE_LIST in arg_type or ArgType.NESTED_LIST in arg_type or ArgType.PATTERN_LIST in arg_type:
-                    arg_parsers.append(nested_list)
-                if ArgType.PATTERN in arg_type:
-                    arg_parsers.append(pattern)
-                if ArgType.MAPPING in arg_type:
-                    arg_parsers.append(nested_mapping(flat_value, flat_value | nested_list))
-                if ArgType.FORMULA in arg_type:
-                    arg_parsers.append(quantified)
-                arg = yield p.alt(*arg_parsers)
-                args.append(arg)
-            # Choose the mode for the remaining arguments
-            # Normal mode is the default
-            next_modes = [command_args(cmd, index+1, args, opts, flags, "normal")]
-            # Non-normal modes can be forced with a semicolon, if applicable
-            # If we only have simple list arguments left, try list mode
-            if index < len(cmd.pos_args)-1 and all(ArgType.SIMPLE_LIST in typ or ArgType.MAPPING in typ for typ in cmd.pos_args[index+1:]):
-                next_modes.append(semicolon.optional() >> command_args(cmd, index+1, args.copy(), opts.copy(), flags.copy(), "list"))
-            if index < len(cmd.pos_args)-1 and all(ArgType.SETTER_LIST in typ for typ in cmd.pos_args[index+1:]):
-                next_modes.append(semicolon.optional() >> command_args(cmd, index+1, args.copy(), opts.copy(), flags.copy(), "setter_list"))
-            # If we have only one list argument left, try nested list or pattern modes
-            if index == len(cmd.pos_args)-2 and ArgType.NESTED_LIST in cmd.pos_args[index+1]:
-                next_modes.append(semicolon.optional() >> command_args(cmd, index+1, args.copy(), opts.copy(), flags.copy(), "nested_list"))
-            if index == len(cmd.pos_args)-2 and ArgType.PATTERN_LIST in cmd.pos_args[index+1]:
-                next_modes.append(semicolon.optional() >> command_args(cmd, index+1, args.copy(), opts.copy(), flags.copy(), "pattern_list"))
-            ret = yield p.alt(*next_modes)
-            return ret
-        elif mode == "list" or mode == "setter_list":
-            # List mode: read remaining arguments as semicolon-separated open lists
-            # Flags and optional arguments can be read, but in setter list mode they're interpreted as assignments
-            # May also read a mapping
-            while index <= len(cmd.pos_args):
-                curr_collection = None
-                while True:
-                    # Optional argument
-                    maybe_flag = yield (p.string('@') >> label).desc("flag").optional()
-                    if maybe_flag is not None:
-                        if maybe_flag not in cmd.flags:
-                            return p.fail("valid flag for {}".format(cmd.name))
-                        flags.append(maybe_flag)
-                        continue
-                    if mode == "list":
-                        maybe_opt = yield set_arg_value.optional()
-                        if maybe_opt is not None:
-                            if maybe_opt[0] not in cmd.opts:
-                                return p.fail("valid option for {}".format(cmd.name))
-                            name, value = maybe_opt
-                            opts[name] = value
-                            continue
-                    # Semicolon: finish current list and begin the next one
-                    # Also finish if we ran out of arguments
-                    maybe_sep = yield semicolon.optional()
-                    if maybe_sep:
-                        break
-                    # Otherwise, read an item and store it to the list
-                    maybe_pair = yield mapping_pair(flat_value, flat_value | nested_list).optional()
-                    if maybe_pair is not None:
-                        if curr_collection is None:
-                            curr_collection = dict()
-                        if type(curr_collection) == dict:
-                            curr_collection[maybe_pair[0]] = maybe_pair[1]
-                        else:
-                            yield p.fail("list item")
-                    else:
-                        maybe_item = yield flat_value.optional()
-                        if maybe_item is not None:
-                            if curr_collection is None:
-                                curr_collection = []
-                            if type(curr_collection) == list:
-                                curr_collection.append(maybe_item)
-                            else:
-                                yield p.fail("mapping item")
-                        else:
-                            break
-                # Store current list and increment index
-                args.append(curr_collection)
-                index += 1
-            return (cmd.name, args, opts, flags)
-        elif mode == "nested_list":
-            # Nested list mode: read the one remaining argument as a semicolon-separated list of open lists
-            # Flags can be read, but not options
-            lists = []
-            finding = True
-            while finding:
-                curr_list = []
-                while True:
-                    # Optional argument
-                    maybe_flag = yield (p.string('@') >> label).desc("flag").optional()
-                    if maybe_flag is not None:
-                        if maybe_flag not in cmd.flags:
-                            return p.fail("valid flag for {}".format(cmd.name))
-                        flags.append(maybe_flag)
-                        continue
-                    # Semicolon: finish current list and begin the next one
-                    # Also finish if we ran out of arguments
-                    maybe_sep = yield semicolon.optional()
-                    if maybe_sep:
-                        break
-                    # Otherwise, read an item and store it to the list
-                    item = yield (quantified | flat_value | nested_list).optional()
-                    if item is None:
-                        finding = False
-                        break
-                    else:
-                        curr_list.append(item)
-                lists.append(curr_list)
-            return (cmd.name, args+[lists], opts, flags)
-        elif mode == "pattern_list":
-            # As above, but with semicolon-separated open patterns
-            patterns = []
-            finding = True
-            while finding:
-                curr_pat = dict()
-                while True:
-                    # Optional argument
-                    maybe_flag = yield (p.string('@') >> label).desc("flag").optional()
-                    if maybe_flag is not None:
-                        if maybe_flag not in cmd.flags:
-                            return p.fail("valid flag for {}".format(cmd.name))
-                        flags.append(maybe_flag)
-                        continue
-                    # Semicolon: finish current list and begin the next one
-                    # Also finish if we ran out of arguments
-                    maybe_sep = yield semicolon.optional()
-                    if maybe_sep:
-                        break
-                    # Otherwise, read an item and store it to the list
-                    pair = yield mapping_pair(flat_value, flat_value | nested_list).optional()
-                    #print("pair", pair)
-                    if pair is None:
-                        finding = False
-                        break
-                    else:
-                        curr_pat[pair[0]] = pair[1]
-                patterns.append(curr_pat)
-            return (cmd.name, args+[patterns], opts, flags)
-        else:
-            raise Exception("Unknown parse mode: " + mode)
+    def parse_arg():
+        nonlocal cmd, opts, flags, arg_specs, mode, depth
+        debug_print = False
+        if debug_print: print("cmdargs inner", cmd.name, arg_specs, mode, depth)
         
-    return parse_args
+        # Parse options and flags
+        while opts != False and flags != False:
+            maybe_flag = yield (p.string('@') >> label).desc("flag").optional()
+            if maybe_flag is not None:
+                if maybe_flag not in cmd.flags:
+                    return p.fail("valid flag for {}".format(cmd.name))
+                flags.add(maybe_flag)
+                continue
+            the_opts = cmd.opts
+            if type(the_opts) == list:
+                maybe_opt = yield set_arg_value.optional()
+                if maybe_opt is not None:
+                    if maybe_opt[0] not in cmd.opts:
+                        return p.fail("valid option for {}".format(cmd.name))
+                    name, value = maybe_opt
+                    opts[name] = value
+                    continue
+            elif type(the_opts) == dict:
+                maybe_opt = yield set_arg_value_of(the_opts).optional()
+                if maybe_opt is not None:
+                    name, value = maybe_opt
+                    opts[name] = value
+                    continue
+            break
+        
+        if not arg_specs:
+            if mode == "normal":
+                yield p.peek(p.string('%') | p.eof)
+            return []
+        elif mode == "normal":
+            modes = []
+            if all(type(item) == list and item[0] in ["LIST","MANY"]
+                   for item in arg_specs):
+                modes.append("list")
+            if len(arg_specs) == 1 and type(arg_specs[0]) == list and\
+               arg_specs[0][0] in ["LIST","MANY"] and\
+               all(type(r) == list and r[0] in ["LIST","MANY"] for r in arg_specs[0][1:]):
+                modes.append("nested")
+            if len(arg_specs) == 1 and type(arg_specs[0]) == list and\
+               arg_specs[0][0] == "MANY" and\
+               type(arg_specs[0][1]) == list and arg_specs[0][1][0] == "MAP":
+                modes.append("map list")
+            if debug_print:print("possible modes", modes)
+            if modes:
+                res = yield p.alt(*[cmd_args(cmd, opts, flags, arg_specs, mode=newmode)
+                                    for newmode in modes]).optional()
+                if res is not None:
+                    return res
+                
+        if type(arg_specs[0]) == list and arg_specs[0][0] == "OR":
+            ret = yield p.alt(*[cmd_args(cmd, opts, flags, [term]+arg_specs[1:],
+                                         mode=mode, depth=depth+1)
+                                for term in arg_specs[0][1:]])
+            return ret
+        # Modes:
+        # normal -> parse a single argument normally
+        # list -> parse all remaining arguments as open lists, separated by semicolons
+        # nested -> parse the one remaining argument as open list of semicolon-separated open lists
+        # map list -> parse the one remaining argument as open list of semicolon-separated open patterns
+        # map in list -> parse one such mapping pair
+        if mode in ["list", "sublist"]:
+            if debug_print:print("mode", mode)
+            ret = []
+            for (i,spec) in enumerate(arg_specs):
+                if spec[0] == "LIST":
+                    lst = yield p.seq(*[cmd_args(cmd, opts, flags, [item], mode="item", depth=depth+1) for item in spec[1:]])
+                elif spec[0] == "MANY":
+                    if debug_print:print("mode list many, spec", spec)
+                    lst = yield cmd_args(cmd, opts, flags, [spec[1]], mode="item", depth=depth+1).many()
+                if i < len(arg_specs)-1:
+                    yield semicolon
+                if debug_print:print("got", lst, "as list")
+                #if lst[-1] == []:
+                #    lst = lst[:-1]
+                ret.append([item[0] for item in lst])
+            if debug_print:print("got", ret, "from mode", mode)
+            if mode == "list":
+                yield semicolon.optional() >> p.peek(p.string('%') | p.eof)
+            return ret
+        elif mode == "nested":
+            spec = arg_specs[0]
+            if spec[0] == "LIST":
+                ret = yield p.seq(*[(cmd_args(cmd, opts, flags, [subspec], mode="sublist", depth=depth+1) << semicolon.optional()) for subspec in spec[1:]])
+            elif spec[0] == "MANY":
+                ret = yield cmd_args(cmd, opts, flags, [spec[1]], mode="sublist", depth=depth+1).sep_by(semicolon)
+                yield semicolon.optional() >> p.peek(p.string('%') | p.eof)
+            if debug_print:print("got", ret, "from nested")
+            return [[y for [y] in ret]]
+        elif mode == "map list":
+            spec = arg_specs[0]
+            ret = yield cmd_args(cmd, opts, flags, [spec[1]], mode="map in list", depth=depth+1).many().sep_by(semicolon)
+            yield semicolon.optional() >> p.peek(p.string('%') | p.eof)
+            if debug_print:print("ret", ret, "from map list")
+            ret = [[{key : val for [(key, val)] in item} for item in ret]]
+            if debug_print:print("new ret", ret, "from map list")
+            return ret
+        elif mode == "map in list":
+            spec = arg_specs[0]
+            arg = yield mapping_pair(spec[1], spec[2])
+            return [arg]
+        elif mode in ["normal", "item"]:
+            # Parse one argument and recurse
+            spec = arg_specs[0]
+            rest = arg_specs[1:]
+            if isinstance(spec, p.Parser):
+                if debug_print:print("normal plain")
+                # We have a plain parser -> parse one item with it
+                arg = yield spec
+                if debug_print:print("got", arg, "from normal plain")
+            elif type(spec) != list:
+                raise Exception("Bad command spec: {}".format(spec))
+            elif spec[0] == "LIST":
+                if debug_print:print("normal list")
+                yield lbracket
+                arg = yield cmd_args(cmd, False, False, spec[1:], mode="item", depth=depth+1)
+                yield rbracket
+            elif spec[0] == "MANY":
+                if debug_print:print("normal many")
+                yield lbracket
+                arg = yield cmd_args(cmd, False, False, [spec[1]], mode="item", depth=depth+1).many()
+                yield rbracket
+                arg = [x[0] for x in arg]
+            elif spec[0] == "MAP":
+                if debug_print:print("normal map")
+                arg = yield mapping(spec[1], spec[2])
+                if debug_print:print("got from normal map", arg)
+            else:
+                raise Exception("Unknown command argument spec: {}".format(spec))
+            rest_args = yield cmd_args(cmd, opts, flags, rest, mode=mode, depth=depth+1)
+            if debug_print:print("returning", [arg]+rest_args, "from normal")
+            return [arg] + rest_args
+    return parse_arg
+
+### Command parser
+
+class Command:
+    "A container for a Diddy command definition."
+    
+    def __init__(self, name, pos_args, opts=None, flags=None, aliases=None):
+        self.name = name
+        self.pos_args = pos_args
+        if opts is None:
+            opts = []
+        self.opts = opts
+        if flags is None:
+            flags = []
+        self.flags = flags
+        if aliases is None:
+            aliases = []
+        self.aliases = aliases
+
+# List of commands
+# Each entry has command names, positional arguments and types, optional arguments (whose values are flat), and flags
+commands = [
+    # Setting up the environment
+    Command("alphabet",
+            [["OR",
+              ["MANY", label|natural],
+              mapping(node_name, label|natural|list_of(label|natural))]],
+            opts = {"default" : list_of(label|natural)},
+            aliases = ["alph"]),
+    Command("topology",
+            [["OR",
+              topology_keyword,
+              ["MANY", ["LIST", label, vector, vector]]]]),
+    Command("dim",
+            [natural],
+            opts = ["onesided"],
+            aliases = ["dimension"]),
+    Command("nodes",
+            [["OR",
+              ["MANY", node_name],
+              nested_default_mapping(label|natural, label|natural)]],
+            aliases = ["vertices"]),
+    Command("set_weights",
+            [mapping(node_name, fraction) | open_mapping(node_name, fraction)]),
+    Command("save_environment",
+            [label]),
+    Command("load_environment",
+            [label]),
+    Command("run",
+            [label]),
+
+    # Defining objects
+    Command("sft",
+            [label,
+             ["OR",
+              quantified,
+              ["MANY", ["MAP", vector, label | natural]]]],
+            aliases = ["SFT"],
+            opts = ["onesided"],
+            flags = ["simplify", "verbose"]),
+    Command("sofic1D",
+            [label, label],
+            aliases = ["sofic1d"]),
+    Command("trace",
+            [label,
+             label,
+             ["MANY", natural],
+             ["MANY",
+              ["OR",
+               label, # dir
+               ["LIST", label, natural], # per p
+               ["LIST", # [a b]
+                ["OR", ["LIST", label, natural], ["LIST", label, natural, natural]],
+                ["OR", ["LIST", label, natural], ["LIST", label, natural, natural]]]]]],
+            opts = ["extra_rad"],
+            flags = ["onesided", "verbose"]),
+    Command("compute_forbidden_patterns",
+            [label],
+            opts = ["radius", "filename"],
+            aliases = ["calculate_forbidden_patterns"]),
+    Command("load_forbidden_patterns",
+            [label, label]),
+    Command("determinize",
+            [label]),
+    Command("minimize",
+            [label]),        
+    Command("wang",
+            [label, "tiles", nested_list], # TODO: figure out how this works
+            opts = ["inverses"],
+            flags = ["topology", "use_topology", "custom_topology"],
+            aliases = ["Wang"]),
+    Command("intersection",
+            [label,
+             ["MANY", label]]),
+    Command("union",
+            [label,
+             ["MANY", label]]),
+    Command("product",
+            [label,
+             ["MANY", label]],
+            opts = {"tracks" : list_of(label|natural), "env" : label}),
+    Command("block_map",
+            [label,
+             ["OR",
+              ["MANY", ["LIST", label|integer, quantified]],
+              ["MANY", ["LIST", node_name, label|integer, quantified]]]],
+            opts = ["domain", "codomain"],
+            flags = ["simplify", "verbose"],
+            aliases = ["blockmap", "CA"]),
+    Command("compose",
+            [label,
+             ["MANY", label]]),
+    Command("relation",
+            [label, label],
+            opts = {"tracks" : list_of(label|natural)}),
+    Command("preimage",
+            [label, label, label]),
+    Command("fixed_points",
+            [label, label]),
+    Command("spacetime_diagram",
+            [label, label],
+            opts = ["time_axis"],
+            flags = ["twosided"],
+            aliases = ["spacetime"]),
+    
+    # TFG stuff not implemented yet
+    Command("TFG",
+            [label, "nested list"], # TODO
+            aliases = ["topological_full_group_element"]),
+
+    # Printing objects' basic properties
+    Command("show_conf",
+            [label],
+            flags = ["hide_contents"],
+            aliases = ["print_conf"]),
+    Command("show_formula",
+            [label],
+            aliases = ["print_formula"]),
+    Command("show_parsed",
+            [label],
+            aliases = ["print_parsed"]),
+    Command("show_forbidden_patterns",
+            [label],
+            aliases = ["print_forbidden_patterns"]),
+    Command("show_graph",
+            [label],
+            aliases = ["print_graph"]),
+    Command("show_environment",
+            [],
+            opts = ["sft"]),
+    Command("info",
+            [["MANY", label]],
+            flags = ["verbose"]),
+
+    # Comparing objects
+    Command("empty",
+            [label],
+            opts = ["conf_name", "expect"],
+            flags = ["verbose"]),
+    Command("equal",
+            [label, label],
+            opts = ["method", "expect"],
+            flags = ["verbose"],
+            aliases = ["equals"]),
+    Command("contains",
+            [label, label],
+            opts = ["method", "expect", "conf_name"],
+            flags = ["verbose"],
+            aliases = ["contain"]),
+    Command("compare_sft_pairs", [],
+            opts = ["method"],
+            aliases = ["compare_SFT_pairs"]),
+    Command("compare_sft_pairs_equality", [],
+            opts = ["method"],
+            aliases = ["compare_SFT_pairs_equality"]),
+    Command("compute_CA_ball",
+            [natural,
+             ["MANY", label]],
+            opts = ["filename"],
+            aliases = ["calculate_CA_ball"]),
+
+    # Analyzing dynamical properties
+    Command("minimum_density",
+            [label,
+             ["MANY", vector]],
+            opts = ["threads", "mode", "chunk_size", "symmetry", "print_freq_pop", "print_freq_cyc", "expect", "conf_name"],
+            flags = ["verbose", "rotate"]),
+    Command("density_lower_bound",
+            [label,
+             ["MANY", vector],
+             ["MANY", vector]],
+            opts = ["radius", "print_freq", "expect"],
+            flags = ["verbose", "show_rules"]),
+    Command("entropy_upper_bound",
+            [label,
+             ["MANY", natural]],
+            opts = ["radius"]),
+    Command("entropy_lower_bound",
+            [label,
+             ["MANY", natural],
+             ["MANY", natural]]),
+    Command("TFG_loops",
+            [label, label],
+            aliases = ["topological_full_group_element_loops"]),
+
+    # Visualization / finding individual tilings in SFT
+    Command("tiler",
+            [label],
+            opts = {"x_size" : natural,
+                    "y_size" : natural,
+                    "node_offsets" : mapping(node_name, list_of(fraction)),
+                    "pictures" : mapping(node_name, list_of(label)),
+                    "gridmoves" : list_of(list_of(fraction)),
+                    "topology" : label,
+                    "initial" : label,
+                    "colors" : mapping(label|natural, list_of(natural)),
+                    "hidden" : list_of(node_name)},
+            flags = ["x_periodic", "y_periodic"]),
+    Command("tile_box",
+            [label, natural]),
+    Command("keep_tiling",
+            [label],
+            opts = ["min", "max"]),
+
+    # Technical commands
+    Command("start_cache",
+            [natural, natural]),
+    Command("end_cache", [])
+]
+
+command_dict = {alias : cmd for cmd in commands for alias in [cmd.name] + cmd.aliases}
+
 
 # Parse any command
 @p.generate
@@ -560,8 +620,12 @@ def command():
     yield p.string('%')
     alias = yield label
     try:
-        com = yield command_args(command_dict[alias], -1)
-        return com
+        opts = dict()
+        flags = set()
+        cmd = command_dict[alias]
+        com = yield cmd_args(cmd, opts, flags, cmd.pos_args)
+        #print("parsed command", cmd.name, com, opts, flags)
+        return cmd.name, com, opts, flags
     except KeyError:
         yield p.fail("valid command name")
 
@@ -713,7 +777,7 @@ restrictions = lexeme(p.string('[')) >> restriction.many() << lexeme(p.string(']
 
 # Logical quantifier, potentially restricted
 @p.generate
-def quantified():
+def quantified_formula():
     #print("parsing quantified")
     the_quantifier = yield p.alt(p.string("AC") >> p.success("CELLFORALL"),
                                  p.string("EC") >> p.success("CELLEXISTS"),
@@ -727,6 +791,8 @@ def quantified():
     #print("parsed quantifier part", the_quantifier, var)
     the_formula = yield formula
     return (the_quantifier, var, restr or dict(), the_formula)
+
+quantified.become(quantified_formula)
 
 # Table of operators and their associativities
 # The first operator binds the loosest, the last one the tightest
@@ -755,7 +821,6 @@ def let_expr():
     return ("LET", tuple(call), result, rest)
 
 num_expr = p.forward_declaration()
-formula = p.forward_declaration()
 
 # A numeric let-in definition
 @p.generate

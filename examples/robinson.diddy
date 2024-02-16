@@ -1,4 +1,4 @@
--- Robinson tiling
+-- Robinson tiling (nonfunctional!)
 %nodes H V N E S W
 %alphabet default=[o l r I L R] {H : [0 1] V : [0 1]}
 %SFT robinson Ao
@@ -20,11 +20,12 @@ in
    rob o.W o.N o.E o.S) &
   o.H != o.(1,0).H &
   o.V != o.(0,1).V &
-  o.H = o.V = 1 ->
-  (cross o.N o.E o.S o.W |
-   cross o.E o.S o.W o.N |
-   cross o.S o.W o.N o.E |
-   cross o.W o.N o.E o.S)
+  (o.H = o.V = 1 ->
+   (cross o.N o.E o.S o.W |
+    cross o.E o.S o.W o.N |
+    cross o.S o.W o.N o.E |
+    cross o.W o.N o.E o.S))
 %tiler x_size=20 y_size=20
   node_offsets={H:[2/5 2/5] V:[3/5 3/5] N:[1/2 4/5] E:[4/5 1/2] S:[1/2 1/5] W:[1/5 1/2]}
+  colors={R:[255 0 0] L:[255 0 0] I:[0 255 0] r:[0 0 255] l:[0 0 255] o:[0 255 0] 0:[100 100 100] 1:[100 100 100]}
   robinson

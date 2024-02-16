@@ -10,12 +10,12 @@
 
 %nodes a b
 %topology
-rt (0,0,a) (0,0,b);
-rt (0,0,b) (1,0,a);
-lt (0,0,a) (-1,0,b);
-lt (0,0,b) (0,0,a);
-up (0,0,b) (0,1,b);
-dn (0,0,b) (0,-1,b)
+rt (0,0;a) (0,0;b);
+rt (0,0;b) (1,0;a);
+lt (0,0;a) (-1,0;b);
+lt (0,0;b) (0,0;a);
+up (0,0;b) (0,1;b);
+dn (0,0;b) (0,-1;b)
 
 -- Define identifying codes on this graph.
 %SFT idcode Ao let c p q := p~q=1 in (Ep[o1] p=1) & (Ap[o2] o!@p -> Eq[o1p1] ((c o q & p!~q) | (c p q & o!~q)))
@@ -27,6 +27,6 @@ dn (0,0,b) (0,-1,b)
 
 -- Compute a lower bound for the density using a linear program.
 -- This gives 0.35 = 7/20 in about 6 minutes.
-%density_lower_bound idcode (1,0) (0,1); (0,0,a) (0,0,b) (1,0,a) (-1,0,b) (0,1,b) (0,-1,b) (0,1,a) (0,-1,a) (1,0,b)
+%density_lower_bound idcode (1,0) (0,1); (0,0;a) (0,0;b) (1,0;a) (-1,0;b) (0,1;b) (0,-1;b) (0,1;a) (0,-1;a) (1,0;b)
 
 -- Hence, the minimum density of an identifying code on this graph is between 7/20 and 5/14.

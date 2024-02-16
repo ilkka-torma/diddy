@@ -24,7 +24,7 @@ circuit_variables are aa little tricky... they should be functions
 
 def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, externals, global_restr):
     #print("to_circuit", formula, "variables", variables)
-    #print("nodes", nodes)
+    #print("nodes", nodes, "topology", topology)
     if type(nodes) == list:
         nodes = sft.Nodes(nodes)
     #print("variables", variables)
@@ -793,8 +793,8 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes, top=True):
                     break
         else:
             # print("not edge", t, expr)
-            if i in nodes: # single thing => change node
-                pos = pos[:-1] + (i,)
+            if (i,) in nodes: # single thing => change node
+                pos = pos[:-1] + ((i,),)
                 continue
             if pos[-1] == ():
                 items = (i,)

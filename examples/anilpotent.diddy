@@ -2,12 +2,12 @@
 -- Symbols in let were missing from unit tests and accidentally stopped working at some point.
 %dim 1 -- dimension 1
 %alphabet 0 1 -- alphabet {0,1}
-%nodes 0 -- one node per cell
+%nodes -- no named nodes
 %topology -- standard topology for \Z
-rt (0,0) (1,0);
-lt (0,0) (-1,0);
+rt (0) (1);
+lt (0) (-1);
 %CA K
-0 1 -- the rule for writing symbol 1 is...
+1 -- the rule for writing symbol 1 is...
 Ao let x a b c d e f g := o=a & o.rt=b & o.rt.rt=c & o.rt.rt.rt=d & o.rt.rt.rt.rt=e & o.rt.rt.rt.rt.rt=f & o.rt.rt.rt.rt.rt.rt=g in
 x 0 1 1 1 0 0 0 |
 x 1 0 0 0 1 0 0 |
@@ -35,5 +35,5 @@ x 0 1 1 1 1 1 1
 --%calculate_CA_ball 10 K
 %compose K7 K K K K K K K
 %CA trivial
-0 0 Ao o=o
+0 Ao o=o
 %equal trivial K7

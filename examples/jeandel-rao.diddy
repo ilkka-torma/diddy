@@ -2,10 +2,10 @@
 %nodes N E S W
 %alphabet 0 1 2 3 4
 %topology
-up (0,0,N) (0,1,S);
-dn (0,0,S) (0,-1,N);
-rt (0,0,E) (1,0,W);
-lt (0,0,W) (-1,0,E)
+up (0,0;N) (0,1;S);
+dn (0,0;S) (0,-1;N);
+rt (0,0;E) (1,0;W);
+lt (0,0;W) (-1,0;E)
 %SFT JeandelRao ACo
 o.N = o.N.up & o.E = o.E.rt & (
 -- 1131
