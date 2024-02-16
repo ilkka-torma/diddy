@@ -178,7 +178,8 @@ class BlockMap:
         "Return a witness for inequality, or None if one does not exist"
         for ns in self.circuits:
             #print(ns)
-            ldac = LDAC2(self.from_alphabet) #lambda a: last_diff_and_count(a, len(self.to_alphabet))
+            #ldac = LDAC2(self.from_alphabet) #lambda a: last_diff_and_count(a, len(self.to_alphabet))
+            ldac = LDAC2(lambda nvec: self.from_alphabet[nvec[-1]])
             diff = equivalent_under(self.circuits[ns], other.circuits[ns], ldac, return_sep=True)
             if diff != True:
                 pat = dict()

@@ -362,8 +362,6 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
 
     # Shearing and stuff, i.e. what is x & y movement in grid visually
     #gridmoves = [(1, 0), (0, 1)]
-
-    nodesize = 12
      
     # This sets the margin between each cell
     #MARGIN = 3
@@ -373,6 +371,10 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
     
     camera = (x_size/2, y_size/2) # where we looking; center of screen is here
     zoom = (40, 40) # how big are cells basically
+
+    linknodesizeandzoom = True
+    shouldnodesize = 12
+    ratio = shouldnodesize/zoom[0]
     
     global screenwidth, screenheight
     screenwidth = 700
@@ -635,10 +637,10 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
         ctrl_modifier = bool(pygame.key.get_mods() & pygame.KMOD_CTRL)
         any_modifier = shift_modifier or ctrl_modifier
         mpos = pygame.mouse.get_pos()
+
+        zoommul = 1
         
         for event in events:  # User did something
-
-            
 
             manager.process_events(event)
 
@@ -842,7 +844,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
 
             if event.type == pygame.MOUSEWHEEL:
                 #print(event.x, event.y)
-                zoom = smul(1.01 ** event.y, zoom) # note that there is also zoom code elsewhere
+                #zoom = smul(1.01 ** event.y, zoom) # note that there is also zoom code elsewhere
+                zoommul *= 1.01 ** event.y
                 
             # end of event loop
 
@@ -879,16 +882,29 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
         if not cancel_non_UI:
             # note that there is also zoom code elsewhere
             if (keys[pygame.K_a] and not any_modifier):
-                zoom = smul(1.01, zoom)
+                zoommul *= 1.01 # = smul(1.01, zoom)
             if keys[pygame.K_z] and not any_modifier:
-                zoom = smul(1/1.01, zoom)
+                zoommul /= 1.01 # = smul(1/1.01, zoom)
+            
             if keys[pygame.K_s] and not any_modifier:
-                nodesize += 1
+                shouldnodesize += 1
+                ratio = shouldnodesize/zoom[0]
             if keys[pygame.K_x] and not any_modifier:
-                nodesize -= 1
-                if nodesize <= 1:
-                    nodesize = 1
+                shouldnodesize -= 1
+                if shouldnodesize <= 1:
+                    shouldnodesize = 1
+                ratio = shouldnodesize/zoom[0]
 
+
+        zoom = smul(zoommul, zoom)
+        if linknodesizeandzoom:
+            # recall ratio = nodesize/zoom
+            shouldnodesize = ratio*zoom[0]
+            nodesize = int(shouldnodesize)
+            if nodesize == 0:
+                nodesize = 1
+            
+            
         pos = cp_from_screen(mpos)
         #print(pos)
         pos = to_grid(*pos)
@@ -1061,6 +1077,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                             pygame.draw.circle(screen, YELLOW, cp_to_screen(p), nodesize+6)
                     elif (x,y,nodes[n]) in backend.selection():
                         pygame.draw.circle(screen, BLUE, cp_to_screen(p), nodesize+6)
+                        
                     if Noneish(conf[x,y,nodes[n]]):
                         continue
                     else:
@@ -1197,7 +1214,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
 
             draw_msg.append("Pan: arrow keys")
             draw_msg.append("Zoom: az")
-            draw_msg.append("Node size: sx")
+            if not linknodesizeandzoom:
+                draw_msg.append("Node size: sx")
             draw_msg.append("Toggle axis states: cv")
             draw_msg.append("Toggle cursor state: d")
             draw_msg.append("Deduce pattern: spacebar")

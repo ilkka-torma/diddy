@@ -1,5 +1,3 @@
--- As of writing, this is not working.
--- Symbols in let were missing from unit tests and accidentally stopped working at some point.
 %dim 1 -- dimension 1
 %alphabet 0 1 -- alphabet {0,1}
 %nodes -- no named nodes
