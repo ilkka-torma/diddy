@@ -475,6 +475,8 @@ commands = [
     Command("intersection",
             [label,
              ["MANY", label]]),
+    Command("sofic_image",
+            [label, label, label]),
     Command("union",
             [label,
              ["MANY", label]]),

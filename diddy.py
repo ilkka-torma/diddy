@@ -31,6 +31,8 @@ import math
 import blockmap
 import tfg
 
+import compute_sofic_image
+
 from basic_things import *
 
 class Diddy:
@@ -434,6 +436,24 @@ class Diddy:
                 if not the_ca.is_CA():
                     raise Exception("{} is not a CA".format(ca_name))
                 self.SFTs[sft_name] = the_ca.fixed_points()
+
+            elif cmd == "sofic_image":
+                sofic_image_name = args[0]
+                ca_name = args[1]
+                sofic_preimage_name = args[2]
+                try:
+                    the_ca = self.blockmaps[ca_name]
+                except KeyError:
+                    raise Exception("{} is not a CA".format(ca_name))
+                if not the_ca.is_CA():
+                    raise Exception("{} is not a CA".format(ca_name))
+                try:
+                    the_sofic = self.SFTs[sofic_preimage_name]
+                except KeyError:
+                    raise Exception("{} is not a sofic shift".format(sofic_preimage_name))
+                if not isinstance(the_sofic, sofic1d.Sofic1D):
+                    raise Exception("{} is not a sofic shift".format(sofic_preimage_name))
+                self.SFTs[sofic_image_name] = compute_sofic_image.sofic_from_BM_and_sofic(the_ca, the_sofic)
                 
             elif cmd == "minimum_density":
                 verbose_here = False

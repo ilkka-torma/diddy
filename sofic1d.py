@@ -22,7 +22,7 @@ def words(length, trans_alph, nodes, forbs):
                            for (i, syms2) in enumerate(word2)
                            for (sym, node) in zip(syms2, nodes))
                        for forb in forbs
-                       if max(p[0] for p in forb) < length):
+                       if max([p[0] for p in forb] + [0]) < length):
                     yield word2
 
 def connected(states, trans, trans_alph):
@@ -70,14 +70,23 @@ def connected(states, trans, trans_alph):
 
 class Sofic1D:
     """
-    A finite automaton representing a 1D sofic shift. May or may not be right resolving.
+    A finite automaton representing a 1D sofic shift.
+    May or may not be right resolving.
     The main data is trans, which is:
     a) a dict[state, sym] -> state if right resolving, or
     b) a dict[state, sym] -> set(state) if not.
     sym here is a tuple of symbols, one for each node
     """
     
-    def __init__(self, nodes, alph, topology, trans, right_resolving=False, onesided=False, trans_alph=None):
+    def __init__(self, nodes, alph, topology, trans,
+                 right_resolving=False, onesided=False, trans_alph=None,
+                 debug = True):
+        if debug or True:
+            print("debugging")
+            print(nodes)
+            print(alph)
+            print(topology)
+            print(trans)
         self.dim = 1
         self.nodes = nodes
         self.alph = alph
@@ -351,7 +360,7 @@ class Sofic1D:
         if is_empty:
             trans = {}
         else:
-            max_len = max(nvec[0] for forb in forbs for nvec in forb)
+            max_len = max([nvec[0] for forb in forbs for nvec in forb] + [0])
             trans_words = set(words(max_len+1, trans_alph, the_sft.nodes, forbs))
             trans = {(word[:-1], word[-1]) : word[1:]
                      for word in trans_words}

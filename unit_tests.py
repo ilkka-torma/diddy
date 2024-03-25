@@ -696,7 +696,6 @@ unit_tests.append(("tracks of varying depths", code))
 
 
 
-
 if __name__ == "__main__":
 
     t = time.time()
@@ -717,3 +716,6 @@ if __name__ == "__main__":
 
     print("All tests were successful.")
     print("time", total_time, "memory", start_mem, "->", end_mem)
+
+
+

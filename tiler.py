@@ -435,6 +435,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
     mouseisdown = False
     mouserisdown = False
     drawcolor = None
+    
 
     thred = None
 
@@ -573,6 +574,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
     
     show_help = True
     show_labels = True
+    show_markers = True
     
     selection_anchor = None
     selection = set()
@@ -748,8 +750,10 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                         backend.toggle_axis(1)
                     if ctrl_modifier: # paste from clipboard
                         pasting = True
-                if event.key == pygame.K_m:
+                if event.key == pygame.K_m and not ctrl_modifier:
                     backend.minimize_markers()
+                if event.key == pygame.K_m and ctrl_modifier:
+                    show_markers = not show_markers
                     
                 if event.key == pygame.K_h:
                     if not ctrl_modifier:
@@ -1159,27 +1163,29 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
                 a = (0, to_screen(0, q-0.5)[1])
                 b = (screenwidth, a[1])
                 pygame.draw.line(screen, color, cp_to_screen(a), cp_to_screen(b), width)
-        #if nnn%100 == 0: print("markers")
-        for (i, marker) in enumerate(conf.markers):
-            # x axis marker
-            #if nnn%100 == 0: print(i, marker)
-            for (j,q) in enumerate(marker):
-                width = 1
-                if j in [1, 2]:
-                    width = 3
-                draw_axis(q, i, GREEN, width)
-            if marker[0] == marker[1]:
-                draw_axis(marker[0], i, BLUE, 3)
-            if marker[2] == marker[3]:
-                draw_axis(marker[2], i, BLUE, 3)
                 
-        # draw moving markers
-        if moving_marker is not None:
-            # x axis marker
-            #if nnn%100 == 0: print(i, marker)
-            axis, marker = moving_marker
-            for (j,q) in enumerate(marker):
-                draw_axis(q, axis, WHITE, 1)
+        if show_markers:
+            #if nnn%100 == 0: print("markers")
+            for (i, marker) in enumerate(conf.markers):
+                # x axis marker
+                #if nnn%100 == 0: print(i, marker)
+                for (j,q) in enumerate(marker):
+                    width = 1
+                    if j in [1, 2]:
+                        width = 3
+                    draw_axis(q, i, GREEN, width)
+                if marker[0] == marker[1]:
+                    draw_axis(marker[0], i, BLUE, 3)
+                if marker[2] == marker[3]:
+                    draw_axis(marker[2], i, BLUE, 3)
+                    
+            # draw moving markers
+            if moving_marker is not None:
+                # x axis marker
+                #if nnn%100 == 0: print(i, marker)
+                axis, marker = moving_marker
+                for (j,q) in enumerate(marker):
+                    draw_axis(q, axis, WHITE, 1)
                     
         
                                
@@ -1224,6 +1230,7 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
             draw_msg.append("Set all nodes to unknown: shift-ctrl-e")
             draw_msg.append("Remove all nodes: shift-backspace")
             draw_msg.append("Minimize markers: m")
+            draw_msg.append("Toggle (showing) markers: ctrl+m")
             draw_msg.append("Copy selection: ctrl-c")
             draw_msg.append("Paste selection: ctrl-v")
             draw_msg.append("Undo: ctrl-z")

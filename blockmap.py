@@ -28,8 +28,8 @@ class BlockMap:
             self.circuits = circuits #[(n,a,circuits[(n,a)]) for (n,a) in circuits]
 
         # inputs can be messier, and we remove intersections and add defaults
-        # by default, default is first missing symbol, or first letter of alphabet
-        # if all appear...
+        # default is first missing symbol, if one is missing.
+        # but if all appear, we use the first letter of the alphabet.
         if type(circuits) == list:
             
             self.circuits = self.circuits_from_list(circuits, overlaps)
@@ -353,27 +353,23 @@ class BlockMap:
             
         return SFT(dim+1, nodes, alph, topology, circuit=AND(*anded), onesided=[time_axis] if onesided else [])
 
-    # pattern is just a dictionary from vectors to tuple of letters, we evaluate at origin
-    #def evaluate_on_explicit(pattern):
-    #    ...
-
     def get_neighborhood(self, only_cells):
         if not only_cells :
             raise Exception("Neighborhood in terms of nodes not implemented.")
         circs = self.circuits
         neighborhood = set()
-        for n in nodes:
-            for s in from_alph[n]:
+        for n in self.to_nodes:
+            for s in self.to_alphabet[n]:
                 for q in circs[n, s].get_variables():
-                    vec, n, s = q[:-2], q[-2], q[-1]
-                    neighborhood.add(vec)
-        return neighborhood
-
-    #def local_rule(self, pattern):
-    #    img_sym = ()
-    #    for n in self.from_nodes:
-    #        for a in self.from_alphabet[n]:
-                
+                    vec = q[:-2]
+                    neighborhood.add(vec) # drop node and symbol
+                    
+        # to prevent bugs and maybe remove special cases
+        # always give a nonempty nbhd (it's not guaranteed minimal anyway)
+        if len(neighborhood) == 0:
+            neighborhood.add((0,)*self.dimension)
+            
+        return neighborhood       
 
     """
     def explicit_local_rule(self, contiguous = False):
