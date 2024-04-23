@@ -457,6 +457,8 @@ commands = [
                 ["OR", ["LIST", label, natural], ["LIST", label, natural, natural]]]]]],
             opts = ["extra_rad"],
             flags = ["onesided", "verbose"]),
+    Command("language",
+            [label, label]),
     Command("compute_forbidden_patterns",
             [label],
             opts = ["radius", "filename"],

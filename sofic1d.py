@@ -2,6 +2,7 @@
 from general import *
 from basic_things import *
 from configuration import RecognizableConf
+from finite_automata import NFA
 import collections
 import sft
 from itertools import combinations
@@ -80,8 +81,8 @@ class Sofic1D:
     
     def __init__(self, nodes, alph, topology, trans,
                  right_resolving=False, onesided=False, trans_alph=None,
-                 debug = True):
-        if debug or True:
+                 debug = False):
+        if debug:
             print("debugging")
             print(nodes)
             print(alph)
@@ -758,6 +759,28 @@ class Sofic1D:
             trans.update({((st,1), sym) : set((res,1) for res in ress)
                           for ((st, sym), ress) in other.trans.items()})
         return Sofic1D(self.nodes, self.alph, self.topology, trans, right_resolving=self.right_resolving and other.right_resolving, onesided=self.onesided)
+
+    def language(self):
+        alph = self.trans_alph
+        states = self.states
+        trans = dict()
+        if self.right_resolving:
+            for st in states:
+                for sym in alph:
+                    try:
+                        trans[st, sym] = [self.trans[st, sym]]
+                    except KeyError:
+                        trans[st, sym] = []
+        else:
+            for st in states:
+                for sym in alph:
+                    try:
+                        trans[st, sym] = self.trans[st, sym]
+                    except KeyError:
+                        trans[st, sym] = []
+        aut = NFA(self.trans_alph, trans, states, states, states=states)
+        aut.rename()
+        return aut
         
 def intersection(*sofics):
     cur = sofics[0]

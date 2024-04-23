@@ -1,3 +1,5 @@
+import time
+
 class DFA:
 
     def __init__(self, alph, trans, init, finals, states=None):
@@ -9,6 +11,14 @@ class DFA:
             self.states = states
         self.init = init
         self.finals = finals
+
+    def info_string(self, name, verbose=False):
+        s = ["DFA {} on alphabet {} with {} states".format(name, self.alph, len(self.states))]
+        if verbose:
+            s.append("Transitions: {}".format(self.trans))
+            s.append("Initial state: {}".format(self.init))
+            s.append("Final states: {}".format(self.finals))
+        return "\n".join(s)
 
     def __call__(self, st, sym):
         return self.trans[st, sym]
@@ -160,6 +170,27 @@ class DFA:
         new_states = {new_coloring[st] for st in self.states}
         return DFA(self.alph, new_trans_dict, new_coloring[self.init], new_final_states, states=new_states)
 
+    def equals(self, other):
+        if isinstance(other, DFA):
+            reachables = {(self.init, other.init)}
+            frontier = list(reachables)
+            i = 0
+            while frontier:
+                newfrontier = []
+                for (st1, st2) in frontier:
+                    if (st1 in self.finals) != (st2 in other.finals):
+                        return False
+                    for sym in self.alph:
+                        new = (self(st1, sym), other(st2, sym))
+                        if new not in reachables:
+                            reachables.add(new)
+                            newfrontier.append(new)
+                frontier = newfrontier
+                i += 1
+            return True
+        else:
+            return self.contains(other) and other.contains(self)
+
     def contains(self, other, track=False, verbose=False):
         # DFA-XFA containment
         if isinstance(other, DFA):
@@ -191,7 +222,7 @@ class DFA:
                         return False
                     for sym in self.alph:
                         st3 = self(st1, sym)
-                        for st4 in self(st2, sym):
+                        for st4 in other(st2, sym):
                             new = (st3, st4)
                             if new not in reachables:
                                 reachables.add(new)
@@ -246,6 +277,14 @@ class NFA:
 
     def __call__(self, st, sym):
         return self.trans[st, sym]
+
+    def info_string(self, name, verbose=False):
+        s = ["NFA {} on alphabet {} with {} states".format(name, self.alph, len(self.states))]
+        if verbose:
+            s.append("Transitions: {}".format(self.trans))
+            s.append("Initial states: {}".format(self.inits))
+            s.append("Final states: {}".format(self.finals))
+        return "\n".join(s)
 
     def rev_trans(self):
         rev = {(st, sym) : [] for st in self.states for sym in self.alph}
@@ -467,7 +506,6 @@ class NFA:
         num_seen = 1
         
         i = 0
-        saved = 0
         while frontier:
             i += 1
             newfrontier = []
@@ -485,15 +523,16 @@ class NFA:
                         seen[new_st_set] = new_num
                         if any(x in self.finals for x in new_st_set):
                             new_finals.add(new_num)
-                        if self.has_sim:
-                            saved += len1 - len(new_st_set)
                     # Transitions are stored using the integer labels
                     det_trans[st_num, sym] = new_num
             frontier = newfrontier
             if verbose:
-                print("Round {}: {} states found, {} in frontier, {} substates saved by sim".format(i, num_seen, len(frontier), saved))
+                print("Round {}: {} states found, {} in frontier".format(i, num_seen, len(frontier)))
         
         return DFA(self.alph, det_trans, 0, new_finals, states=set(seen.values()))
+
+    def equals(self, other):
+        return self.contains(other) and other.contains(self)
     
     def contains(self, other, track=False, verbose=False):
         
@@ -505,8 +544,7 @@ class NFA:
         clock = time.perf_counter()
 
         # Keep track of (compressed) processed states of pair automaton, B is implicitly determinized
-        self_inits = compre(self.inits)
-        frontier = {(st, self_inits) for st in other.inits}
+        frontier = [(st, frozenset(self.inits)) for st in other.inits]
         #frontier = set([(init_A, inits_B, compre(init_A, inits_B))])
         if not track:
             reachables = {st : {comp} for (st, comp) in frontier}
@@ -528,7 +566,7 @@ class NFA:
                 print("{}: {} states processed, {} in frontier, in {:.3f} seconds.".format(i, sum(len(x) for x in reachables.values()), len(frontier), time.perf_counter()-clock))
                 #print("reachables", reachables)
             i += 1
-            newfrontier = set()
+            newfrontier = []
             
             #assert all(st_A in reachables and c_B in reachables[st_A] for (st_A, c_B) in frontier)
            
@@ -565,7 +603,7 @@ class NFA:
                                 reachables[new_st][new_comp] = old + [sym]
                             except KeyError:
                                 reachables[new_st] = {new_comp : old + [sym]}
-                        newfrontier.add((new_st, new_comp))
+                        newfrontier.append((new_st, new_comp))
             frontier = newfrontier
         if track:
             return (True, None)

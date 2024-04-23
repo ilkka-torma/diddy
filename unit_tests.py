@@ -694,6 +694,31 @@ rt (0;c) (1;c)
 """
 unit_tests.append(("tracks of varying depths", code))
 
+code = """
+%topology line
+%SFT gms Ao o=0 | o.rt=0
+%compute_forbidden_patterns gms
+%sofic1d gms_s gms
+%language aut gms_s
+%SFT gms2 Ao (o=o.rt=1 -> o.rt.rt=1) & (o=1 -> !(o.lt=o.lt.lt=1))
+%compute_forbidden_patterns gms2
+%sofic1d gms_s2 gms2
+%language aut2 gms_s2
+%equals expect=T aut aut2
+%determinize aut
+%minimize aut
+%equals expect=T aut aut2
+%determinize aut2
+%minimize aut2
+%equals expect=T aut aut2
+%SFT gms3 Ao o=0 | o.rt=0 | o.lt=0
+%compute_forbidden_patterns gms3
+%sofic1d gms_s3 gms3
+%language aut3 gms_s3
+%equals expect=F aut aut3
+"""
+unit_tests.append(("language comparison", code))
+
 
 
 if __name__ == "__main__":
