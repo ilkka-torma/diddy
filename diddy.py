@@ -14,6 +14,7 @@ import sys
 from general import *
 
 import compiler
+import regexp_compiler
 import sft
 import sofic1d
 import configuration
@@ -269,6 +270,14 @@ class Diddy:
                 sft_name = args[1]
                 verbose = "verbose" in flags
                 self.SFTs[name] = sofic1d.Sofic1D.from_SFT(self.SFTs[sft_name], verbose=verbose)
+
+            elif cmd == "regexp":
+                name = args[0]
+                regexp = args[1]
+                aut = regexp_compiler.compile_regexp(self.nodes, self.alphabet, regexp)
+                if "minimize" in flags:
+                    aut = aut.determinize().minimize()
+                self.automata[name] = aut
                 
             elif cmd == "determinize":
                 name = args[0]
@@ -1367,9 +1376,9 @@ def report_aut_contains(a, b, mode="report", truth=True, method=None, verbose=Fa
     res, word = aaut.contains(baut, verbose=verbose, track=True)
     tim = time.time() - tim
     if res:
-        print("%s CONTAINS %s (radius %s, time %s)" % (aname, bname, rad, tim))
+        print("%s CONTAINS %s (time %s)" % (aname, bname, tim))
     else:
-        print("%s DOES NOT CONTAIN %s (radius %s, time %s)" % (aname, bname, rad, tim))
+        print("%s DOES NOT CONTAIN %s (time %s)" % (aname, bname, tim))
         if mode == "report":
             print("Separated by {}".format(word))
     if mode == "assert":

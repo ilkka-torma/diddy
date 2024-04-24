@@ -259,11 +259,24 @@ class NFA:
         return self(alph, trans, {0}, {1})
 
     @classmethod
-    def empty_nfa(self, alph):
+    def empty_word(self, alph):
+        "NFA accepting only the empty word"
         trans = dict()
         for sym in alph:
             trans[0, sym] = []
         return self(alph, trans, {0}, {0})
+
+    @classmethod
+    def single_word(self, alph, word):
+        trans = dict()
+        for st in range(len(word)+1):
+            for sym in alph:
+                if st < len(word) and sym == word[st]:
+                    trans[st, sym] = [st+1]
+                else:
+                    trans[st, sym] = []
+        return self(alph, trans, {0}, {len(word)})
+                    
 
     def __init__(self, alph, trans, inits, finals, states=None):
         self.alph = alph
@@ -304,9 +317,9 @@ class NFA:
             trans[(0, st), sym] = {(0, st2) for st2 in sts}
             if st in self.finals:
                 trans[(0, st), sym] |= init_followers[sym]
-            if not sts.isdisjoint(self.finals):
+            if not set(sts).isdisjoint(self.finals):
                 trans[(0, st), sym] |= other_inits
-        for ((st, sym), sts) in self.trans.items():
+        for ((st, sym), sts) in other.trans.items():
             trans[(1, st), sym] = {(1, st2) for st2 in sts}
         inits = {(0, st) for st in self.inits}
         if not self.inits.isdisjoint(self.finals):
@@ -317,7 +330,7 @@ class NFA:
     def plus(self):
         trans = dict()
         for ((st, sym), sts) in self.trans.items():
-            trans[st, sym] = set(sts)
+            trans[st, sym] = sts = set(sts)
             if not sts.isdisjoint(self.finals):
                 trans[st, sym] |= self.inits
         return NFA(self.alph, trans, self.inits, self.finals)
@@ -325,7 +338,7 @@ class NFA:
     def star(self):
         trans = dict()
         for ((st, sym), sts) in self.trans.items():
-            trans[st, sym] = set(sts)
+            trans[st, sym] = sts = set(sts)
             if not sts.isdisjoint(self.finals):
                 trans[st, sym] |= self.inits
         return NFA(self.alph, trans, self.inits, self.inits | self.finals)
@@ -382,7 +395,7 @@ class NFA:
             other = other.to_nfa()
         states = {(i, st)
                   for (i, aut) in enumerate([self, other])
-                  for (st, sim) in aut.states.items()}
+                  for st in aut.states}
         inits = {(i, st) for (i, aut) in enumerate([self, other]) for st in aut.inits}
         finals = {(i, st) for (i, aut) in enumerate([self, other]) for st in aut.finals}
         trans = {((i, st), sym) : [(i, st2) for st2 in sts]

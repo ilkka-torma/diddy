@@ -57,8 +57,8 @@ Actually, this allows initially writing whatever, and we should
 only take the limit set.
 """
 def compute_image(local_rule, sofic):
-    print(local_rule)
-    print(sofic)
+    #print(local_rule)
+    #print(sofic)
     radius, image_alphabet, local_rule = local_rule
     nodes, edges, alphabet = sofic
     initials = set([((), n) for n in nodes])
@@ -150,7 +150,7 @@ def sofic_from_BM_and_sofic(BM, sofic):
     #print(edges, "gilly")
     alphabet = list(sofic.trans_alph)
     tuple_sofic = states, edges, alphabet
-    print("esme", tuple_sofic)
+    #print("esme", tuple_sofic)
 
     # then from 1D block map we need (radius, image_alphabet, local rule)
     # get neighborhood as vectors \subset \Z^d
@@ -165,7 +165,7 @@ def sofic_from_BM_and_sofic(BM, sofic):
 
     # given a word of length radius + 1, evaluate the BlockMap circuit(s)
     def local_rule(w):
-        print("evaling", w)
+        #print("evaling", w)
         # convert to pattern (= truth values for variables)
         pattern = {}
         for v in nbhd:
@@ -176,7 +176,7 @@ def sofic_from_BM_and_sofic(BM, sofic):
                         pattern[v, n, s] = True
                     else:
                         pattern[v, n, s] = False
-        print(pattern)
+        #print(pattern)
         # now evaluate circuits
         result = []
         for n in BM.to_nodes:
@@ -187,7 +187,7 @@ def sofic_from_BM_and_sofic(BM, sofic):
                     break
             else:
                 raise Exception("Bug: BlockMap circuits do not cover all cases!")
-        print(result)
+        #print(result)
         return tuple(result)
 
     # compute the image as (seen_nodes, transitions, image_alphabet)
@@ -200,7 +200,7 @@ def sofic_from_BM_and_sofic(BM, sofic):
                         BM.to_topology, image[1],
                         right_resolving=False,
                         onesided=sofic.onesided,
-                        debug=True)
+                        debug=False)
     return s
 
 
