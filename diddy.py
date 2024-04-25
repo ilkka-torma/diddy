@@ -17,6 +17,8 @@ import compiler
 import regexp_compiler
 import sft
 import sofic1d
+import sofic_from_aut
+import finite_automata
 import configuration
 import circuit
 import abstract_SAT_simplify
@@ -266,17 +268,26 @@ class Diddy:
                 #print("CIRCUIT", circ)
                 
             elif cmd == "sofic1D":
-                name = args[0]
-                sft_name = args[1]
+                sofic_name = args[0]
+                name = args[1]
                 verbose = "verbose" in flags
-                self.SFTs[name] = sofic1d.Sofic1D.from_SFT(self.SFTs[sft_name], verbose=verbose)
+                if name in self.SFTs:
+                    self.SFTs[sofic_name] = sofic1d.Sofic1D.from_SFT(self.SFTs[name], verbose=verbose)
+                elif name in self.automata:
+                    if "forbs" in flags:
+                        self.SFTs[sofic_name] = sofic_from_aut.sofic_from_forbs(self.nodes, self.alphabet, self.topology, self.automata[name], onesided="onesided" in flags, verbose=verbose)
+                    else:
+                        self.SFTs[sofic_name] = sofic_from_aut.sofic_as_limit(self.nodes, self.alphabet, self.topology, self.automata[name], onesided="onesided" in flags, verbose=verbose)
 
             elif cmd == "regexp":
                 name = args[0]
                 regexp = args[1]
-                aut = regexp_compiler.compile_regexp(self.nodes, self.alphabet, regexp)
+                verbose = "verbose" in flags
+                aut = regexp_compiler.compile_regexp(self.nodes, self.alphabet, regexp, verbose=verbose)
                 if "minimize" in flags:
                     aut = aut.determinize().minimize()
+                if verbose:
+                    print("Produced {}-state {}.".format(len(aut.states), "DFA" if isinstance(aut, finite_automata.DFA) else "NFA"))
                 self.automata[name] = aut
                 
             elif cmd == "determinize":

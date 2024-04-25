@@ -741,6 +741,23 @@ code = """
 """
 unit_tests.append(("sofic image and regex", code))
 
+code = """
+%topology line
+%regexp r 0* 1 0*
+%sofic1d s r
+%regexp r2 1 0* 1
+%sofic1d s2 r2 @forbs
+%SFT step Ao o=1 -> o.rt=1
+%compute_forbidden_patterns step
+%sofic1d step_s step
+%CA xor
+1 Ao o!=o.rt
+%sofic_image s3 xor step_s
+%equal expect=T s s2
+%equal expect=T s2 s3
+"""
+unit_tests.append(("sofic from regexp", code))
+
 if __name__ == "__main__":
 
     t = time.time()

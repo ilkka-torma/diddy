@@ -2,6 +2,11 @@ import time
 
 class DFA:
 
+    @classmethod
+    def universal(self, alph):
+        trans = {(0, sym) : 0 for sym in alph}
+        return self(alph, trans, 0, {0})
+
     def __init__(self, alph, trans, init, finals, states=None):
         self.alph = alph
         self.trans = trans
@@ -76,44 +81,24 @@ class DFA:
         self.init = nums[self.init]
         self.finals = {nums[st] for st in self.finals}
 
-    def trim(self, forward=True, backward=True, verbose=False):
+    def trim(self, verbose=False):
         if verbose:
             print("Trimming {}-state DFA".format(len(self.states)))
-        if forward:
-            reachables = {self.init}
-            frontier = [self.init]
-            while frontier:
-                new_frontier = []
-                for st in frontier:
-                    for sym in self.alph:
-                        st2 = self(st, sym)
-                        if st2 not in reachables:
-                            reachables.add(st2)
-                            new_frontier.append(st2)
-                frontier = new_frontier
-            self.trans = {(st, sym) : st2 for ((st, sym), st2) in self.trans.items()
-                          if st in reachables}
-            self.states &= reachables
-            self.finals &= reachables
-        if backward:
-            rev_trans = {(st, sym) : [] for st in self.states for sym in self.alph}
-            for ((st, sym), st2) in self.trans.items():
-                rev_trans[st2, sym].append(st)
-            reachables = set(self.finals)
-            frontier = set(self.finals)
-            while frontier:
-                new_frontier = []
-                for st in frontier:
-                    for sym in self.alph:
-                        for st2 in rev_trans[st, sym]:
-                            if st2 not in reachables:
-                                reachables.add(st2)
-                                new_frontier.append(st2)
-                frontier = new_frontier
-            self.trans = {(st, sym) : st2 for ((st, sym), st2) in self.trans.items()
-                          if st in reachables}
-            self.states &= reachables
-            self.inits &= reachables
+        reachables = {self.init}
+        frontier = [self.init]
+        while frontier:
+            new_frontier = []
+            for st in frontier:
+                for sym in self.alph:
+                    st2 = self(st, sym)
+                    if st2 not in reachables:
+                        reachables.add(st2)
+                        new_frontier.append(st2)
+            frontier = new_frontier
+        self.trans = {(st, sym) : st2 for ((st, sym), st2) in self.trans.items()
+                      if st in reachables}
+        self.states &= reachables
+        self.finals &= reachables
         if verbose:
             print("Trimmed to {} states".format(len(self.states)))
 
@@ -194,44 +179,65 @@ class DFA:
     def contains(self, other, track=False, verbose=False):
         # DFA-XFA containment
         if isinstance(other, DFA):
-            reachables = {(self.init, other.init)}
+            if track:
+                reachables = {(self.init, other.init) : []}
+            else:
+                reachables = {(self.init, other.init)}
             frontier = list(reachables)
             i = 0
             while frontier:
                 newfrontier = []
                 for (st1, st2) in frontier:
                     if st1 not in self.finals and st2 in other.finals:
-                        return False
+                        if track:
+                            return (False, reachables[st1, st2])
+                        else:
+                            return False
                     for sym in self.alph:
                         new = (self(st1, sym), other(st2, sym))
                         if new not in reachables:
-                            reachables.add(new)
+                            if track:
+                                reachables[new] = reachables[st1, st2] + [sym]
+                            else:
+                                reachables.add(new)
                             newfrontier.append(new)
                 frontier = newfrontier
                 i += 1
                 if verbose:
                     print("Round {}: {} states processed, {} in frontier".format(i, len(reachables), len(frontier)))
         else:
-            reachables = {(self.init, st) for st in other.inits}
+            if track:
+                reachables = {(self.init, st) : [] for st in other.inits}
+            else:
+                reachables = {(self.init, st) for st in other.inits}
             frontier = list(reachables)
             i = 0
             while frontier:
                 newfrontier = []
                 for (st1, st2) in frontier:
                     if st1 not in self.finals and st2 in other.finals:
-                        return False
+                        if track:
+                            return (False, reachables[st1, st2])
+                        else:
+                            return False
                     for sym in self.alph:
                         st3 = self(st1, sym)
                         for st4 in other(st2, sym):
                             new = (st3, st4)
                             if new not in reachables:
-                                reachables.add(new)
+                                if track:
+                                    reachables[new] = reachables[st1, st2] + [sym]
+                                else:
+                                    reachables.add(new)
                                 newfrontier.append(new)
                 frontier = newfrontier
                 i += 1
                 if verbose:
                     print("Round {}: {} states processed, {} in frontier".format(i, len(reachables), len(frontier)))
-        return True
+        if track:
+            return (True, None)
+        else:
+            return True
     
     
 class NFA:
@@ -361,8 +367,8 @@ class NFA:
                 for pair in frontier:
                     (st1, st2) = pair
                     for sym in self.alph:
-                        trans[(st1, st2), sym] = res = [(res1, other(st2, sym))
-                                                        for res1 in self(st1, sym)]
+                        trans[(st1, st2), sym] = res = {(res1, other(st2, sym))
+                                                        for res1 in self(st1, sym)}
                         for new in res:
                             if new not in states:
                                 states.add(new)
@@ -378,9 +384,9 @@ class NFA:
                 for pair in frontier:
                     (st1, st2) = pair
                     for sym in self.alph:
-                        trans[(st1, st2), sym] = res = [(res1, res2)
+                        trans[(st1, st2), sym] = res = {(res1, res2)
                                                         for res1 in self(st1, sym)
-                                                        for res2 in other(st2, sym)]
+                                                        for res2 in other(st2, sym)}
                         for new in res:
                             if new not in states:
                                 states.add(new)
@@ -398,7 +404,7 @@ class NFA:
                   for st in aut.states}
         inits = {(i, st) for (i, aut) in enumerate([self, other]) for st in aut.inits}
         finals = {(i, st) for (i, aut) in enumerate([self, other]) for st in aut.finals}
-        trans = {((i, st), sym) : [(i, st2) for st2 in sts]
+        trans = {((i, st), sym) : {(i, st2) for st2 in sts}
                  for (i, aut) in enumerate([self, other])
                  for ((st, sym), sts) in aut.trans.items()}
         return NFA(self.alph, trans, inits, finals, states=states)
@@ -454,7 +460,7 @@ class NFA:
 
     def rename(self):
         nums = {st : i for (i, st) in enumerate(self.states)}
-        self.trans = {(nums[st], sym) : [nums[st2] for st2 in sts]
+        self.trans = {(nums[st], sym) : {nums[st2] for st2 in sts}
                  for ((st, sym), sts) in self.trans.items()}
         self.states = {nums[st] for st in self.states}
         self.inits = {nums[st] for st in self.inits}
@@ -495,7 +501,7 @@ class NFA:
                                 reachables.add(st2)
                                 new_frontier.append(st2)
                 frontier = new_frontier
-            self.trans = {(st, sym) : [st2 for st2 in sts if st2 in reachables]
+            self.trans = {(st, sym) : {st2 for st2 in sts if st2 in reachables}
                           for ((st, sym), sts) in self.trans.items()
                           if st in reachables}
             self.states &= reachables

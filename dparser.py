@@ -444,7 +444,8 @@ commands = [
             flags = ["simplify", "verbose"]),
     Command("sofic1D",
             [label, label],
-            aliases = ["sofic1d"]),
+            aliases = ["sofic1d"],
+            flags = ["forbs", "onesided", "verbose"]),
     Command("trace",
             [label,
              label,
@@ -460,7 +461,7 @@ commands = [
             flags = ["onesided", "verbose"]),
     Command("regexp",
             [label, regexp],
-            flags = ["minimize"]),
+            flags = ["minimize", "verbose"]),
     Command("language",
             [label, label]),
     Command("compute_forbidden_patterns",
@@ -930,21 +931,25 @@ formula.become(expr_with_ops(boolean_ops, quantified | let_expr | num_let_expr |
 empty_word_lang = lexeme(lparen) >> lexeme(rparen) >> p.success("EMPTYWORD")
 
 # Language consisting of a single word
-word_lang = ((label | natural).map(lambda sym: ("SYMBOL", sym)) | list_of(label | natural).map(lambda syms: ("SYMBOLS", syms))).at_least(1).map(lambda word: ("WORD", word))
+symbol_lang = ((label | natural).map(lambda sym: ("SYMBOL", sym)) | list_of(label | natural).map(lambda syms: ("SYMBOLS", syms)))
 
 # Regexp operation table
 regexp_ops = [
     # Boolean ops
     ("union", Assoc.RIGHT, [lexeme(p.string("|")) >> p.success(lambda x, y: ("UNION", x, y))]),
     ("intersection", Assoc.RIGHT, [lexeme(p.string("&")) >> p.success(lambda x, y: ("ISECT", x, y))]),
+    ("negation", Assoc.PREFIX, [lexeme(p.string("!")) >> p.success(lambda x: ("NOT", x))]),
+    # Containment
+    ("containment", Assoc.PREFIX, [lexeme(p.string("~")) >> p.success(lambda x: ("CONTAINS", x))]),
     # Concatenation
-    #("concatenation", Assoc.RIGHT, [p.success(lambda x, y: ("CONCAT", x, y))]),
+    ("concat", Assoc.RIGHT, [p.peek(regexp) >> p.success(lambda x, y: ("CONCAT", x, y))]),
     # Star
     ("star/plus", Assoc.SUFFIX, [lexeme(p.string("*")) >> p.success(lambda x: ("STAR", x)),
-                                 lexeme(p.string("+")) >> p.success(lambda x: ("PLUS", x))])]
+                                 lexeme(p.string("+")) >> p.success(lambda x: ("PLUS", x)),
+                                 lexeme(p.string("?")) >> p.success(lambda x: ("UNION", "EMPTYWORD", x))])]
 
 # Regular expression
-regexp.become(expr_with_ops(regexp_ops, empty_word_lang | word_lang | (lparen >> regexp << rparen)).at_least(1).map(lambda auts: reduce(lambda x,y: ("CONCAT", x, y), auts)))
+regexp.become(expr_with_ops(regexp_ops, empty_word_lang | symbol_lang | (lparen >> regexp << rparen)))#.at_least(1).map(lambda auts: reduce(lambda x,y: ("CONCAT", x, y), auts)))
 
 ### Testing
 
