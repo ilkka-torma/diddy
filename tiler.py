@@ -646,7 +646,8 @@ def run(the_SFT, topology, gridmoves, nodeoffsets,
 
             manager.process_events(event)
 
-            if event.type == pygame_gui.UI_BUTTON_START_PRESS:
+            if event.type == pygame_gui.UI_BUTTON_START_PRESS and show_help:
+                    
                 cancel_non_UI = True
                 #print("canceling")
                 filename = filename_box.get_text()
