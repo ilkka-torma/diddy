@@ -14,8 +14,11 @@ import sys
 from general import *
 
 import compiler
+import regexp_compiler
 import sft
 import sofic1d
+import sofic_from_aut
+import finite_automata
 import configuration
 import circuit
 import abstract_SAT_simplify
@@ -42,6 +45,7 @@ class Diddy:
         self.TFGs = {}
         self.clopens = {}
         self.confs = {}
+        self.automata = {}
         self.environments = {}
         self.nodes = sft.Nodes()
         self.alphabet = {() : [0, 1] for node in self.nodes}
@@ -264,20 +268,43 @@ class Diddy:
                 #print("CIRCUIT", circ)
                 
             elif cmd == "sofic1D":
-                name = args[0]
-                sft_name = args[1]
+                sofic_name = args[0]
+                name = args[1]
                 verbose = "verbose" in flags
-                self.SFTs[name] = sofic1d.Sofic1D.from_SFT(self.SFTs[sft_name], verbose=verbose)
+                if name in self.SFTs:
+                    self.SFTs[sofic_name] = sofic1d.Sofic1D.from_SFT(self.SFTs[name], verbose=verbose)
+                elif name in self.automata:
+                    if "forbs" in flags:
+                        self.SFTs[sofic_name] = sofic_from_aut.sofic_from_forbs(self.nodes, self.alphabet, self.topology, self.automata[name], onesided="onesided" in flags, verbose=verbose)
+                    else:
+                        self.SFTs[sofic_name] = sofic_from_aut.sofic_as_limit(self.nodes, self.alphabet, self.topology, self.automata[name], onesided="onesided" in flags, verbose=verbose)
+
+            elif cmd == "regexp":
+                name = args[0]
+                regexp = args[1]
+                verbose = "verbose" in flags
+                aut = regexp_compiler.compile_regexp(self.nodes, self.alphabet, regexp, verbose=verbose)
+                if "minimize" in flags:
+                    aut = aut.determinize().minimize()
+                if verbose:
+                    print("Produced {}-state {}.".format(len(aut.states), "DFA" if isinstance(aut, finite_automata.DFA) else "NFA"))
+                self.automata[name] = aut
                 
             elif cmd == "determinize":
                 name = args[0]
                 verbose = "verbose" in flags
-                self.SFTs[name].determinize(verbose=verbose)
+                if name in self.SFTs:
+                    self.SFTs[name].determinize(verbose=verbose)
+                elif name in self.automata:
+                    self.automata[name] = self.automata[name].determinize(verbose=verbose)
                 
             elif cmd == "minimize":
                 name = args[0]
                 verbose = "verbose" in flags
-                self.SFTs[name].minimize(verbose=verbose)
+                if name in self.SFTs:
+                    self.SFTs[name].minimize(verbose=verbose)
+                elif name in self.automata:
+                    self.automata[name] = self.automata[name].minimize(verbose=verbose)
 
             elif cmd == "intersection":
                 isect_name = args[0]
@@ -363,6 +390,17 @@ class Diddy:
                         self.nodes = env_nodes
                         self.topology = env_topology
                         self.alphabet = env_alphabet
+
+            elif cmd == "language":
+                lang_name = args[0]
+                sofic_name = args[1]
+                try:
+                    the_sofic = self.SFTs[sofic_name]
+                except KeyError:
+                    raise Exception("{} is not a 1D sofic shift".format(sofic_name))
+                if not isinstance(the_sofic, sofic1d.Sofic1D):
+                    raise Exception("{} is not a 1D sofic shift".format(sofic_name))
+                self.automata[lang_name] = the_sofic.language()
                         
             elif cmd == "trace":
                 trace_name = args[0]
@@ -649,6 +687,9 @@ class Diddy:
                         if name in self.blockmaps:
                             print(self.blockmaps[name].info_string(name, verbose=verbose))
                             found = True
+                        if name in self.automata:
+                            print(self.automata[name].info_string(name, verbose=verbose))
+                            found = True
                         if not found:
                             raise Exception("Unknown object: {}".format(name))
                 else:
@@ -708,9 +749,14 @@ class Diddy:
                     CA1 = self.blockmaps[name1]
                     CA2 = self.blockmaps[name2]
                     report_blockmap_equal((name1, CA1), (name2, CA2), mode=mode, truth=expect, verbose=verb)
+
+                elif name1 in self.automata and name2 in self.automata:
+                    aut1 = self.automata[name1]
+                    aut2 = self.automata[name2]
+                    report_aut_equal((name1, aut1), (name2, aut2), truth=expect, verbose=verb)
                 
                 else:
-                    raise Exception("%s or %s is not an SFT or block map." % (name1, name2))
+                    raise Exception("%s and %s are not comparable." % (name1, name2))
                 
                     #if i[1] not in clopens or i[2] not in clopens:
                     #    raise Exception("%s not a clopen set"i[1] )                
@@ -735,6 +781,15 @@ class Diddy:
                     elif item2 in self.confs:
                         conf = self.confs[item2]
                         report_SFT_in((item1, SFT1), (item2, conf), mode=mode, truth=expect)
+                    else:
+                        raise Exception("No SFT, sofic or configuration named {}".format(item2))
+                elif item1 in self.automata:
+                    aut1 = self.automata[item1]
+                    if item2 in self.automata:
+                        aut2 = self.automata[item2]
+                        report_aut_contains((item1, aut1), (item2, aut2), truth=expect, verbose=verb)
+                    else:
+                        raise Exception("No automaton named {}".format(item2))
                 else:
                     clopen1 = self.clopens[item1]
                     clopen2 = self.clopens[item2]
@@ -1323,6 +1378,40 @@ def report_blockmap_equal(a, b, mode="report", truth=True, verbose=False): # ver
     if mode == "assert":
         print(diff is None, "=", (truth == "T"))
         assert (diff is None) == (truth == "T")
+
+def report_aut_contains(a, b, mode="report", truth=True, method=None, verbose=False):
+    aname, aaut = a
+    bname, baut = b
+    print("Testing whether %s contains %s." % (aname, bname))
+    tim = time.time()
+    res, word = aaut.contains(baut, verbose=verbose, track=True)
+    tim = time.time() - tim
+    if res:
+        print("%s CONTAINS %s (time %s)" % (aname, bname, tim))
+    else:
+        print("%s DOES NOT CONTAIN %s (time %s)" % (aname, bname, tim))
+        if mode == "report":
+            print("Separated by {}".format(word))
+    if mode == "assert":
+        print(res, "=", (truth == "T"))
+        assert res == (truth == "T")
+    print()
+
+def report_aut_equal(a, b, mode="report", truth=True, verbose=False): # verbose does nothing here
+    aname, aaut = a
+    bname, baut = b
+    print("Testing whether finite automata %s and %s are equivalent." % (aname, bname))
+    tim = time.time()
+    res = aaut.equals(baut)
+    tim = time.time() - tim
+    if res:
+        print("They are EQUAL (time %s)." % (tim))
+    else:
+        print("They are DIFFERENT (time %s)." % (tim))
+    print()
+    if mode == "assert":
+        print(res, "=", (truth == "T"))
+        assert res == (truth == "T")
 
 def fix_filename(filename):
     if "." not in filename:

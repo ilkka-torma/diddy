@@ -694,7 +694,69 @@ rt (0;c) (1;c)
 """
 unit_tests.append(("tracks of varying depths", code))
 
+code = """
+%topology line
+%SFT gms Ao o=0 | o.rt=0
+%compute_forbidden_patterns gms
+%sofic1d gms_s gms
+%language aut gms_s
+%SFT gms2 Ao (o=o.rt=1 -> o.rt.rt=1) & (o=1 -> !(o.lt=o.lt.lt=1))
+%compute_forbidden_patterns gms2
+%sofic1d gms_s2 gms2
+%language aut2 gms_s2
+%equals expect=T aut aut2
+%determinize aut
+%minimize aut
+%equals expect=T aut aut2
+%determinize aut2
+%minimize aut2
+%equals expect=T aut aut2
+%SFT gms3 Ao o=0 | o.rt=0 | o.lt=0
+%compute_forbidden_patterns gms3
+%sofic1d gms_s3 gms3
+%language aut3 gms_s3
+%equals expect=F aut aut3
+"""
+unit_tests.append(("language comparison", code))
 
+code = """
+%topology line
+%SFT gms Ao o=0 | o.rt=0
+%compute_forbidden_patterns gms
+%sofic1d gms_s gms
+%language aut gms_s
+%SFT inc Ao o=1 -> o.rt=1
+%compute_forbidden_patterns inc
+%sofic1d inc_s inc
+%blockmap xor
+1 Ao o!=o.rt
+%sofic_image img xor inc_s
+%language aut2 img
+%regexp aut3 (1|())(0|01)*
+%regexp aut4 0*(1|())0*
+%equal expect=T aut aut3
+%equal expect=T aut2 aut4
+%contains expect=T aut aut2
+%contains expect=F aut2 aut
+"""
+unit_tests.append(("sofic image and regex", code))
+
+code = """
+%topology line
+%regexp r 0* 1 0*
+%sofic1d s r
+%regexp r2 1 0* 1
+%sofic1d s2 r2 @forbs
+%SFT step Ao o=1 -> o.rt=1
+%compute_forbidden_patterns step
+%sofic1d step_s step
+%CA xor
+1 Ao o!=o.rt
+%sofic_image s3 xor step_s
+%equal expect=T s s2
+%equal expect=T s2 s3
+"""
+unit_tests.append(("sofic from regexp", code))
 
 if __name__ == "__main__":
 

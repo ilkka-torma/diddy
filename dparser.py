@@ -78,9 +78,10 @@ def natural_range():
 # Set of nonnegative integers (union of ranges)
 natural_set = natural_range.sep_by(comma, min=1)
 
-# FO formula, to be defined later
+# Stuff to be defined later
 formula = p.forward_declaration()
 quantified = p.forward_declaration()
+regexp = p.forward_declaration()
 
 ### Command arguments
 
@@ -443,7 +444,8 @@ commands = [
             flags = ["simplify", "verbose"]),
     Command("sofic1D",
             [label, label],
-            aliases = ["sofic1d"]),
+            aliases = ["sofic1d"],
+            flags = ["forbs", "onesided", "verbose"]),
     Command("trace",
             [label,
              label,
@@ -457,6 +459,11 @@ commands = [
                 ["OR", ["LIST", label, natural], ["LIST", label, natural, natural]]]]]],
             opts = ["extra_rad"],
             flags = ["onesided", "verbose"]),
+    Command("regexp",
+            [label, regexp],
+            flags = ["minimize", "verbose"]),
+    Command("language",
+            [label, label]),
     Command("compute_forbidden_patterns",
             [label],
             opts = ["radius", "filename"],
@@ -643,6 +650,7 @@ diddy_file = many_strict(command)
 # Chain joins the propositions with ANDs
 class Assoc(Flag):
     PREFIX = auto()
+    SUFFIX = auto()
     LEFT = auto() # unused for now
     RIGHT = auto()
     FLATTEN = auto()
@@ -666,6 +674,11 @@ def expr_with_ops(prec_table, atomic, prec_index=0):
                 prefixes = yield p.alt(*operators).many()
                 value = yield parse_next
                 ret = reduce(lambda val, op: op(val), reversed(prefixes), value)
+            if assoc == Assoc.SUFFIX:
+                # Parse a chain of suffix operators
+                value = yield parse_next
+                suffixes = yield p.alt(*operators).many()
+                ret = reduce(lambda val, op: op(val), suffixes, value)
             elif assoc == Assoc.LEFT:
                 # Parse tokens separated by a left associative operator
                 raise NotImplementedError
@@ -912,8 +925,31 @@ num_expr.become(expr_with_ops(numeric_ops, count_list | count_quantified | sym_t
 formula.become(expr_with_ops(boolean_ops, quantified | let_expr | num_let_expr | num_comparison | node_expr | bool_or_call | (lparen >> formula << rparen)))
 
 
+### Regexp parser
 
+# Language consisting of the empty word
+empty_word_lang = lexeme(lparen) >> lexeme(rparen) >> p.success("EMPTYWORD")
 
+# Language consisting of a single word
+symbol_lang = ((label | natural).map(lambda sym: ("SYMBOL", sym)) | list_of(label | natural).map(lambda syms: ("SYMBOLS", syms)))
+
+# Regexp operation table
+regexp_ops = [
+    # Boolean ops
+    ("union", Assoc.RIGHT, [lexeme(p.string("|")) >> p.success(lambda x, y: ("UNION", x, y))]),
+    ("intersection", Assoc.RIGHT, [lexeme(p.string("&")) >> p.success(lambda x, y: ("ISECT", x, y))]),
+    ("negation", Assoc.PREFIX, [lexeme(p.string("!")) >> p.success(lambda x: ("NOT", x))]),
+    # Containment
+    ("containment", Assoc.PREFIX, [lexeme(p.string("~")) >> p.success(lambda x: ("CONTAINS", x))]),
+    # Concatenation
+    ("concat", Assoc.RIGHT, [p.peek(regexp) >> p.success(lambda x, y: ("CONCAT", x, y))]),
+    # Star
+    ("star/plus", Assoc.SUFFIX, [lexeme(p.string("*")) >> p.success(lambda x: ("STAR", x)),
+                                 lexeme(p.string("+")) >> p.success(lambda x: ("PLUS", x)),
+                                 lexeme(p.string("?")) >> p.success(lambda x: ("UNION", "EMPTYWORD", x))])]
+
+# Regular expression
+regexp.become(expr_with_ops(regexp_ops, empty_word_lang | symbol_lang | (lparen >> regexp << rparen)))#.at_least(1).map(lambda auts: reduce(lambda x,y: ("CONCAT", x, y), auts)))
 
 ### Testing
 
