@@ -24,6 +24,8 @@ circuit_variables are aa little tricky... they should be functions
 
 def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, externals, global_restr):
     #print("to_circuit", formula, "variables", variables)
+    #print([n for n in nodes])
+    #a = bbb
     #print("nodes", nodes, "topology", topology)
     if type(nodes) == list:
         nodes = sft.Nodes(nodes)
@@ -373,6 +375,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, exte
             if not p1ispos and p2ispos:
                 p1, p2val = p2, p1val
             #print("here p1", p1, "p2val", p2val)
+            #pina = wfe
             local_alph = alphabet[p1[-1]]
             if p2val not in local_alph:
                 ret = F
@@ -480,6 +483,7 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, exte
     return ret
 
 def formula_to_circuit(nodes, dim, topology, alphabet, formula, externals, simplify=True):
+    print(nodes, dim, topology, alphabet, formula, externals)
     variables = {}
     global_restr = []
     form = formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, externals, global_restr)
@@ -487,6 +491,8 @@ def formula_to_circuit(nodes, dim, topology, alphabet, formula, externals, simpl
     form = tech_simp(AND(*([form]+global_restr)))
     if simplify:
         _, form = ass.simplify_circ_eqrel(form)
+    print(form)
+    a = Bb
     return form
     
 def sum_circuit(summands, global_restr):
@@ -774,7 +780,7 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes, top=True):
     #print(topology)
     for i in expr[2:]:
         #print("i", i)
-        # empty string means go to cell level
+        # underscore means go to cell level
         if i == '_':
             pos = pos[:-1] + ((),)
             continue
@@ -796,19 +802,22 @@ def eval_to_position(dim, topology, expr, pos_variables, nodes, top=True):
             if (i,) in nodes: # single thing => change node
                 pos = pos[:-1] + ((i,),)
                 continue
-            if pos[-1] == ():
-                items = (i,)
-            elif type(pos[-1]) == tuple:
+            #if pos[-1] == (): # removed because obviously does nothing
+            #    items = (i,)
+            #el
+            if type(pos[-1]) == tuple:
                 items = pos[-1] + (i,)
-            else:
-                items = (pos[-1], i)
+            #else: This is deprecated, nowadays cells are just cell + node ().
+            #    raise Exception("Aha")
+            #    items = (pos[-1], i)
             #print(nodes)
             if nodes.compatible(items):
                 pos = pos[:-1] + (items,)
             elif type(i) == tuple and len(i) == dim: # tuple of len dim => move
                 pos = vadd(pos[:-1], i) + (pos[-1],)
-            elif type(i) == tuple and len(i) == dim+1: # tuple of len dim+1 => both
-                pos = vadd(pos[:-1], i[:-1]) + (i[-1],)
+            #elif type(i) == tuple and len(i) == dim+1: # tuple of len dim+1 => both
+            #    pos = vadd(pos[:-1], i[:-1]) + (i[-1],)
+            #    a = bbb
             else:
                 # return None
                 raise Exception("Could not process transition {} from node {}".format(i, pos))
@@ -897,7 +906,7 @@ def get_ball(dim, topology, pos, radius, nodes):
         radius -= 1
         newfrontier = set()
         for f in frontier:
-            for n in get_nbhd(dim, topology, f):
+            for n in get_open_nbhd(dim, topology, f):
                 #print(n)
                 if n in ball:
                     continue
@@ -912,12 +921,15 @@ def get_open_nbhd(dim, topology, pos):
     for t in topology:
         a, b = t[1], t[2]
         # if pos is a, then we add b
-        if pos[dim] == None or t[1][dim] == pos[dim]:
+        #if pos[dim] == None or
+        if t[1][dim] == pos[dim]:
              v = vadd(vsub(pos[:-1], a[:-1]), b[:-1])
              ret.add(v + (b[-1],))
     return ret
 
 def get_closed_nbhd(dim, topology, pos):
+    return get_open_nbhd(dim, topology, pos).union(set([pos]))
+    """
     ret = set()
     if pos[-1] != None:
         ret.add(pos)
@@ -928,7 +940,9 @@ def get_closed_nbhd(dim, topology, pos):
              v = vadd(vsub(pos[:-1], a[:-1]), b[:-1])
              ret.add(v + (b[-1],))
     return ret
-        
+    """
+
+""" 
 def get_nbhd(dim, topology, pos):
     ret = set()
     for t in topology:
@@ -942,6 +956,7 @@ def get_nbhd(dim, topology, pos):
              v = vadd(vsub(pos[:-1], a[:-1]), b[:-1])
              ret.add(v + (b[-1],))
     return ret
+"""
 
 """
 def vsub(a, b):
@@ -971,8 +986,8 @@ def end_cache():
     circuit.Circuit.global_set = None
 
 
-"""
 # golden mean shift
+"""
 c = formula_to_circuit(nodes = [0], # N = nodes
                        dim = 2, # dimension
                        topology = [("up", (0,0,0), (0,1,0)),
@@ -984,13 +999,15 @@ c = formula_to_circuit(nodes = [0], # N = nodes
                        # Ao Av ||=o0=ov=v0
                        formula = ("NODEFORALL", "o", {},
                                   ("NODEFORALL", "v", {"o" : 1},
-                                   ("SETCIRCUIT", "c", ("F",),
+                                   ("SET", "c", ("F",),
                                     ("OR", ("HASVAL", "o", 0),
                                     ("POSEQ", "o", "v"),
                                     ("HASVAL", "v", 0),
-                                     ("CIRCUIT", "c"))))))
+                                     ("CIRCUIT", "c"))))),
+                       externals = [])
 
 print(c)
+a = bbb
 """
 
 """
