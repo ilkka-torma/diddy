@@ -17,3 +17,10 @@
 %CA xor
 0 Ao o=0&o.x=0 | o=1&o.x=1
 %has_post_inverse xor radius=5
+
+%graph Aleshin
+%alphabet 0 1 2
+%CA test
+0 Ao 0=1;
+1 Ao o=1 | (o.a=o.b & o.x=o.y) | (o.c=1<->o.C=1);
+%has_post_inverse test radius=3
