@@ -482,8 +482,9 @@ def formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, exte
     #print("ret", ret)
     return ret
 
-def formula_to_circuit(nodes, dim, topology, alphabet, formula, externals, simplify=True):
-    print(nodes, dim, topology, alphabet, formula, externals)
+def formula_to_circuit(nodes, dim, topology, alphabet, formula, externals, simplify=True, graph=None):
+    #print(nodes, dim, topology, alphabet, formula, externals)
+    assert graph==None
     variables = {}
     global_restr = []
     form = formula_to_circuit_(nodes, dim, topology, alphabet, formula, variables, externals, global_restr)
@@ -491,8 +492,8 @@ def formula_to_circuit(nodes, dim, topology, alphabet, formula, externals, simpl
     form = tech_simp(AND(*([form]+global_restr)))
     if simplify:
         _, form = ass.simplify_circ_eqrel(form)
-    print(form)
-    a = Bb
+    #print(form)
+    #a = Bb
     return form
     
 def sum_circuit(summands, global_restr):

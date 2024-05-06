@@ -13,7 +13,7 @@ import sys
 
 from general import *
 
-import compiler2 as compiler
+import compiler #2 as compiler
 import regexp_compiler
 import sft
 import sofic1d

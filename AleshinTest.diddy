@@ -12,3 +12,8 @@
 %CA spread0
 0 Ao o=0 | o.b=0
 %has_post_inverse spread0 radius=5
+
+%alphabet 0 1
+%CA xor
+0 Ao o=0&o.x=0 | o=1&o.x=1
+%has_post_inverse xor radius=5
