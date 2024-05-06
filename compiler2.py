@@ -113,7 +113,10 @@ def formula_to_circuit_(graph, topology, nodes, alphabet, formula, variables, ex
                 ret = T
                 for step in args[1:]:
                     try:
+                        print(variables, ("ADDR", node, step))
+
                         p = eval_to_position(graph, topology, nodes, ("ADDR", node, step), variables)
+                        print("speijf", p)
                         if p == None:
                             ret = F
                             break
@@ -774,12 +777,17 @@ def var_of_pos_expr(f):
 
 def eval_to_position(graph, topology, nodes, expr, pos_variables, top=True):
     #print("Evaluating to pos", graph, topology, nodes, expr, pos_variables, top)
+    ret = eval_to_position_(graph, topology, nodes, expr, pos_variables, top)
+    #print("Result", ret)
+    return ret
+
+def eval_to_position_(graph, topology, nodes, expr, pos_variables, top=True):
     # should be name of variable variable
     if type(expr) != tuple:
         pos = pos_variables[expr]
         # if not tuple, it's a chain of variables, just go down
         if type(pos) != tuple:
-            return eval_to_position(graph, topology, nodes, pos, pos_variables, top=False)
+            return eval_to_position_(graph, topology, nodes, pos, pos_variables, top=False)
         #print("got 1 pos", pos)
         return pos
     if expr[0] != "ADDR":
@@ -788,7 +796,7 @@ def eval_to_position(graph, topology, nodes, expr, pos_variables, top=True):
         return expr
     pos = pos_variables[expr[1]]
     if type(pos) != tuple:
-        pos = eval_to_position(graph, topology, nodes, pos, pos_variables, nodes, top=False)
+        pos = eval_to_position_(graph, topology, nodes, pos, pos_variables, nodes, top=False)
 
     #print("pos", pos, expr,  "going through topo")
     for i in expr[2:]:
@@ -816,40 +824,56 @@ def eval_to_position(graph, topology, nodes, expr, pos_variables, top=True):
         else:
             # nothing applicable found in topology, try moving in graph
             # by generator, direction
-            #print("kjerwf",i)
-            if type(i) == tuple and len(i) == 2 and graph.has_move(pos[0], i[0]):
-                #print("had")
+            #print("kjerwf", graph, pos[0], i, graph.has_cell(i))
+
+            # I think this is what moves SHOULD look like, because we do want to be able to go both ways
+            # but e.g. (0, 1) will be interpreted currently as a positive move by generator 0...
+            """if type(i) == tuple and len(i) == 2 and graph.has_move(pos[0], i[0]):
+                print("had")
                 newpos = graph.move(pos[0], i)
                 if newpos:
                     # copy node from previous, all cells have same nodes
                     pos = (newpos, pos[1])
-            # by just generator without direction
-            elif graph.has_move(pos[0], i):
+            """
+            if (i,) in nodes: # single thing => change node
+                    pos = (pos[0], (i,))
+                    continue
+            
+            # move to node
+            #print("stil2")
+            #if pos[1] == (): 
+            #    items = (i,)
+            #el
+            #print("here", i)
+            if type(pos[1]) == tuple:
+                items = pos[1] + (i,)
+            #else: # Deprecated, nowadays cells are just graph-cell + ()
+            #    items = (pos[1], i)
+            #print(nodes)
+            if nodes.compatible(items):
+                #print("compa")
+                pos = (pos[0], items)
+                continue
+            #else:
+                # finally assume it's an actual graph node
+                #print("kek")
+                #pos = graph.move_rel(pos[0], i), pos[1]
+            #else:
+            #    raise Exception("Could not process transition {} from node {}".format(i, pos))
+
+                        # by just generator without direction
+            if graph.has_move(pos[0], i):
+                #print("actualy")
                 newpos = graph.move(pos[0], (i, 1))
                 if newpos:
                     # copy node from previous, all cells have same nodes
                     pos = (newpos, pos[1])
-            else:
-                # move to node
-                if (i,) in nodes: # single thing => change node
-                    pos = (pos[0], (i,))
                     continue
-                #if pos[1] == (): 
-                #    items = (i,)
-                #el
-                if type(pos[1]) == tuple:
-                    items = pos[1] + (i,)
-                #else: # Deprecated, nowadays cells are just graph-cell + ()
-                #    items = (pos[1], i)
-                #print(nodes)
-                if nodes.compatible(items):
-                    pos = (pos[0], items)
-                else:
-                    # finally assume it's an actual graph node
-                    #print("kek")
-                    pos = graph.move_rel(pos[0], i), pos[1]
-                #else:
-                #    raise Exception("Could not process transition {} from node {}".format(i, pos))
+            elif graph.has_cell(i):
+                #print("here", pos, i, graph.move_rel(pos[0], i), pos[1])
+                pos = graph.move_rel(pos[0], i), pos[1]
+                continue
+            raise Exception("") # exception raised if 
         #print(pos)
     #print ("got 2 pos", pos)
     if top:

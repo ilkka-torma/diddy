@@ -2,6 +2,7 @@ import diddy
 import time
 
 unit_tests = []
+unit_tests2 = []
 
 # whether we test the ones that take like 10 seconds
 #long_ones_too = True <- currently nothing takes long

@@ -13,6 +13,7 @@ class Graph:
     #def __iter__(self): raise NotImplemented("__iter__ not implemented.")
     #def moves(self): raise NotImplemented("generators not implemented.")
     #def move(self, cell, generator): raise NotImplemented("move not implemented.")
+    #def has_cell(self, cell):
     # by default just check if it's one of the moves in general
     def has_move(self, cell, generator): return generator in self.moves()
     def ball(self, rad):
@@ -46,6 +47,8 @@ class AbelianGroup(Graph):
     def from_vector(self, v):
         assert len(v) == self.dim
         return tuple(v)
+    def has_cell(self, cell):
+        return type(cell) == tuple and all(map(lambda a:type(a) == int, cell)) and len(cell) == self.dim
     def move(self, cell, generator):
         gen, power = generator
         idx = self.generators.index(gen)
@@ -121,6 +124,9 @@ class SquareComplex(Graph):
     # we accept also upper case as move.
     def has_move(self, cell, m):
         return m.lower() in self.moves() or m.upper() in self.moves()
+    def has_cell(self, cell):
+        return type(cell) == tuple and len(cell) == 2 and \
+               all(a in self.V_colors for a in cell[0]) and all(a in self.H_colors for a in cell[1])
     def moves(self):
         return set(self.V_colors) | set(self.H_colors)
     def move(self, cell, generator):
