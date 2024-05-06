@@ -1,6 +1,14 @@
 %graph Aleshin
 %alphabet 0 1 2
-%CA test
-0 Ao o=2|o.a=o.b&o.x=1;
-1 Ao o=1|o.B=0
-%has_post_inverse test radius=3
+%CA FlipBefore2
+0 Ao o=0 & o.a!=2 | o=1 & o.a=2;
+1 Ao o=1 & o.a!=2 | o=0 & o.a=2;
+2 Ao o=2
+%has_post_inverse FlipBefore2 radius=0
+%has_post_inverse FlipBefore2 radius=1
+%has_post_inverse FlipBefore2 radius=2
+
+%alphabet 0 1
+%CA spread0
+0 Ao o=0 | o.b=0
+%has_post_inverse spread0 radius=5

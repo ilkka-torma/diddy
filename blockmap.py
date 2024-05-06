@@ -55,8 +55,7 @@ class BlockMap:
                 # all formulas are there, but we should possibly still add a default case
                 # if it's possible that no formula triggers; default is first letter then
                 else:
-                    # TODO: remove this or fix
-                    ldac = LDAC2(self.from_alphabet)
+                    ldac = LDAC2(lambda a:self.from_alphabet[a[1]])
                     first_sym = from_alphabet[n][0]
                     if SAT_under(AND(*(NOT(b) for b in circs.values())), ldac):
                         if verbose:
