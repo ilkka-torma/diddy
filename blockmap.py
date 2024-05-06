@@ -12,12 +12,14 @@ variables in circuits are (vector, node, symbol) encodeed
 overlaps should be "ignore", "check" or "remove"
 """
 class BlockMap:
-    def __init__(self, from_alphabet, to_alphabet, from_nodes, to_nodes, dimension, circuits, from_topology, to_topology, overlaps="remove", verbose=False):
+    def __init__(self, from_alphabet, to_alphabet, from_nodes, to_nodes, dimension, circuits, from_topology,
+                 to_topology, overlaps="remove", verbose=False, graph=None):
         self.from_alphabet = from_alphabet
         self.to_alphabet = to_alphabet
         self.from_nodes = from_nodes
         self.to_nodes = to_nodes
         self.dimension = dimension
+        self.graph = graph # this overrides dimension if not None, for things that implement it
         self.from_topology = from_topology
         self.to_topology = to_topology
 
@@ -53,6 +55,7 @@ class BlockMap:
                 # all formulas are there, but we should possibly still add a default case
                 # if it's possible that no formula triggers; default is first letter then
                 else:
+                    # TODO: remove this or fix
                     ldac = LDAC2(self.from_alphabet)
                     first_sym = from_alphabet[n][0]
                     if SAT_under(AND(*(NOT(b) for b in circs.values())), ldac):
@@ -166,9 +169,8 @@ class BlockMap:
             return False
         if self.to_nodes != other.to_nodes:
             return False
-        #print("he")
+        # TODO: remove this or fix
         for ns in self.circuits:
-            #print(ns)
             ldac = LDAC2(self.from_alphabet) #lambda a: last_diff_and_count(a, len(self.to_alphabet))
             if not equivalent_under(self.circuits[ns], other.circuits[ns], ldac):
                 return False
@@ -195,7 +197,11 @@ class BlockMap:
                 return (ns, pat)
         return None
 
+    # this cannot be up to date because now we can have different alphabet for each node
+    """
     def injective_to_ball(self, r):
+        if self.graph != None:
+            return self.injective_to_graph_ball(r)
         # two circuits per position per letter
         # force images same
         # force preimage different
@@ -222,7 +228,42 @@ class BlockMap:
                 differents.append(XOR(V(origin + (n, a, "A")), V(origin + (n, a, "B"))))
         # all images must be the same, and some central node has diff preimage
         ret = UNSAT_under(AND(AND(*eq_circuits), OR(*differents)), LDAC2(self.from_alphabet))
+        return ret
+    """
 
+    def injective_to_graph_ball(self, r):
+        # two circuits per position per letter
+        # force images same
+        # force preimage different at origin
+        eq_circuits = []
+        for p in self.graph.ball(r):
+            #print(p)
+            for n in self.to_nodes:
+                for a in self.to_alphabet[n]:
+                    circA = self.circuits[(n, a)].copy()
+                    circB = self.circuits[(n, a)].copy()
+                    # shift the cell, i.e. not node or letter
+                    # and also add x at the end, we make two copies of each
+                    # def move_rel(self, cell, offset): = move to cell that is at offset relative to the input cell
+                    # x[2] is the VALUE of the cell, so label should be before for ldaccing to work
+                    def shift(x, label): return self.graph.move_rel(p, x[0]), x[1], label, x[2] #return vadd(v[:-2], p) + v[-2:] + (x,)
+                    transform(circA, lambda y:shift(y, "A"))
+                    #circuits[p + (n, a, 0)] = circA
+                    transform(circB, lambda y:shift(y, "B"))
+                    #circuits[p + (n, a, 1)] = circB
+                    eq_circuits.append(IFF(circA, circB))
+                    #print(IFF(circA, circB))
+                    
+        origin = self.graph.origin()
+        differents = []
+        for n in self.from_nodes:
+            for a in self.from_alphabet[n]:
+                differents.append(XOR(V((origin, n, "A", a)), V((origin, n, "B", a))))
+        # all images must be the same, and some central node has diff preimage
+        def lda(a):
+            #print(self.from_alphabet, a)
+            return self.from_alphabet[a[1]]
+        ret = UNSAT_under(AND(AND(*eq_circuits), OR(*differents)), LDAC2(lda))
         return ret
         
     def __repr__(self):

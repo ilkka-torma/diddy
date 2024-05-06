@@ -6,19 +6,6 @@ unit_tests = []
 # whether we test the ones that take like 10 seconds
 #long_ones_too = True <- currently nothing takes long
 
-
-code_basicc_comparisons = """
---%SFT hor_golden_mean_shift  Ao (o.rt.rt = 1 -> o.rt = 0) & Ae[o3] e.up = 0 | e.lt.up != e.rt.up.lt
-%SFT hor_golden_mean_shift3 Ao (o.(2,0) = 1 -> o.(1,0) = 0) & Ae[o3] e.(0,1) = 0 | e.(-1,1) != e.(0,1)
---%equal expect=T hor_golden_mean_shift3 hor_golden_mean_shift
-"""
-unit_tests.append(("basicc comparisons", code_basicc_comparisons))
-
-
-
-
-
-
 # just some basic checks
 code_basic_comparisons = """
 %SFT full_shift             Ao 0 = 0

@@ -116,6 +116,7 @@ def fraction():
 # Labels (of commands, alphabets, nodes etc.)
 label = lexeme(keyword.should_fail("keyword") >> p.regex(r'[a-zA-Z]\w*')).desc("label")
 topology_keyword = lexeme(p.regex(r'line|grid|square|squaregrid|king[0-9]*|kinggrid|triangle|trianglegrid|hex|hexgrid|CR')).desc("topology name")
+graph_keyword = lexeme(p.regex(r'Aleshin|none')).desc("graph name")
 
 # Optional argument / setter; value is a signed number or label
 # Type checking is not done at parse time
@@ -419,6 +420,9 @@ commands = [
             [natural],
             opts = ["onesided"],
             aliases = ["dimension"]),
+    Command("graph",
+            [graph_keyword]),
+    
     Command("nodes",
             [["OR",
               ["MANY", node_name],
@@ -502,6 +506,10 @@ commands = [
     Command("compose",
             [label,
              ["MANY", label]]),
+    Command("has_post_inverse",
+            [label],
+            opts = ["radius"],
+            aliases = ["has_retraction"]),
     Command("relation",
             [label, label],
             opts = {"tracks" : list_of(label|natural)}),

@@ -455,8 +455,12 @@ def formula_to_circuit_(graph, topology, nodes, alphabet, formula, variables, ex
     return ret
 
 # wrap to graph, use the new compiler, go back
-def formula_to_circuit(nodes, dim, topology, alphabet, formula, externals, simplify=True):
+def formula_to_circuit(nodes, dim, topology, alphabet, formula, externals, simplify=True, graph=None):
     #print(nodes, dim, topology, alphabet, formula, externals)
+
+    # Actual graph being used, so compile to modern format.
+    if graph!=None:
+        return formula_to_circuit2(graph, topology, nodes, alphabet, formula, externals, simplify)
 
     graph = graphs.AbelianGroup(range(dim))
     newtopology = []
@@ -494,7 +498,10 @@ def formula_to_circuit2(graph, topology, nodes, alphabet, formula, externals, si
         for n1 in nodes:
             for n2 in nodes:
                 for m in graph.moves():
-                    topology.append([str(counter), graph.move(graph.origin(), m), n1, n2])
+                    topology.append([str(counter), graph.move(graph.origin(), (m, 1)), n1, n2])
+                    counter += 1
+                    topology.append([str(counter), graph.move(graph.origin(), (m, -1)), n1, n2])
+                    counter += 1
             
     variables = {}
     global_restr = []
@@ -765,10 +772,6 @@ def var_of_pos_expr(f):
         f = f[1]
     return f
 
-# a position expression is a list where
-# we have first a position variable,
-# then a bunch of edges. we will go forward along
-# those edges
 def eval_to_position(graph, topology, nodes, expr, pos_variables, top=True):
     #print("Evaluating to pos", graph, topology, nodes, expr, pos_variables, top)
     # should be name of variable variable
@@ -797,10 +800,8 @@ def eval_to_position(graph, topology, nodes, expr, pos_variables, top=True):
 
         for t in topology:
             #print(t, i)
-            # check == 4 now
+            # all should have length 4 now: label, offset, fromnode, tonode
             if len(t) == 4:
-                #print("test edge", t)
-                # later it could ask the graph how to move around
                 name, offset, fromnode, tonode = t
                 if name == i and (pos[1] == () or fromnode == pos[1]):
                     #print("found edge", t)
@@ -815,12 +816,19 @@ def eval_to_position(graph, topology, nodes, expr, pos_variables, top=True):
         else:
             # nothing applicable found in topology, try moving in graph
             # by generator, direction
-            if type(i) == tuple and len(i) == 2 and graph.has_move(pos[0], i):
+            #print("kjerwf",i)
+            if type(i) == tuple and len(i) == 2 and graph.has_move(pos[0], i[0]):
                 #print("had")
                 newpos = graph.move(pos[0], i)
                 if newpos:
                     # copy node from previous, all cells have same nodes
-                    pos = (newpos, pos[1]) 
+                    pos = (newpos, pos[1])
+            # by just generator without direction
+            elif graph.has_move(pos[0], i):
+                newpos = graph.move(pos[0], (i, 1))
+                if newpos:
+                    # copy node from previous, all cells have same nodes
+                    pos = (newpos, pos[1])
             else:
                 # move to node
                 if (i,) in nodes: # single thing => change node

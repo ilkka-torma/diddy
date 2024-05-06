@@ -590,6 +590,8 @@ def last_diff_and_count2(circs, count):
             if v[:-1] not in lasts:
                 lasts[v[:-1]] = set()
             lasts[v[:-1]].add(v)
+    #print("ijrjf")
+    #print(lasts)
     newlasts = {} # change to variables
     for l in lasts:
         newlasts[l] = list(map(lambda a : V(a), lasts[l]))

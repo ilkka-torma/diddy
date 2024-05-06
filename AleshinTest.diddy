@@ -1,0 +1,6 @@
+%graph Aleshin
+%alphabet 0 1 2
+%CA test
+0 Ao o=2|o.a=o.b&o.x=1;
+1 Ao o=1|o.B=0
+%has_post_inverse test radius=3

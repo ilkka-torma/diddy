@@ -36,6 +36,8 @@ import tfg
 
 import compute_sofic_image
 
+import graphs
+
 from basic_things import *
 
 class Diddy:
@@ -51,6 +53,7 @@ class Diddy:
         self.alphabet = {() : [0, 1] for node in self.nodes}
         self.dim = 2
         self.topology = grid
+        self.graph = None
         #self.tiler_skew = 1 # actually skew is completely useless
         self.tiler_gridmoves = [(1,0), (0,1)]
         self.tiler_nodeoffsets = {() : (0,0)}
@@ -141,6 +144,15 @@ class Diddy:
                             self.alphabet[node] = local_alph
                 if None in self.alphabet.values():
                     raise Exception("Incomplete alphabet definition")
+
+            elif cmd == "graph":
+                grph = args[0]
+                if grph == "none":
+                    self.graph = None
+                else:
+                    self.topology = []
+                    if grph == "Aleshin":
+                        self.graph = graphs.Aleshin
                     
             elif cmd == "topology":
                 top = args[0]
@@ -247,7 +259,8 @@ class Diddy:
                     self.SFTs[name] = sft.SFT(self.dim, self.nodes, self.alphabet, self.topology, forbs=forbs, onesided=onesided)
                 elif type(defn) == tuple:
                     #print("defn", defn)
-                    circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet, defn, self.externals, simplify="simplify" in flags)
+                    circ = compiler.formula_to_circuit(self.nodes, self.dim, self.topology, self.alphabet,
+                                                       defn, self.externals, simplify="simplify" in flags)
                     #vardict = dict()
                     #inst = circuit.circuit_to_sat_instance(circ, vardict)
                     #import abstract_SAT_simplify
@@ -928,10 +941,12 @@ class Diddy:
                             sym, formula = rule
                             node = ()
                         #print("CA rule", node, sym, formula)
-                        circ = compiler.formula_to_circuit(dom_nodes, dom_dim, dom_top, dom_alph, formula, self.externals, simplify="simplify" in flags)
+                        circ = compiler.formula_to_circuit(dom_nodes, dom_dim, dom_top, dom_alph, formula,
+                                                           self.externals, simplify="simplify" in flags, graph=self.graph)
                         circuits.append((node, sym, circ))
                 #print(circuits)
-                self.blockmaps[name] = blockmap.BlockMap(dom_alph, cod_alph, dom_nodes, cod_nodes, dom_dim, circuits, dom_top, cod_top, overlaps=overlaps, verbose=verbose)
+                self.blockmaps[name] = blockmap.BlockMap(dom_alph, cod_alph, dom_nodes, cod_nodes,
+                                                         dom_dim, circuits, dom_top, cod_top, overlaps=overlaps, verbose=verbose, graph=self.graph)
 
             elif cmd == "TFG":
                 name = args[0]
@@ -996,6 +1011,15 @@ class Diddy:
                     for _ in blockmap.find_relations(generators, radius):
                         pass
                 print("Time to calculate ball: %s seconds." % (time.time() - t))
+
+            elif cmd == "has_post_inverse":
+                name = args[0]
+                the_bm = self.blockmaps[name]
+                # by default, we try to find inverse of radius 1 -- could be radius of given tho
+                rad = kwds.get("radius", 1) 
+                if mode == "report":
+                    print("Checking existence of post inverse (retraction) with radius %s." % rad)
+                print(the_bm.injective_to_graph_ball(int(rad)))
                 
             elif cmd == "tiler":
                 import tiler

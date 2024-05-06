@@ -21,7 +21,7 @@ class Graph:
         for i in range(rad):
             newfrontier = set()
             for f in frontier:
-                for g in self.generators():
+                for g in self.moves():
                     for candidate in [self.move(f, (g, 1)), self.move(f, (g, -1))]:
                         if candidate not in b:
                             newfrontier.add(candidate)
@@ -118,6 +118,9 @@ class SquareComplex(Graph):
         self.tiles = tiles
     def origin(self):
         return ("", "")
+    # we accept also upper case as move.
+    def has_move(self, cell, m):
+        return m.lower() in self.moves() or m.upper() in self.moves()
     def moves(self):
         return set(self.V_colors) | set(self.H_colors)
     def move(self, cell, generator):
@@ -149,7 +152,13 @@ class SquareComplex(Graph):
             else:
                 raise Exception("Move by %s failed in square complex at %s." % (generator, cell))
         return free_simplify(cell[0] + generator), newh
+    def move_rel(self, cell, offset):
+        #print("move_rel", cell, offset)
+        for s in offset[0] + offset[1]:
+            cell = self.move(cell, (s, 1))
+        return cell
         
+
 Aleshin = SquareComplex(["byay", "axby", "cxcy", "bxax", "cybx", "aycx"])    
 #o = Aleshin.origin()
 #print(o)
