@@ -4,7 +4,7 @@ requires = [
 	 "frozendict >= 2.3.2",
 	 "parsy >= 2.1",
 	 "PuLP >= 2.7.0",
-	 "python-sat >= 0.1.7",
+	 "python-sat >= 0.1.7.dev15",
 	 "pygame >= 2.4.0",
 	 "pygame-gui >= 0.6.9",
 	 "numpy >= 1.26.4"
@@ -31,3 +31,6 @@ license-files = ["LICEN[CS]E*"]
 [project.urls]
 Homepage = "https://github.com/ilkka-torma/diddy"
 Issues = "https://github.com/ilkka-torma/diddy/issues"
+
+[project.scripts]
+diddy = "diddy.diddy.__main__"
