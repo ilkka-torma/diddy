@@ -2,7 +2,7 @@ try:
     import dparser
     import parsy
 except ImportError as error:
-    print("Perhaps you have not installed the prerequisite modules for Diddy.")
+    print("Perhaps you have not installed the prerequisite modules for Griddy.")
     print("The file pip_installs.bat contains a list of pip installs you should perform.")
     import os
     if os.name == 'nt':
@@ -40,7 +40,7 @@ import graphs
 
 from basic_things import *
 
-class Diddy:
+class Griddy:
     def __init__(self):
         self.SFTs = {}
         self.blockmaps = {}
@@ -77,7 +77,7 @@ class Diddy:
     def run(self, code, mode="report", print_parsed=False):
         #print(code)
         try:
-            parsed = dparser.parse_diddy(code)
+            parsed = dparser.parse_griddy(code)
             if print_parsed:
                 print(parsed)
         except parsy.ParseError as e:
@@ -888,7 +888,7 @@ class Diddy:
                 self.SFTs[name] = sft.SFT(2, Wang_nodes, self.alphabet, circuit=circ, formula=formula)
 
             # caching is global, is that dangerous?
-            # in principle we could have a circuitset here in diddy,
+            # in principle we could have a circuitset here in griddy,
             # and (through compiler) tell Circuit that we are using one,
             elif cmd == "start_cache":
                 compiler.start_cache(args[0], args[1])
@@ -1439,7 +1439,7 @@ def report_aut_equal(a, b, mode="report", truth=True, verbose=False): # verbose 
 
 def fix_filename(filename):
     if "." not in filename:
-        return filename + ".diddy"
+        return filename + ".griddy"
     return filename
 
 
@@ -1507,16 +1507,16 @@ forced_repl = False
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
-    arg_parser.add_argument("filename", type=str, nargs='*', help="Name of Diddy script to execute.")
+    arg_parser.add_argument("filename", type=str, nargs='*', help="Name of Griddy script to execute.")
     arg_parser.add_argument('-r', '--repl', action='store_true', help="Open a basic read-eval-print-loop.")
 
     if len(sys.argv) == 1 and not forced_repl:
-        print("""If you want to test that Diddy is installed correctly, run \"python unit_tests.py\".
-You can test that Tiler works by running \"python diddy.py tiler_test\" and pressing spacebar.\n""")
+        print("""If you want to test that Griddy is installed correctly, run \"python unit_tests.py\".
+You can test that Tiler works by running \"python griddy.py tiler_test\" and pressing spacebar.\n""")
     
     args = arg_parser.parse_args()
 
-    runner = Diddy()
+    runner = Griddy()
 
     if len(args.filename) > 0:
         runner.run_file(args.filename[0])
@@ -1524,7 +1524,7 @@ You can test that Tiler works by running \"python diddy.py tiler_test\" and pres
         arg_parser.error("please supply the argument filename, the -r flag, or both")
 
     if args.repl or forced_repl:
-        print("Starting Diddy REPL mode.\nA command with ; at the end is run immediately.\nOtherwise a multiline input begins; then input an empty line to run and 'c' to cancel.\nInput 'quit' to quit.")
+        print("Starting Griddy REPL mode.\nA command with ; at the end is run immediately.\nOtherwise a multiline input begins; then input an empty line to run and 'c' to cancel.\nInput 'quit' to quit.")
         running = True
         while running:
             command = ""

@@ -1,5 +1,10 @@
-import diddy
+import os.path
+import sys
+sys.path.append(os.path.abspath(os.path.join(__file__, os.pardir, os.pardir, "src", "griddy")))
+import griddy
 import time
+
+print(griddy)
 
 unit_tests = []
 unit_tests2 = []
@@ -769,9 +774,9 @@ if __name__ == "__main__":
     start_mem = process.memory_info().rss/1000
 
     for (name, code) in unit_tests:
-        diddy_inst = diddy.Diddy()
+        griddy_inst = griddy.Griddy()
         print("Running test", name)
-        diddy_inst.run(code, "assert")
+        griddy_inst.run(code, "assert")
 #print("total time", time.time()-t)
     
     total_time = time.time() - t

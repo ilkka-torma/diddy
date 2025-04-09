@@ -12,7 +12,7 @@ requires = [
 build-backend = "hatchling.build"
 
 [project]
-name = "diddy"
+name = "griddy"
 version = "0.2"
 authors = [
   { name="Ville Salo", email="vosalo@utu.fi" },
@@ -29,8 +29,8 @@ license = "MIT"
 license-files = ["LICEN[CS]E*"]
 
 [project.urls]
-Homepage = "https://github.com/ilkka-torma/diddy"
-Issues = "https://github.com/ilkka-torma/diddy/issues"
+Homepage = "https://github.com/ilkka-torma/griddy"
+Issues = "https://github.com/ilkka-torma/griddy/issues"
 
 [project.scripts]
-diddy = "diddy.diddy.__main__"
+griddy = "griddy.griddy.__main__"

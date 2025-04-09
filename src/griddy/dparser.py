@@ -14,9 +14,9 @@ from functools import reduce, wraps
 
 ### Top-level parsing functions
 
-def parse_diddy(code):
-    "Parse a Diddy file. Return a list of commands or raise a ParseError."
-    return (whitespace >> diddy_file).parse(code)
+def parse_griddy(code):
+    "Parse a Griddy file. Return a list of commands or raise a ParseError."
+    return (whitespace >> griddy_file).parse(code)
     
 def parse_formula(code):
     "Parse a FO formula."
@@ -387,7 +387,7 @@ def cmd_args(cmd, opts, flags, arg_specs, mode="normal", depth=0):
 ### Command parser
 
 class Command:
-    "A container for a Diddy command definition."
+    "A container for a Griddy command definition."
     
     def __init__(self, name, pos_args, opts=None, flags=None, aliases=None):
         self.name = name
@@ -646,8 +646,8 @@ def command():
     except KeyError:
         yield p.fail("valid command name")
 
-# Parse a full Diddy file
-diddy_file = many_strict(command)
+# Parse a full Griddy file
+griddy_file = many_strict(command)
 
 
 ### Formula parser

@@ -1,6 +1,6 @@
 import sofic1d
 import blockmap
-import diddy
+import griddy
 
 import circuit
 from general import *
